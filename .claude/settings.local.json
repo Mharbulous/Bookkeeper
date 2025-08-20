@@ -17,7 +17,9 @@
       "Bash(cp:*)",
       "Bash(true)",
       "Bash(git submodule:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "WebSearch",
+      "WebFetch(domain:m3.material.io)"
     ],
     "deny": [],
     "ask": []
