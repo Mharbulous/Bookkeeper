@@ -7,7 +7,12 @@
       <div
         class="font-bold text-lg whitespace-nowrap opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100"
       >
-Vue Template
+BookKeeper
+      </div>
+      <div
+        class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 font-bold text-sm text-white opacity-100 transition-opacity duration-300 ease-in-out group-hover:opacity-0"
+      >
+BK
       </div>
       <div
         class="absolute right-5 top-1/2 transform -translate-y-1/2 text-base text-slate-400 opacity-100 transition-all duration-300 ease-in-out before:content-['❯'] group-hover:before:content-['❮']"
