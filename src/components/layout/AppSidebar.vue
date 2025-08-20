@@ -20,17 +20,29 @@ BK
     </div>
 
     <div class="py-0">
-      <router-link
-        to="/"
-        class="flex items-center py-3 px-3 text-slate-300 no-underline transition-all duration-200 ease-in-out relative cursor-pointer hover:bg-slate-600 hover:text-white"
-        :class="{ 'bg-brand-blue text-white': $route.path === '/' || $route.path === '/home' }"
-      >
-        <div class="min-w-[30px] h-[30px] mr-3 flex items-center justify-center">🏠</div>
-        <span
-          class="whitespace-nowrap opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100"
-          >Home</span
+      <div class="relative w-full cursor-pointer outline-none group" tabindex="0">
+        <router-link
+          to="/"
+          class="flex items-center py-3 px-3 text-slate-300 no-underline transition-all duration-200 ease-in-out relative cursor-pointer hover:bg-slate-600 hover:text-white"
+          :class="{ 'bg-brand-blue text-white': $route.path === '/' || $route.path === '/home' }"
         >
-      </router-link>
+          <div class="min-w-[30px] h-[30px] mr-3 flex items-center justify-center">📚</div>
+          <span
+            class="whitespace-nowrap opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100"
+            >Book Keeper</span
+          >
+          <div 
+            class="absolute right-2 opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100 text-slate-400"
+          >
+            ▼
+          </div>
+        </router-link>
+        
+        <!-- App Switcher Dropdown -->
+        <div class="hidden group-focus-within:block absolute top-full left-0 mt-2 z-[1100]">
+          <AppSwitcher />
+        </div>
+      </div>
     </div>
 
     <div class="py-0">
@@ -56,7 +68,24 @@ BK
 </template>
 
 <script>
+import AppSwitcher from '../AppSwitcher.vue'
+
 export default {
   name: 'AppSidebar',
+  components: {
+    AppSwitcher
+  }
 };
 </script>
+
+<style scoped>
+/* Hide the dropdown when the sidebar is not hovered */
+#app-sidebar:not(.group):not(:hover) .group-focus-within\:block {
+  display: none !important;
+}
+
+/* Alternative approach - hide dropdown when sidebar collapses */
+#app-sidebar:not(:hover) [class*="group-focus-within:block"] {
+  display: none !important;
+}
+</style>
