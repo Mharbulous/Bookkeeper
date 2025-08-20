@@ -52,6 +52,17 @@ BK
         Main Menu
       </div>
       <router-link
+        to="/upload"
+        class="flex items-center py-3 px-3 text-slate-300 no-underline transition-all duration-200 ease-in-out relative cursor-pointer hover:bg-slate-600 hover:text-white"
+        :class="{ 'bg-brand-blue text-white': $route.path === '/upload' }"
+      >
+        <div class="min-w-[30px] h-[30px] mr-3 flex items-center justify-center">📤</div>
+        <span
+          class="whitespace-nowrap opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100"
+          >File Upload</span
+        >
+      </router-link>
+      <router-link
         to="/about"
         class="flex items-center py-3 px-3 text-slate-300 no-underline transition-all duration-200 ease-in-out relative cursor-pointer hover:bg-slate-600 hover:text-white"
         :class="{ 'bg-brand-blue text-white': $route.path === '/about' }"
