@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, reactive } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, reactive, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
@@ -99,6 +99,18 @@ const props = defineProps({
   isHovered: {
     type: Boolean,
     default: false
+  }
+})
+
+// Watch for sidebar collapse and close dropdown
+watch(() => props.isHovered, (newValue, oldValue) => {
+  // If sidebar goes from hovered to not hovered, close dropdown and blur button
+  if (oldValue === true && newValue === false && isOpen.value) {
+    closeDropdown()
+    // Also blur the trigger button to ensure it loses focus
+    nextTick(() => {
+      triggerButton.value?.blur()
+    })
   }
 })
 
@@ -118,18 +130,18 @@ const dropdownId = `app-switcher-${Math.random().toString(36).substr(2, 9)}`
 // Available apps configuration - matches the roadmap specs
 const availableApps = [
   {
-    name: 'Coryphaeus',
-    subdomain: 'files',
-    description: 'File management system',
-    icon: '🎭',
-    port: '5173'
+    name: 'Book Keeper',
+    subdomain: 'bookkeeping',
+    description: 'Bookkeeping and accounting',
+    icon: '📚',
+    port: '3001'
   },
   {
     name: 'Intranet',
     subdomain: 'intranet',
     description: 'Internal portal and resources',
     icon: '📇',
-    port: '5175'
+    port: '3000'
   }
 ]
 
