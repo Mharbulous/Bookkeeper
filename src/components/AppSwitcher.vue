@@ -38,18 +38,18 @@ const authStore = useAuthStore()
 // Available apps configuration - matches the roadmap specs
 const availableApps = [
   {
-    name: 'Intranet',
-    subdomain: 'intranet',
-    description: 'Internal portal and resources',
-    icon: '📇',
-    port: '5175'
-  },
-  {
     name: 'Coryphaeus',
     subdomain: 'files',
     description: 'File management system',
     icon: '🎭',
     port: '5173'
+  },
+  {
+    name: 'Intranet',
+    subdomain: 'intranet',
+    description: 'Internal portal and resources',
+    icon: '📇',
+    port: '5175'
   }
 ]
 

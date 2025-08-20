@@ -1,12 +1,16 @@
 # Planned prompt for creating Book Keeper app
 
-### Step 1 
+### Step 1 ✅ COMPLETED
 
-Copy documentation of the Firebase storage and Firestore designs from Corphaeus
+Copy documentation of the Firebase storage and Firestore designs from Corphaeus repo
 
-### Step 2 
+**Status**: Completed - Firebase storage and Firestore documentation copied from Coryphaeus repository to Bookkeeper
+
+### Step 2 ✅ COMPLETED
 
 Verify the App Switcher functionality that was recently added to Corphaeus repository has been added to the BookKeeper app.
+
+**Status**: Completed - AppSwitcher component verified and updated with correct app configurations (Coryphaeus and Intranet)
 
 ### Step 3 - Build Front End for File Uploading
 
