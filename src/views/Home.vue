@@ -81,7 +81,7 @@
             <div>
               <h3 class="font-semibold text-slate-800 mb-2">Create Repository from Template</h3>
               <div class="text-slate-600 text-sm space-y-2">
-                <p>1. Go to this repository on GitHub</p>
+                <p>1. Go to this repository on GitHub:  https://github.com/Mharbulous/Coryphaeus.git</p>
                 <p>2. Click the <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">"Use this template"</span> button</p>
                 <p>3. Name your new repository (e.g., <code class="bg-slate-100 px-1 rounded">my-intranet-app</code>, <code class="bg-slate-100 px-1 rounded">my-booking-app</code>)</p>
                 <p>4. Clone your new repository locally</p>
@@ -271,7 +271,7 @@
             <div>
               <h3 class="font-semibold text-slate-800 mb-2">Create Repository from Template</h3>
               <div class="text-slate-600 text-sm space-y-2">
-                <p>1. Go to this repository on GitHub</p>
+                <p>1. Go to this repository on GitHub:  https://github.com/Mharbulous/Coryphaeus.git</p>
                 <p>2. Click the <span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">"Use this template"</span> button</p>
                 <p>3. Name your new app repository (e.g., <code class="bg-slate-100 px-1 rounded">my-bookkeeping-app</code>, <code class="bg-slate-100 px-1 rounded">my-files-app</code>)</p>
                 <p>4. Clone your new repository locally</p>
