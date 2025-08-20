@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection - users can read/write their own document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Teams collection - team-based access control
+    match /teams/{teamId} {
+      // Allow read if user is authenticated and is a member of the team
+      allow read: if request.auth != null && 
+        (
+          // Check custom claims for teamId (preferred for SSO)
+          request.auth.token.teamId == teamId ||
+          // Fallback: check if user is listed as a member in the team document
+          request.auth.uid in resource.data.members.keys()
+        );
+      
+      // Allow write if user is authenticated and is an admin of the team
+      allow write: if request.auth != null && 
+        (
+          // Check if user has admin role in custom claims
+          (request.auth.token.teamId == teamId && request.auth.token.role == 'admin') ||
+          // Fallback: check if user is an admin member in the team document
+          (request.auth.uid in resource.data.members.keys() && 
+           resource.data.members[request.auth.uid].role == 'admin')
+        );
+      
+      // Allow create if user is authenticated (for initial team creation)
+      allow create: if request.auth != null;
+    }
+    
+    // Team-specific data collections (if you add sub-collections to teams)
+    match /teams/{teamId}/{document=**} {
+      // Users can access team data if they're team members
+      allow read, write: if request.auth != null && 
+        (
+          // Check custom claims for teamId
+          request.auth.token.teamId == teamId ||
+          // Fallback: check team membership (requires additional read)
+          exists(/databases/$(database)/documents/teams/$(teamId)) &&
+          request.auth.uid in get(/databases/$(database)/documents/teams/$(teamId)).data.members.keys()
+        );
+    }
+    
+    // App-specific collections with team scoping
+    // Example: documents, projects, etc. that should be team-scoped
+    match /documents/{documentId} {
+      allow read, write: if request.auth != null && 
+        request.auth.token.teamId != null &&
+        // Ensure document belongs to user's team
+        resource.data.teamId == request.auth.token.teamId;
+      
+      allow create: if request.auth != null && 
+        request.auth.token.teamId != null &&
+        // Ensure new document is assigned to user's team
+        request.resource.data.teamId == request.auth.token.teamId;
+    }
+    
+    // Global admin access (optional - for super admins)
+    match /{document=**} {
+      allow read, write: if request.auth != null && 
+        request.auth.token.role == 'superadmin';
+    }
+    
+    // Default: deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

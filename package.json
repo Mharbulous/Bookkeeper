@@ -1,0 +1,43 @@
+{
+  "name": "vue-template",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --fix",
+    "format": "prettier --write src/",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:sso": "vitest run tests/sso-e2e.test.js",
+    "dev:intranet": "npm run dev -- --host intranet.localhost --port 3000",
+    "dev:bookkeeping": "npm run dev -- --host bookkeeping.localhost --port 3001",
+    "dev:files": "npm run dev -- --host files.localhost --port 3002"
+  },
+  "dependencies": {
+    "firebase": "^12.0.0",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.17",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "@vitest/ui": "^3.2.4",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.29.0",
+    "eslint-plugin-vue": "~10.2.0",
+    "globals": "^16.2.0",
+    "jsdom": "^26.1.0",
+    "postcss": "^8.5.6",
+    "prettier": "3.5.3",
+    "tailwindcss": "^3.4.17",
+    "vite": "^7.0.0",
+    "vite-plugin-vue-devtools": "^7.7.7",
+    "vitest": "^3.2.4"
+  }
+}
