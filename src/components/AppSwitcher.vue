@@ -176,7 +176,7 @@ const closeDropdown = () => {
 /**
  * Handle blur event to close dropdown when focus leaves button
  */
-const handleBlur = (event) => {
+const handleBlur = () => {
   // Small delay to allow click events to register
   setTimeout(() => {
     if (isOpen.value) {

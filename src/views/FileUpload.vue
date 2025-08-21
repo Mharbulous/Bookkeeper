@@ -177,12 +177,17 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import { UploadLogService } from '../services/uploadLogService'
 import FileUploadQueue from '../components/features/upload/FileUploadQueue.vue'
 
 // Component configuration
 defineOptions({
   name: 'FileUploadView'
 })
+
+// Store access
+const authStore = useAuthStore()
 
 // Reactive data
 const isDragOver = ref(false)
@@ -279,16 +284,20 @@ const handleFolderSelect = (event) => {
 
 // File processing functions
 const processSingleFile = async (file) => {
-  // For single files, skip queue and show notification
-  await createFileInfo(file)
+  // For single files, check for duplicates and show notification
+  const fileInfo = await createFileInfo(file)
   
-  // Check for duplicates (placeholder for now)
-  const duplicateInfo = await checkForDuplicates()
+  // Check for duplicates using the real upload log service
+  const duplicateResult = await checkForDuplicates(fileInfo)
   
-  if (duplicateInfo.exactDuplicates.length > 0) {
-    showNotification(`File previously uploaded by ${duplicateInfo.exactDuplicates[0].uploadedBy} on ${duplicateInfo.exactDuplicates[0].uploadDate} and will be skipped.`, 'warning')
-  } else if (duplicateInfo.metadataDuplicates.length > 0) {
-    showNotification(`Duplicate file with different metadata was uploaded by ${duplicateInfo.metadataDuplicates[0].uploadedBy} on ${duplicateInfo.metadataDuplicates[0].uploadDate}. Proceeding with upload to enable comparison.`, 'info')
+  if (duplicateResult.isDuplicate && duplicateResult.exactDuplicate) {
+    const uploadDate = duplicateResult.exactDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.exactDuplicate.uploadDate)
+    const formattedDate = uploadDate.toLocaleDateString()
+    showNotification(`File previously uploaded by ${duplicateResult.exactDuplicate.uploaderName} on ${formattedDate} and will be skipped.`, 'warning')
+  } else if (duplicateResult.isDuplicate && duplicateResult.metadataDuplicate) {
+    const uploadDate = duplicateResult.metadataDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.metadataDuplicate.uploadDate)
+    const formattedDate = uploadDate.toLocaleDateString()
+    showNotification(`Duplicate file with different metadata was uploaded by ${duplicateResult.metadataDuplicate.uploaderName} on ${formattedDate}. Proceeding with upload to enable comparison.`, 'info')
   } else {
     showNotification('File ready for upload', 'success')
     // Add to queue for actual upload in future steps
@@ -297,7 +306,31 @@ const processSingleFile = async (file) => {
 }
 
 const addFilesToQueue = async (files) => {
+  // Create file info objects
   const newFileInfos = await Promise.all(files.map(createFileInfo))
+  
+  // Check each file for duplicates and update status
+  for (const fileInfo of newFileInfos) {
+    const duplicateResult = await checkForDuplicates(fileInfo)
+    
+    if (duplicateResult.isDuplicate) {
+      if (duplicateResult.exactDuplicate) {
+        fileInfo.status = 'skipped'
+        fileInfo.isDuplicate = true
+        fileInfo.isExactDuplicate = true
+        const uploadDate = duplicateResult.exactDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.exactDuplicate.uploadDate)
+        const formattedDate = uploadDate.toLocaleDateString()
+        fileInfo.duplicateMessage = `File previously uploaded by ${duplicateResult.exactDuplicate.uploaderName} on ${formattedDate} and will be skipped.`
+      } else if (duplicateResult.metadataDuplicate) {
+        fileInfo.isDuplicate = true
+        fileInfo.isExactDuplicate = false
+        const uploadDate = duplicateResult.metadataDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.metadataDuplicate.uploadDate)
+        const formattedDate = uploadDate.toLocaleDateString()
+        fileInfo.duplicateMessage = `Duplicate file with different metadata was uploaded by ${duplicateResult.metadataDuplicate.uploaderName} on ${formattedDate}. Proceed with upload to enable comparison of these similar files.`
+      }
+    }
+  }
+  
   uploadQueue.value.push(...newFileInfos)
 }
 
@@ -388,13 +421,30 @@ const calculateFileHash = async (file) => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-const checkForDuplicates = async () => {
-  // Placeholder for duplicate detection
-  // Would check against upload logs in production
-  return {
-    exactDuplicates: [],
-    metadataDuplicates: [],
-    queueDuplicates: []
+const checkForDuplicates = async (fileInfo) => {
+  try {
+    // Get current team ID for multi-tenant isolation
+    const teamId = authStore.currentTeam
+    if (!teamId) {
+      console.warn('No team ID available for duplicate detection')
+      return {
+        isDuplicate: false,
+        exactDuplicate: null,
+        metadataDuplicate: null
+      }
+    }
+
+    // Check against upload logs in Firestore
+    const duplicateResult = await UploadLogService.checkForDuplicates(fileInfo, teamId)
+    return duplicateResult
+  } catch (error) {
+    console.error('Error checking for duplicates:', error)
+    // Return safe fallback if service fails
+    return {
+      isDuplicate: false,
+      exactDuplicate: null,
+      metadataDuplicate: null
+    }
   }
 }
 
