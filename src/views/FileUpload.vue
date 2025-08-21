@@ -309,29 +309,56 @@ const addFilesToQueue = async (files) => {
   // Create file info objects
   const newFileInfos = await Promise.all(files.map(createFileInfo))
   
-  // Check each file for duplicates and update status
+  // Process each file according to new deduplication logic
   for (const fileInfo of newFileInfos) {
-    const duplicateResult = await checkForDuplicates(fileInfo)
+    // Step 1: Check for exact queue duplicates - skip entirely if found
+    const exactQueueMatch = uploadQueue.value.find(queueFile => areExactDuplicates(fileInfo, queueFile))
+    if (exactQueueMatch) {
+      // Update existing file with longer folder path
+      exactQueueMatch.path = getLongerPath(exactQueueMatch.path, fileInfo.path)
+      continue // Skip adding this file entirely
+    }
     
-    if (duplicateResult.isDuplicate) {
-      if (duplicateResult.exactDuplicate) {
-        fileInfo.status = 'skipped'
-        fileInfo.isDuplicate = true
-        fileInfo.isExactDuplicate = true
-        const uploadDate = duplicateResult.exactDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.exactDuplicate.uploadDate)
-        const formattedDate = uploadDate.toLocaleDateString()
-        fileInfo.duplicateMessage = `File previously uploaded by ${duplicateResult.exactDuplicate.uploaderName} on ${formattedDate} and will be skipped.`
-      } else if (duplicateResult.metadataDuplicate) {
-        fileInfo.isDuplicate = true
-        fileInfo.isExactDuplicate = false
+    // Step 2: Check for previous uploads
+    const duplicateResult = await checkForDuplicates(fileInfo)
+    if (duplicateResult.isDuplicate && duplicateResult.exactDuplicate) {
+      fileInfo.status = 'existing'
+      fileInfo.isPreviousUpload = true
+      fileInfo.isDuplicate = false
+      const uploadDate = duplicateResult.exactDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.exactDuplicate.uploadDate)
+      const formattedDate = uploadDate.toLocaleDateString()
+      fileInfo.duplicateMessage = `Previously uploaded by ${duplicateResult.exactDuplicate.uploaderName} on ${formattedDate}.`
+      uploadQueue.value.push(fileInfo)
+      continue
+    }
+    
+    // Step 3: Check for queue duplicates (same hash, different metadata)
+    const queueDuplicateIndex = uploadQueue.value.findIndex(queueFile => 
+      queueFile.hash === fileInfo.hash && !areExactDuplicates(fileInfo, queueFile)
+    )
+    
+    if (queueDuplicateIndex !== -1) {
+      // This is a queue duplicate - add immediately after the original
+      fileInfo.status = 'duplicate'
+      fileInfo.isQueueDuplicate = true
+      fileInfo.isDuplicate = true
+      fileInfo.duplicateMessage = `Duplicate of file already in queue with different metadata.`
+      uploadQueue.value.splice(queueDuplicateIndex + 1, 0, fileInfo)
+    } else {
+      // Step 4: This is a new file
+      fileInfo.status = 'pending'
+      fileInfo.isDuplicate = false
+      
+      // Check for metadata duplicates from previous uploads (different from exact duplicates)
+      if (duplicateResult.isDuplicate && duplicateResult.metadataDuplicate) {
         const uploadDate = duplicateResult.metadataDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.metadataDuplicate.uploadDate)
         const formattedDate = uploadDate.toLocaleDateString()
-        fileInfo.duplicateMessage = `Duplicate file with different metadata was uploaded by ${duplicateResult.metadataDuplicate.uploaderName} on ${formattedDate}. Proceed with upload to enable comparison of these similar files.`
+        fileInfo.duplicateMessage = `Similar file uploaded by ${duplicateResult.metadataDuplicate.uploaderName} on ${formattedDate}. Proceeding with upload to enable comparison.`
       }
+      
+      uploadQueue.value.push(fileInfo)
     }
   }
-  
-  uploadQueue.value.push(...newFileInfos)
 }
 
 const processFolderEntry = async (dirEntry) => {
@@ -419,6 +446,36 @@ const calculateFileHash = async (file) => {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Helper function for intelligent folder path matching
+const isFolderPathMatch = (path1, path2) => {
+  if (!path1 || !path2) return path1 === path2
+  
+  // Normalize paths by removing leading/trailing slashes and converting to lowercase
+  const normalize = (path) => path.replace(/^\/+|\/+$/g, '').toLowerCase()
+  const normalizedPath1 = normalize(path1)
+  const normalizedPath2 = normalize(path2)
+  
+  // Empty paths (root) match anything
+  if (normalizedPath1 === '' || normalizedPath2 === '') return true
+  
+  // Check if one path contains the other
+  return normalizedPath1.includes(normalizedPath2) || normalizedPath2.includes(normalizedPath1)
+}
+
+// Helper function to get the longer folder path
+const getLongerPath = (path1, path2) => {
+  if (!path1) return path2
+  if (!path2) return path1
+  return path1.length > path2.length ? path1 : path2
+}
+
+// Helper function to check if two files are exact duplicates
+const areExactDuplicates = (file1, file2) => {
+  return file1.hash === file2.hash &&
+         file1.lastModified.getTime() === file2.lastModified.getTime() &&
+         isFolderPathMatch(file1.path, file2.path)
 }
 
 const checkForDuplicates = async (fileInfo) => {

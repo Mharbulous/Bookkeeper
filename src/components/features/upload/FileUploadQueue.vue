@@ -94,23 +94,23 @@
               
               <!-- Duplicate indicators -->
               <v-chip
-                v-if="file.isDuplicate"
+                v-if="file.isQueueDuplicate"
                 size="x-small"
-                color="warning"
+                color="orange"
                 variant="flat"
                 class="me-1"
               >
-                Duplicate
+                Queue Duplicate
               </v-chip>
               
               <v-chip
-                v-if="file.isExactDuplicate"
+                v-if="file.isPreviousUpload"
                 size="x-small"
-                color="error"
+                color="blue"
                 variant="flat"
                 class="me-1"
               >
-                Will Skip
+                Previously Uploaded
               </v-chip>
             </v-list-item-title>
 
@@ -134,12 +134,12 @@
               <div class="d-flex align-center">
                 <!-- Status indicator -->
                 <v-chip
-                  :color="getStatusColor(file.status)"
+                  :color="getStatusColor(file.status, file)"
                   size="small"
                   variant="flat"
                   class="me-2"
                 >
-                  {{ getStatusText(file.status) }}
+                  {{ getStatusText(file.status, file) }}
                 </v-chip>
                 
                 <!-- Remove button -->
@@ -205,11 +205,11 @@ defineEmits(['remove-file', 'start-upload', 'clear-queue'])
 
 // Computed properties
 const uploadableFiles = computed(() => {
-  return props.files.filter(file => !file.isExactDuplicate)
+  return props.files.filter(file => !file.isDuplicate)
 })
 
 const skippableFiles = computed(() => {
-  return props.files.filter(file => file.isExactDuplicate)
+  return props.files.filter(file => file.isDuplicate)
 })
 
 const totalSize = computed(() => {
@@ -220,39 +220,17 @@ const hasErrors = computed(() => {
   return props.files.some(file => file.status === 'error')
 })
 
-const uniqueFileCount = computed(() => {
-  const uniqueHashes = new Set(props.files.map(file => file.hash))
-  return uniqueHashes.size
-})
 
 const pendingCount = computed(() => {
-  // Count unique files that are new files (first occurrence of each hash)
-  const uniquePendingHashes = new Set()
-  props.files
-    .filter(file => file.status === 'pending' || !file.status)
-    .forEach(file => uniquePendingHashes.add(file.hash))
-  return uniquePendingHashes.size
+  return props.files.filter(file => file.status === 'pending' || (!file.status && !file.isQueueDuplicate && !file.isPreviousUpload)).length
 })
 
 const queueDuplicatesCount = computed(() => {
-  const hashGroups = {}
-  props.files.forEach(file => {
-    if (!hashGroups[file.hash]) {
-      hashGroups[file.hash] = []
-    }
-    hashGroups[file.hash].push(file)
-  })
-  
-  // Count only the excess duplicates (total in duplicate groups minus one copy of each unique file)
-  const duplicateGroups = Object.values(hashGroups).filter(group => group.length > 1)
-  const totalDuplicateFiles = duplicateGroups.reduce((sum, group) => sum + group.length, 0)
-  const uniqueFilesInDuplicateGroups = duplicateGroups.length
-  
-  return totalDuplicateFiles - uniqueFilesInDuplicateGroups
+  return props.files.filter(file => file.isQueueDuplicate).length
 })
 
 const previouslyUploadedCount = computed(() => {
-  return props.files.filter(file => file.isExactDuplicate).length
+  return props.files.filter(file => file.isPreviousUpload).length
 })
 
 const successfulCount = computed(() => {
@@ -319,37 +297,49 @@ const formatDate = (date) => {
   }).format(date)
 }
 
-const getStatusColor = (status) => {
+const getStatusColor = (status, file) => {
   const statusColors = {
     pending: 'grey',
     uploading: 'primary',
     completed: 'success',
     error: 'error',
-    skipped: 'warning'
+    duplicate: 'orange',
+    existing: 'blue'
   }
+  
+  // Handle special cases based on file properties
+  if (file?.isQueueDuplicate) return 'orange'
+  if (file?.isPreviousUpload) return 'blue'
+  
   return statusColors[status] || 'grey'
 }
 
-const getStatusText = (status) => {
+const getStatusText = (status, file) => {
   const statusTexts = {
     pending: 'Pending',
     uploading: 'Uploading',
     completed: 'Completed',
     error: 'Error',
-    skipped: 'Skipped'
+    duplicate: 'Duplicate',
+    existing: 'Existing'
   }
+  
+  // Handle special cases based on file properties
+  if (file?.isQueueDuplicate) return 'Duplicate'
+  if (file?.isPreviousUpload) return 'Existing'
+  
   return statusTexts[status] || 'Unknown'
 }
 
 const getDuplicateMessageClass = (file) => {
-  if (file.isExactDuplicate) return 'text-error'
-  if (file.isDuplicate) return 'text-warning'
+  if (file.isPreviousUpload) return 'text-blue'
+  if (file.isQueueDuplicate) return 'text-orange'
   return 'text-info'
 }
 
 const getDuplicateIcon = (file) => {
-  if (file.isExactDuplicate) return 'mdi-close-circle'
-  if (file.isDuplicate) return 'mdi-alert-circle'
+  if (file.isPreviousUpload) return 'mdi-cloud-check'
+  if (file.isQueueDuplicate) return 'mdi-content-duplicate'
   return 'mdi-information'
 }
 
