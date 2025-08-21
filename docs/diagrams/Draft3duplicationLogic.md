@@ -25,7 +25,7 @@ flowchart TD
     H --> TagB[🏷️ Tag Files<br/>status: ready, existing]
     
     TagB --> CountA[📊 Count File Status<br/>Ready, Existing, Duplicates]
-    CountA --> I[Display Upload Summary<br/>Ready: X, Duplicates: Y, Queue Duplicates: Z]
+    CountA --> I[Display Upload Summary<br/>Ready: X, Existing: Y, Duplicates: Z]
     I --> DisplayA[🖥️ Show File List<br/>User Review Interface]
     
     DisplayA --> J{User Clicks Start Upload?}
