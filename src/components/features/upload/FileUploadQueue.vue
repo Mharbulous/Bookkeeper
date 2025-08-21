@@ -47,15 +47,6 @@
       <!-- Upload Status Categories -->
       <div class="mb-4 d-flex flex-wrap gap-2">
         <v-chip
-          v-if="queueingFiles.length > 0"
-          variant="outlined"
-          size="default"
-          prepend-icon="mdi-dots-horizontal"
-          class="text-grey-darken-2"
-        >
-          {{ queueingFiles.length }} {{ queueingFiles.length === 1 ? 'queueing' : 'queueing' }}
-        </v-chip>
-        <v-chip
           v-if="pendingFiles.length > 0"
           color="primary"
           size="default"
@@ -232,11 +223,6 @@ const props = defineProps({
 defineEmits(['remove-file', 'start-upload', 'clear-queue', 'cancel-processing'])
 
 // Computed properties for six categories based on status and duplicates
-const queueingFiles = computed(() => {
-  // Files that are still being processed (no duplicate analysis completed yet)
-  // This could be files with status 'queueing' or files without hash/duplicate analysis
-  return props.files.filter(file => file.status === 'queueing')
-})
 const pendingFiles = computed(() => {
   // Track seen hashes to identify queue duplicates
   const seenHashes = new Set()
