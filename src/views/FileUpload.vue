@@ -342,6 +342,11 @@ const addFilesToQueue = async (files) => {
   const stepTimes = {}
   const overallStartTime = performance.now()
   
+  // Variables for tracking optimization metrics
+  let uniqueSizeCount = 0
+  let filesToHash = []
+  let fileSizeGroups = new Map()
+  
   console.log('⚡ PERFORMANCE: Starting addFilesToQueue', {
     fileCount: files.length,
     fileNames: files.map(f => f.name),
@@ -365,15 +370,73 @@ const addFilesToQueue = async (files) => {
   })
   
   try {
-    // Step 2: Calculate hashes in parallel using worker pool
+    // Step 1.5: Pre-filter by file size (following optimal deduplication algorithm)
+    stepTimes.step1_5Start = performance.now()
+    fileSizeGroups.clear() // Reset the map
+    filesToHash.length = 0 // Clear the array
+    const filesWithUniqueSize = []
+    
+    // Group files by size
+    files.forEach((file, index) => {
+      const fileSize = file.size
+      if (!fileSizeGroups.has(fileSize)) {
+        fileSizeGroups.set(fileSize, [])
+      }
+      fileSizeGroups.get(fileSize).push({ file, index })
+    })
+    
+    // Separate files that need hashing vs those with unique sizes
+    uniqueSizeCount = 0
+    fileSizeGroups.forEach((filesGroup) => {
+      if (filesGroup.length === 1) {
+        // Unique size - no need to hash
+        filesWithUniqueSize.push(filesGroup[0])
+        uniqueSizeCount++
+      } else {
+        // Multiple files with same size - need to hash for deduplication
+        filesToHash.push(...filesGroup)
+      }
+    })
+    
+    stepTimes.step1_5End = performance.now()
+    console.log('🎯 PERFORMANCE: Step 1.5 - File size pre-filtering', {
+      timeMs: Math.round(stepTimes.step1_5End - stepTimes.step1_5Start),
+      totalFiles: files.length,
+      uniqueSizeFiles: uniqueSizeCount,
+      filesToHash: filesToHash.length,
+      hashingReduction: Math.round((uniqueSizeCount / files.length) * 100) + '%',
+      sizeGroups: fileSizeGroups.size
+    })
+
+    // Step 2: Calculate hashes only for files that need it (major optimization!)
     stepTimes.step2Start = performance.now()
-    console.log('🔢 PERFORMANCE: Step 2 - Starting hash calculation', { fileCount: files.length })
-    const hashes = await calculateFileHashesBatch(files)
+    console.log('🔢 PERFORMANCE: Step 2 - Starting optimized hash calculation', { 
+      fileCount: filesToHash.length,
+      skippedFiles: uniqueSizeCount 
+    })
+    
+    const hashes = new Array(files.length)
+    
+    if (filesToHash.length > 0) {
+      const hashResults = await calculateFileHashesBatch(filesToHash.map(item => item.file))
+      // Map hash results back to original file positions
+      filesToHash.forEach((item, hashIndex) => {
+        hashes[item.index] = hashResults[hashIndex]
+      })
+    }
+    
+    // Generate deterministic pseudo-hashes for unique size files (for consistency)
+    filesWithUniqueSize.forEach(item => {
+      hashes[item.index] = `unique_size_${item.file.size}_${item.file.name}_${item.file.lastModified}`
+    })
+    
     stepTimes.step2End = performance.now()
-    console.log('🔢 PERFORMANCE: Step 2 - Hash calculation completed', {
+    console.log('🔢 PERFORMANCE: Step 2 - Optimized hash calculation completed', {
       timeMs: Math.round(stepTimes.step2End - stepTimes.step2Start),
-      avgHashTime: Math.round((stepTimes.step2End - stepTimes.step2Start) / files.length),
-      filesHashed: files.length
+      avgHashTime: filesToHash.length > 0 ? Math.round((stepTimes.step2End - stepTimes.step2Start) / filesToHash.length) : 0,
+      filesHashed: filesToHash.length,
+      filesSkipped: uniqueSizeCount,
+      optimizationSavings: uniqueSizeCount > 0 ? Math.round((uniqueSizeCount / files.length) * 100) + '% reduction' : 'No savings'
     })
     
     // Step 3: Update file infos with calculated hashes
@@ -532,10 +595,17 @@ const addFilesToQueue = async (files) => {
       avgTimePerFile: Math.round(totalTime / files.length * 100) / 100 + 'ms',
       stepBreakdown: {
         queueAddition: Math.round(stepTimes.step1End - stepTimes.step1Start) + 'ms',
-        hashCalculation: Math.round(stepTimes.step2End - stepTimes.step2Start) + 'ms',
+        sizePrefiltering: Math.round(stepTimes.step1_5End - stepTimes.step1_5Start) + 'ms',
+        optimizedHashCalculation: Math.round(stepTimes.step2End - stepTimes.step2Start) + 'ms',
         queueFiltering: Math.round(stepTimes.step4End - stepTimes.step4Start) + 'ms',
         firestoreQueries: Math.round(stepTimes.step5End - stepTimes.step5Start) + 'ms',
         statusUpdate: Math.round(stepTimes.step7End - stepTimes.step7Start) + 'ms'
+      },
+      optimizationMetrics: {
+        filesWithUniqueSize: uniqueSizeCount,
+        hashingReduction: Math.round((uniqueSizeCount / files.length) * 100) + '%',
+        totalFilesToHash: filesToHash.length,
+        sizeGroups: fileSizeGroups.size
       }
     })
     
