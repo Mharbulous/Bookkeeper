@@ -19,7 +19,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ```javascript
 {
   // User preferences only (identity comes from Firebase Auth)
-  defaultTeamId: 'team-abc-123',  // Primary team for quick access
+  defaultTeamId: 'team-abc-123',  // Primary team for quick access (could be userId for solo users)
   preferences: {
     theme: 'light',
     notifications: true,
@@ -35,17 +35,19 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ### 2. Teams Collection: `/teams/{teamId}`
 **Purpose**: Store team info and embedded member list
 
+**Solo User Design**: New users automatically get a team where `teamId === userId`, making them a "team of one". This eliminates special cases in storage, security, and duplicate detection.
+
 ```javascript
 {
   // Team information
-  name: 'ACME Law Firm',
-  description: 'Full-service law firm',
+  name: 'ACME Law Firm',  // For solo users: "John's Workspace"
+  description: 'Full-service law firm',  // For solo users: "Personal workspace"
   
-  // Embedded members (perfect for 3-10 users)
+  // Embedded members (perfect for 3-10 users, or 1 for solo users)
   members: {
     'user-john-123': {
       email: 'john@acme.com',
-      role: 'admin',  // 'admin' | 'member'
+      role: 'admin',  // 'admin' | 'member' (solo users are always admin)
       joinedAt: Timestamp
     },
     'user-jane-456': {
@@ -60,7 +62,8 @@ This document defines a **simple, scalable** Firestore data structure for our mu
     'newuser@acme.com': {
       invitedBy: 'user-john-123',
       invitedAt: Timestamp,
-      role: 'member'
+      role: 'member',
+      fromTeam: 'team-abc-123'  // Track which team invited them
     }
   },
   
@@ -72,6 +75,9 @@ This document defines a **simple, scalable** Firestore data structure for our mu
     timezone: 'America/New_York',
     maxMembers: 100
   },
+  
+  // Team type flags
+  isPersonal: false,  // true for solo users (teamId === userId)
   
   // Metadata
   createdAt: Timestamp,
@@ -119,12 +125,12 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 
 ## Custom Claims (Firebase Auth)
 
-Keep it **dead simple**:
+Keep it **dead simple**. Solo users have `teamId === userId`:
 
 ```javascript
 {
-  teamId: 'team-abc-123',
-  role: 'admin'  // or 'member'
+  teamId: 'team-abc-123',  // For solo users: equals their userId
+  role: 'admin'            // Solo users are always 'admin', team members can be 'admin' | 'member'
 }
 ```
 
@@ -189,37 +195,133 @@ const matters = await db
   .where('status', '==', 'active')
   .get()
 
-## Handling Team Invitations (Simple Way)
+## Solo User to Team Workflow
 
+### New User Registration
+```javascript
+async function createNewUser(userId, email, displayName) {
+  // 1. Set custom claims (solo user is their own team)
+  await setCustomClaims(userId, {
+    teamId: userId,  // teamId === userId for solo users
+    role: 'admin'    // Solo users are admin of their own team
+  })
+  
+  // 2. Create user document
+  await db.collection('users').doc(userId).set({
+    defaultTeamId: userId,
+    preferences: { theme: 'light', notifications: true },
+    createdAt: new Date(),
+    lastLogin: new Date()
+  })
+  
+  // 3. Create solo team
+  await db.collection('teams').doc(userId).set({
+    name: `${displayName}'s Workspace`,
+    description: 'Personal workspace',
+    members: {
+      [userId]: {
+        email: email,
+        role: 'admin',
+        joinedAt: new Date()
+      }
+    },
+    pendingInvites: {},
+    apps: ['intranet', 'bookkeeper'],
+    settings: { timezone: 'UTC', maxMembers: 100 },
+    isPersonal: true,  // Flag for solo teams
+    createdAt: new Date(),
+    createdBy: userId
+  })
+}
+```
+
+## Handling Team Invitations and Mergers
+
+### Invitation Process
 1. **Admin adds email to `pendingInvites`** in team document
-2. **User signs up** with that email
-3. **On first login**, check all teams for pending invites:
+2. **User signs up** with that email (creates solo team)
+3. **On login**, check all teams for pending invites
+4. **User accepts** → migrate solo team data or merge teams
+
+### Team Migration Logic
 
 ```javascript
-// Check for pending invitations
-const teamsSnapshot = await db.collection('teams')
-  .where(`pendingInvites.${userEmail}`, '!=', null)
-  .get()
+// Check for pending invitations on login
+async function checkAndProcessInvitations(userId, userEmail) {
+  const teamsSnapshot = await db.collection('teams')
+    .where(`pendingInvites.${userEmail}`, '!=', null)
+    .get()
 
-if (!teamsSnapshot.empty) {
-  const team = teamsSnapshot.docs[0]
-  const invite = team.data().pendingInvites[userEmail]
+  if (!teamsSnapshot.empty) {
+    const invitingTeam = teamsSnapshot.docs[0]
+    const invite = invitingTeam.data().pendingInvites[userEmail]
+    
+    // Get user's current team (their solo team)
+    const currentTeam = await db.collection('teams').doc(userId).get()
+    const currentTeamData = currentTeam.data()
+    
+    if (currentTeamData.isPersonal && Object.keys(currentTeamData.members).length === 1) {
+      // Solo user joining another team - migrate data
+      await migrateSoloUserToTeam(userId, invitingTeam.id, invite.role)
+    } else {
+      // Team founder with members - team merger scenario
+      await promptForTeamMerger(userId, invitingTeam.id, invite)
+    }
+  }
+}
+
+async function migrateSoloUserToTeam(userId, newTeamId, role) {
+  // 1. Update custom claims
+  await setCustomClaims(userId, {
+    teamId: newTeamId,
+    role: role
+  })
   
-  // Add user to team
-  await team.ref.update({
+  // 2. Add user to new team
+  await db.collection('teams').doc(newTeamId).update({
     [`members.${userId}`]: {
-      email: userEmail,
-      role: invite.role,
+      email: auth.currentUser.email,
+      role: role,
       joinedAt: new Date()
     },
-    [`pendingInvites.${userEmail}`]: firebase.firestore.FieldValue.delete()
+    [`pendingInvites.${auth.currentUser.email}`]: firebase.firestore.FieldValue.delete()
   })
   
-  // Set custom claims
-  await setCustomClaims(userId, {
-    teamId: team.id,
-    role: invite.role
-  })
+  // 3. Migrate data from solo team to new team
+  await migrateTeamData(userId, newTeamId)
+  
+  // 4. Clean up solo team
+  await db.collection('teams').doc(userId).delete()
+}
+
+async function migrateTeamData(fromTeamId, toTeamId) {
+  // Migrate all subcollections: clients, matters, documents, etc.
+  const collections = ['clients', 'matters', 'documents', 'upload_logs']
+  
+  for (const collectionName of collections) {
+    const docs = await db
+      .collection('teams').doc(fromTeamId)
+      .collection(collectionName)
+      .get()
+    
+    // Copy documents to new team
+    const batch = db.batch()
+    docs.forEach(doc => {
+      const newDocRef = db
+        .collection('teams').doc(toTeamId)
+        .collection(collectionName).doc(doc.id)
+      batch.set(newDocRef, {
+        ...doc.data(),
+        migratedFrom: fromTeamId,
+        migratedAt: new Date()
+      })
+    })
+    await batch.commit()
+  }
+  
+  // Note: Firebase Storage files don't need to move - 
+  // we'll update storage paths in future uploads
+  // or create a background job for this
 }
 ```
 

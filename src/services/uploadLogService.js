@@ -44,8 +44,8 @@ export class UploadLogService {
     }
 
     try {
-      // Generate a unique document ID
-      const logRef = doc(collection(db, 'uploadLogs'))
+      // Generate a unique document ID in team-specific collection
+      const logRef = doc(collection(db, 'teams', logData.teamId, 'upload_logs'))
       
       const uploadLog = {
         fileHash: logData.fileHash,
@@ -76,17 +76,18 @@ export class UploadLogService {
 
   /**
    * Update upload status for an existing log entry
+   * @param {string} teamId - Team ID
    * @param {string} logId - Upload log document ID
    * @param {string} status - New status ('completed' | 'failed' | 'skipped')
    * @returns {Promise<void>}
    */
-  static async updateUploadStatus(logId, status) {
-    if (!logId || !status) {
-      throw new Error('Log ID and status are required')
+  static async updateUploadStatus(teamId, logId, status) {
+    if (!teamId || !logId || !status) {
+      throw new Error('Team ID, log ID and status are required')
     }
 
     try {
-      const logRef = doc(db, 'uploadLogs', logId)
+      const logRef = doc(db, 'teams', teamId, 'upload_logs', logId)
       await setDoc(logRef, {
         uploadStatus: status,
         updatedAt: serverTimestamp()
@@ -109,11 +110,12 @@ export class UploadLogService {
     }
 
     try {
-      const uploadsRef = collection(db, 'uploadLogs')
+      // Use team-specific upload logs collection as per storage plan
+      const uploadsRef = collection(db, 'teams', teamId, 'upload_logs')
       const q = query(
         uploadsRef,
-        where('fileHash', '==', fileHash),
-        where('teamId', '==', teamId)
+        where('fileHash', '==', fileHash)
+        // No need to filter by teamId since we're already in the team's collection
       )
       
       const querySnapshot = await getDocs(q)
@@ -247,11 +249,12 @@ export class UploadLogService {
     }
 
     try {
-      const uploadsRef = collection(db, 'uploadLogs')
+      // Use team-specific upload logs collection
+      const uploadsRef = collection(db, 'teams', teamId, 'upload_logs')
       const q = query(
-        uploadsRef,
-        where('teamId', '==', teamId)
-        // Note: orderBy would require a composite index in Firestore
+        uploadsRef
+        // No need to filter by teamId since we're already in the team's collection
+        // Note: orderBy would require an index in Firestore
         // For now, we'll sort on the client side
       )
       

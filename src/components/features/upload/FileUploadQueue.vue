@@ -12,20 +12,9 @@
           size="small"
           prepend-icon="mdi-delete-sweep"
           @click="$emit('clear-queue')"
-          :disabled="files.length === 0 || isProcessing"
+          :disabled="files.length === 0"
         >
           Clear All
-        </v-btn>
-        
-        <v-btn
-          v-if="isProcessing"
-          color="warning"
-          variant="elevated"
-          size="small"
-          prepend-icon="mdi-stop"
-          @click="$emit('cancel-processing')"
-        >
-          Cancel Processing
         </v-btn>
         
         <v-btn
@@ -33,7 +22,7 @@
           variant="elevated"
           prepend-icon="mdi-upload"
           @click="$emit('start-upload')"
-          :disabled="uploadableFiles.length === 0 || hasErrors || isProcessing"
+          :disabled="files.length === 0 || hasErrors"
         >
           Start Upload
         </v-btn>
@@ -44,48 +33,50 @@
 
     <!-- File List -->
     <div class="pa-4">
-      <!-- Upload Status Categories -->
-      <div class="mb-4 d-flex flex-wrap gap-2">
-        <v-chip
-          v-if="pendingFiles.length > 0"
-          color="primary"
-          size="default"
-          prepend-icon="mdi-clock-outline"
-        >
-          {{ pendingFiles.length }} {{ pendingFiles.length === 1 ? 'pending' : 'pending' }}
-        </v-chip>
-        <v-chip
-          v-if="queueDuplicates.length > 0"
-          color="warning"
-          size="default"
-          prepend-icon="mdi-content-duplicate"
-        >
-          {{ queueDuplicates.length }} {{ queueDuplicates.length === 1 ? 'queue duplicate' : 'queue duplicates' }}
-        </v-chip>
-        <v-chip
-          v-if="previouslyUploaded.length > 0"
-          color="grey"
-          size="default"
-          prepend-icon="mdi-history"
-        >
-          {{ previouslyUploaded.length }} {{ previouslyUploaded.length === 1 ? 'previously uploaded' : 'previously uploaded' }}
-        </v-chip>
-        <v-chip
-          v-if="successfulUploads.length > 0"
-          color="success"
-          size="default"
-          prepend-icon="mdi-check-circle"
-        >
-          {{ successfulUploads.length }} {{ successfulUploads.length === 1 ? 'uploaded' : 'uploaded' }}
-        </v-chip>
-        <v-chip
-          v-if="failedUploads.length > 0"
-          color="error"
-          size="default"
-          prepend-icon="mdi-alert-circle"
-        >
-          {{ failedUploads.length }} {{ failedUploads.length === 1 ? 'failed' : 'failed' }}
-        </v-chip>
+      <!-- Status Tags -->
+      <div v-if="files.length > 0" class="mb-4">
+        <div class="d-flex gap-2 flex-wrap">
+          <v-chip
+            size="large"
+            variant="flat"
+            color="grey"
+            class="text-white"
+          >
+            {{ pendingCount }} new
+          </v-chip>
+          
+          <v-chip
+            size="large"
+            variant="flat"
+            color="orange"
+          >
+            {{ queueDuplicatesCount }} duplicates
+          </v-chip>
+          
+          <v-chip
+            size="large"
+            variant="flat"
+            color="blue"
+          >
+            {{ previouslyUploadedCount }} previous uploads
+          </v-chip>
+          
+          <v-chip
+            size="large"
+            variant="flat"
+            color="green"
+          >
+            {{ successfulCount }} successful uploads
+          </v-chip>
+          
+          <v-chip
+            size="large"
+            variant="flat"
+            color="red"
+          >
+            {{ failedCount }} failed uploads
+          </v-chip>
+        </div>
       </div>
 
       <!-- Files List -->
@@ -100,27 +91,6 @@
 
             <v-list-item-title class="d-flex align-center">
               <span class="text-truncate me-2">{{ file.name }}</span>
-              
-              <!-- Duplicate indicators -->
-              <v-chip
-                v-if="file.isDuplicate"
-                size="x-small"
-                color="warning"
-                variant="flat"
-                class="me-1"
-              >
-                Duplicate
-              </v-chip>
-              
-              <v-chip
-                v-if="file.isExactDuplicate"
-                size="x-small"
-                color="error"
-                variant="flat"
-                class="me-1"
-              >
-                Will Skip
-              </v-chip>
             </v-list-item-title>
 
             <v-list-item-subtitle>
@@ -129,13 +99,7 @@
                 <v-divider vertical class="mx-2" />
                 <span>{{ formatDate(file.lastModified) }}</span>
                 <v-divider vertical class="mx-2" />
-                <span>{{ file.type || 'Unknown type' }}</span>
-              </div>
-              
-              <!-- Path for folder uploads -->
-              <div v-if="file.path && file.path !== file.name" class="text-caption text-grey-darken-2 mt-1">
-                <v-icon icon="mdi-folder-outline" size="12" class="me-1" />
-                {{ file.path }}
+                <span>{{ getRelativePath(file) }}</span>
               </div>
               
               <!-- Duplicate messages -->
@@ -147,23 +111,38 @@
 
             <template #append>
               <div class="d-flex align-center">
-                <!-- Status indicator -->
+                <!-- Status indicator for duplicates and existing files only -->
                 <v-chip
-                  :color="getStatusColor(file.status)"
+                  v-if="file.isDuplicate || file.isPreviousUpload"
+                  :color="getStatusColor(file.status, file)"
                   size="small"
                   variant="flat"
                   class="me-2"
                 >
-                  {{ getStatusText(file.status) }}
+                  {{ getStatusText(file.status, file) }}
                 </v-chip>
                 
-                <!-- Remove button -->
-                <v-btn
-                  icon="mdi-close"
-                  size="small"
-                  variant="text"
-                  @click="$emit('remove-file', file.id)"
-                />
+                <!-- Status icon -->
+                <div class="text-h6">
+                  <v-tooltip 
+                    v-if="file.status === 'pending' && !file.isDuplicate"
+                    text="Ready"
+                    location="bottom"
+                  >
+                    <template #activator="{ props }">
+                      <span v-bind="props">🟢</span>
+                    </template>
+                  </v-tooltip>
+                  <v-tooltip 
+                    v-else-if="file.isDuplicate || file.isPreviousUpload" 
+                    text="Skip"
+                    location="bottom"
+                  >
+                    <template #activator="{ props }">
+                      <span v-bind="props">↩️</span>
+                    </template>
+                  </v-tooltip>
+                </div>
               </div>
             </template>
           </v-list-item>
@@ -212,85 +191,19 @@ const props = defineProps({
     type: Array,
     required: true,
     default: () => []
-  },
-  isProcessing: {
-    type: Boolean,
-    default: false
   }
 })
 
 // Emits
-defineEmits(['remove-file', 'start-upload', 'clear-queue', 'cancel-processing'])
+defineEmits(['remove-file', 'start-upload', 'clear-queue'])
 
-// Computed properties for six categories based on status and duplicates
-const pendingFiles = computed(() => {
-  // Track seen hashes to identify queue duplicates
-  const seenHashes = new Set()
-  
-  return props.files.filter(file => {
-    // Only include pending files
-    if (file.status !== 'pending') {
-      return false
-    }
-    
-    // Skip exact duplicates (historical)
-    if (file.isExactDuplicate) {
-      return false
-    }
-    
-    // For queue duplicates, only keep the first occurrence
-    if (seenHashes.has(file.hash)) {
-      return false // This is a queue duplicate
-    }
-    
-    seenHashes.add(file.hash)
-    return true // This is the first occurrence and pending
-  })
-})
-
-const queueDuplicates = computed(() => {
-  const seenHashes = new Set()
-  
-  return props.files.filter(file => {
-    // Skip exact duplicates (historical) - they're in their own category
-    if (file.isExactDuplicate) {
-      return false
-    }
-    
-    // Skip completed/failed files - they're in their own categories
-    if (file.status === 'completed' || file.status === 'error') {
-      return false
-    }
-    
-    // For queue duplicates, skip the first occurrence but include subsequent ones
-    if (seenHashes.has(file.hash)) {
-      return true // This is a queue duplicate (2nd, 3rd, etc. occurrence)
-    }
-    
-    seenHashes.add(file.hash)
-    return false // This is the first occurrence, so it's not a queue duplicate
-  })
-})
-
-const previouslyUploaded = computed(() => {
-  return props.files.filter(file => file.isExactDuplicate)
-})
-
-const successfulUploads = computed(() => {
-  return props.files.filter(file => file.status === 'completed')
-})
-
-const failedUploads = computed(() => {
-  return props.files.filter(file => file.status === 'error')
-})
-
-// Keep these for backward compatibility with existing logic
+// Computed properties
 const uploadableFiles = computed(() => {
-  return pendingFiles.value
+  return props.files.filter(file => !file.isDuplicate)
 })
 
 const skippableFiles = computed(() => {
-  return [...queueDuplicates.value, ...previouslyUploaded.value]
+  return props.files.filter(file => file.isDuplicate)
 })
 
 const totalSize = computed(() => {
@@ -301,6 +214,26 @@ const hasErrors = computed(() => {
   return props.files.some(file => file.status === 'error')
 })
 
+
+const pendingCount = computed(() => {
+  return props.files.filter(file => file.status === 'pending' || (!file.status && !file.isQueueDuplicate && !file.isPreviousUpload)).length
+})
+
+const queueDuplicatesCount = computed(() => {
+  return props.files.filter(file => file.isQueueDuplicate).length
+})
+
+const previouslyUploadedCount = computed(() => {
+  return props.files.filter(file => file.isPreviousUpload).length
+})
+
+const successfulCount = computed(() => {
+  return props.files.filter(file => file.status === 'completed').length
+})
+
+const failedCount = computed(() => {
+  return props.files.filter(file => file.status === 'error').length
+})
 
 // Methods
 const getFileIcon = (mimeType) => {
@@ -358,38 +291,66 @@ const formatDate = (date) => {
   }).format(date)
 }
 
-const getStatusColor = (status) => {
+const getStatusColor = (status, file) => {
   const statusColors = {
     pending: 'grey',
     uploading: 'primary',
     completed: 'success',
     error: 'error',
-    skipped: 'warning'
+    duplicate: 'orange',
+    existing: 'blue'
   }
+  
+  // Handle special cases based on file properties
+  if (file?.isQueueDuplicate) return 'orange'
+  if (file?.isPreviousUpload) return 'blue'
+  
   return statusColors[status] || 'grey'
 }
 
-const getStatusText = (status) => {
+const getStatusText = (status, file) => {
   const statusTexts = {
-    pending: 'Pending',
+    pending: 'Ready',
     uploading: 'Uploading',
     completed: 'Completed',
     error: 'Error',
-    skipped: 'Skipped'
+    duplicate: 'Duplicate',
+    existing: 'Existing'
   }
+  
+  // Handle special cases based on file properties
+  if (file?.isQueueDuplicate) return 'Duplicate'
+  if (file?.isPreviousUpload) return 'Existing'
+  
   return statusTexts[status] || 'Unknown'
 }
 
 const getDuplicateMessageClass = (file) => {
-  if (file.isExactDuplicate) return 'text-error'
-  if (file.isDuplicate) return 'text-warning'
+  if (file.isPreviousUpload) return 'text-blue'
+  if (file.isQueueDuplicate) return 'text-orange'
   return 'text-info'
 }
 
 const getDuplicateIcon = (file) => {
-  if (file.isExactDuplicate) return 'mdi-close-circle'
-  if (file.isDuplicate) return 'mdi-alert-circle'
+  if (file.isPreviousUpload) return 'mdi-cloud-check'
+  if (file.isQueueDuplicate) return 'mdi-content-duplicate'
   return 'mdi-information'
+}
+
+const getRelativePath = (file) => {
+  if (!file.path || file.path === file.name) {
+    return '\\'
+  }
+  
+  // Extract the folder path by removing the filename
+  const pathParts = file.path.split('/')
+  pathParts.pop() // Remove the filename
+  
+  if (pathParts.length === 0) {
+    return '\\'
+  }
+  
+  return '/' + pathParts.join('/')
 }
 </script>
 

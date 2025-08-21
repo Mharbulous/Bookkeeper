@@ -139,6 +139,53 @@ Use material design for the front end elements as much as possible.
 - Material Design component integration
 - Accessibility features and proper labeling
 
+### Step 5.1 ✅ COMPLETED - Enhanced Duplicate Detection and UX Refinements
+
+**Issue Identified**: Original implementation had several UX and logical issues:
+- Files showing as "Pending" instead of proper duplicate status
+- Renamed files not detected as duplicates due to filename-based hashing
+- Verbose messaging cluttering the interface
+- Redundant status indicators
+- Missing visual feedback for user actions
+
+**Solution Implemented**: Comprehensive duplicate detection overhaul with clean UX design
+
+**Core Deduplication Logic**:
+1. **Exact queue duplicate filtering**: Files with identical content, filename, dates, and folder path are filtered out entirely (prevents repeated user actions)
+2. **Previous upload detection**: Files previously uploaded show "Existing" status with blue color scheme
+3. **Queue duplicate detection**: Files with same content but different metadata show "Duplicate" status with orange color scheme and are positioned immediately below originals
+4. **Intelligent folder path matching**: Paths like "/2023/Statement/RBC" match "/Statement/RBC" for exact duplicate detection
+
+**Content-Based Hashing**:
+- ✅ Switched from metadata-based to actual file content hashing using `file.arrayBuffer()`
+- ✅ Renamed files now properly detected as duplicates
+- ✅ Hash calculation independent of filename, ensuring accurate duplicate detection
+
+**Enhanced User Interface**:
+- ✅ Replaced verbose duplicate messages with clean visual indicators
+- ✅ Simplified status chips: "Ready" → "Duplicate" → "Existing"
+- ✅ Removed redundant status tags, keeping only essential information
+- ✅ Added intuitive status icons: 🟢 for ready files, ↩️ for skipped files
+- ✅ Implemented tooltips: "Ready" for green circle, "Skip" for return arrow
+- ✅ Removed delete buttons to prevent accidental queue modifications
+
+**Flag Naming Improvements**:
+- ✅ Reverted to `isDuplicate` flag (more semantically accurate than `isSkippable`)
+- ✅ Clear distinction between `isPreviousUpload` and `isQueueDuplicate` flags
+- ✅ Accurate duplicate counting that excludes exact matches
+
+**Technical Enhancements**:
+- Smart duplicate positioning (duplicates appear immediately below originals)
+- Folder path consolidation (longer paths preserved when exact matches found)
+- Accurate count calculations for meaningful user feedback
+- Improved exact match criteria (hash + filename + dates + intelligent folder path)
+
+**Files Modified**:
+- `src/views/FileUpload.vue` - Enhanced deduplication logic and exact duplicate filtering
+- `src/components/features/upload/FileUploadQueue.vue` - Clean UI with status icons and tooltips
+
+**Status**: Completed - Professional-grade duplicate detection with intuitive user experience
+
 ### Step 6 📋 NOT STARTED - Implement Actual File Uploads
 
 Once the Front End looks good, and user has approved the UI, then start implementing the actual uploads.  
@@ -161,14 +208,16 @@ Use material design wherever possible.
 - ✅ **Step 3**: File upload front end interface with Material Design (COMPLETED)
 - ✅ **Step 4**: Bulk upload options with subfolder selection dialog (COMPLETED)
 - ✅ **Step 5**: Upload queue preview with duplicate detection (COMPLETED)
+- ✅ **Step 5.1**: Enhanced duplicate detection and UX refinements (COMPLETED)
 - 📋 **Step 6**: Actual file upload implementation (NEXT TO START)
 
 **Implementation Status**: 
 - **Front-end interface**: Fully functional with comprehensive Material Design UI
 - **File handling**: Complete drag/drop, file picker, and folder support
-- **Queue management**: Full preview with complete duplicate detection
+- **Queue management**: Full preview with professional-grade duplicate detection
 - **Upload logs integration**: Fully implemented with Firestore backend
-- **Duplicate detection**: Complete historical and queue-based duplicate detection
+- **Duplicate detection**: Advanced content-based detection with intelligent path matching
+- **User experience**: Clean, intuitive interface with visual status indicators and tooltips
 
 **Ready to Begin**: Step 6 - Implement Actual File Uploads
 
@@ -176,10 +225,12 @@ Use material design wherever possible.
 - Comprehensive Material Design interface using Vuetify
 - Full drag & drop functionality for files and folders
 - Subfolder inclusion dialog with user choice options
-- SHA-256 hash calculation for duplicate detection
-- Upload queue preview with file management
-- Single file notification system
-- All components properly integrated into the application
+- Advanced content-based SHA-256 hash calculation for accurate duplicate detection
+- Professional upload queue with intelligent duplicate positioning
+- Clean visual status system with icons and tooltips
+- Exact duplicate filtering to prevent queue bloat
+- Intelligent folder path matching and consolidation
+- All components properly integrated with enhanced user experience
 
 
 
