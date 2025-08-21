@@ -60,6 +60,28 @@ flowchart TD
     class DisplayA,DisplayB displayInterface
 ```
 
+## File Status Legend
+
+| Status | Color | Definition | Action Taken |
+|--------|-------|------------|--------------|
+| **Ready** | 🟢 Green | New files that will be uploaded | Upload to storage |
+| **Existing** | 🔵 Blue | Files already uploaded previously | Skip upload, show notification |
+| **Duplicates** | 🟡 Yellow | Same file selected multiple times in current batch | Keep one copy, skip duplicates |
+| **Uploading** | 🟠 Orange | Files currently being processed | Show progress indicator |
+| **Successful** | ✅ Green | Files uploaded successfully | Mark as complete |
+| **Failed** | 🔴 Red | Upload failed due to error | Show error, allow retry |
+| **Skipped** | ⚪ Gray | Files not uploaded (existing/duplicates) | Log for analytics |
+
+### Status Flow
+```
+Selection → Ready/Existing/Duplicates → Uploading → Successful/Failed/Skipped
+```
+
+### Color Usage in Interface
+- **Pre-upload**: Files show Ready (green), Existing (blue), Duplicates (yellow)
+- **During upload**: Ready files change to Uploading (orange)
+- **Post-upload**: Files show final status Successful (green), Failed (red), Skipped (gray)
+
 ## Key Advantages of Constraint-Based Approach
 
 ### 1. Zero Custom Deduplication Logic
