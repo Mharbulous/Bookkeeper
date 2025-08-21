@@ -4,13 +4,6 @@
       <div class="d-flex align-center">
         <v-icon icon="mdi-format-list-bulleted" class="me-2" />
         Upload Queue
-        <v-chip
-          :color="files.length > 0 ? 'primary' : 'grey'"
-          size="small"
-          class="ms-2"
-        >
-          {{ files.length }} {{ files.length === 1 ? 'file' : 'files' }}
-        </v-chip>
       </div>
       
       <div class="d-flex gap-2">
@@ -29,7 +22,7 @@
           variant="elevated"
           prepend-icon="mdi-upload"
           @click="$emit('start-upload')"
-          :disabled="files.length === 0 || hasErrors"
+          :disabled="uploadableFiles.length === 0 || hasErrors"
         >
           Start Upload
         </v-btn>
@@ -40,22 +33,57 @@
 
     <!-- File List -->
     <div class="pa-4">
-      <!-- Duplicate Detection Summary -->
-      <div v-if="duplicateInfo.queueDuplicates.length > 0" class="mb-4">
-        <v-alert
-          type="warning"
-          variant="tonal"
-          density="compact"
-          icon="mdi-content-duplicate"
+      <!-- Upload Status Categories -->
+      <div class="mb-4 d-flex flex-wrap gap-2">
+        <v-chip
+          v-if="queueingFiles.length > 0"
+          variant="outlined"
+          size="default"
+          prepend-icon="mdi-dots-horizontal"
+          class="text-grey-darken-2"
         >
-          <template #title>
-            Duplicate Files Detected
-          </template>
-          <div class="text-body-2">
-            {{ duplicateInfo.queueDuplicates.length }} duplicate file(s) found in the upload queue.
-            Only one copy of each will be uploaded.
-          </div>
-        </v-alert>
+          {{ queueingFiles.length }} {{ queueingFiles.length === 1 ? 'queueing' : 'queueing' }}
+        </v-chip>
+        <v-chip
+          v-if="pendingFiles.length > 0"
+          color="primary"
+          size="default"
+          prepend-icon="mdi-clock-outline"
+        >
+          {{ pendingFiles.length }} {{ pendingFiles.length === 1 ? 'pending' : 'pending' }}
+        </v-chip>
+        <v-chip
+          v-if="queueDuplicates.length > 0"
+          color="warning"
+          size="default"
+          prepend-icon="mdi-content-duplicate"
+        >
+          {{ queueDuplicates.length }} {{ queueDuplicates.length === 1 ? 'queue duplicate' : 'queue duplicates' }}
+        </v-chip>
+        <v-chip
+          v-if="previouslyUploaded.length > 0"
+          color="grey"
+          size="default"
+          prepend-icon="mdi-history"
+        >
+          {{ previouslyUploaded.length }} {{ previouslyUploaded.length === 1 ? 'previously uploaded' : 'previously uploaded' }}
+        </v-chip>
+        <v-chip
+          v-if="successfulUploads.length > 0"
+          color="success"
+          size="default"
+          prepend-icon="mdi-check-circle"
+        >
+          {{ successfulUploads.length }} {{ successfulUploads.length === 1 ? 'uploaded' : 'uploaded' }}
+        </v-chip>
+        <v-chip
+          v-if="failedUploads.length > 0"
+          color="error"
+          size="default"
+          prepend-icon="mdi-alert-circle"
+        >
+          {{ failedUploads.length }} {{ failedUploads.length === 1 ? 'failed' : 'failed' }}
+        </v-chip>
       </div>
 
       <!-- Files List -->
@@ -188,13 +216,80 @@ const props = defineProps({
 // Emits
 defineEmits(['remove-file', 'start-upload', 'clear-queue'])
 
-// Computed properties
+// Computed properties for six categories based on status and duplicates
+const queueingFiles = computed(() => {
+  // Files that are still being processed (no duplicate analysis completed yet)
+  // This could be files with status 'queueing' or files without hash/duplicate analysis
+  return props.files.filter(file => file.status === 'queueing')
+})
+const pendingFiles = computed(() => {
+  // Track seen hashes to identify queue duplicates
+  const seenHashes = new Set()
+  
+  return props.files.filter(file => {
+    // Only include pending files
+    if (file.status !== 'pending') {
+      return false
+    }
+    
+    // Skip exact duplicates (historical)
+    if (file.isExactDuplicate) {
+      return false
+    }
+    
+    // For queue duplicates, only keep the first occurrence
+    if (seenHashes.has(file.hash)) {
+      return false // This is a queue duplicate
+    }
+    
+    seenHashes.add(file.hash)
+    return true // This is the first occurrence and pending
+  })
+})
+
+const queueDuplicates = computed(() => {
+  const seenHashes = new Set()
+  
+  return props.files.filter(file => {
+    // Skip exact duplicates (historical) - they're in their own category
+    if (file.isExactDuplicate) {
+      return false
+    }
+    
+    // Skip completed/failed files - they're in their own categories
+    if (file.status === 'completed' || file.status === 'error') {
+      return false
+    }
+    
+    // For queue duplicates, skip the first occurrence but include subsequent ones
+    if (seenHashes.has(file.hash)) {
+      return true // This is a queue duplicate (2nd, 3rd, etc. occurrence)
+    }
+    
+    seenHashes.add(file.hash)
+    return false // This is the first occurrence, so it's not a queue duplicate
+  })
+})
+
+const previouslyUploaded = computed(() => {
+  return props.files.filter(file => file.isExactDuplicate)
+})
+
+const successfulUploads = computed(() => {
+  return props.files.filter(file => file.status === 'completed')
+})
+
+const failedUploads = computed(() => {
+  return props.files.filter(file => file.status === 'error')
+})
+
+// Keep these for backward compatibility with existing logic
 const uploadableFiles = computed(() => {
-  return props.files.filter(file => !file.isExactDuplicate)
+  return pendingFiles.value
 })
 
 const skippableFiles = computed(() => {
-  return props.files.filter(file => file.isExactDuplicate)
+  return [...queueDuplicates.value, ...previouslyUploaded.value]
 })
 
 const totalSize = computed(() => {
@@ -205,26 +300,6 @@ const hasErrors = computed(() => {
   return props.files.some(file => file.status === 'error')
 })
 
-const duplicateInfo = computed(() => {
-  // Analyze files for duplicates within the queue
-  const hashGroups = {}
-  props.files.forEach(file => {
-    if (!hashGroups[file.hash]) {
-      hashGroups[file.hash] = []
-    }
-    hashGroups[file.hash].push(file)
-  })
-  
-  const queueDuplicates = Object.values(hashGroups)
-    .filter(group => group.length > 1)
-    .flat()
-  
-  return {
-    queueDuplicates,
-    exactDuplicates: [],
-    metadataDuplicates: []
-  }
-})
 
 // Methods
 const getFileIcon = (mimeType) => {

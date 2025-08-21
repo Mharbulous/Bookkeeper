@@ -393,21 +393,25 @@ const readDirectoryRecursive = (dirEntry) => {
 }
 
 const createFileInfo = async (file) => {
-  // Calculate file hash (placeholder - would use actual crypto in production)
-  const hash = await calculateFileHash(file)
-  
-  return {
+  // Create initial file info with 'queueing' status
+  const fileInfo = {
     id: crypto.randomUUID(),
     file,
     name: file.name,
     size: file.size,
     type: file.type,
     lastModified: new Date(file.lastModified),
-    hash,
-    status: 'pending', // pending, uploading, completed, error, skipped
+    hash: null, // Will be calculated
+    status: 'queueing', // queueing, pending, uploading, completed, error, skipped
     progress: 0,
     path: file.webkitRelativePath || file.name
   }
+  
+  // Calculate file hash and update status
+  fileInfo.hash = await calculateFileHash(file)
+  fileInfo.status = 'pending' // Now ready for duplicate analysis
+  
+  return fileInfo
 }
 
 const calculateFileHash = async (file) => {
