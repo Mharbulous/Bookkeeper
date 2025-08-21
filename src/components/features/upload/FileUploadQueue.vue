@@ -37,7 +37,7 @@
       <div v-if="files.length > 0" class="mb-4">
         <div class="d-flex gap-2 flex-wrap">
           <v-chip
-            size="small"
+            size="large"
             variant="flat"
             color="grey"
             class="text-white"
@@ -46,7 +46,7 @@
           </v-chip>
           
           <v-chip
-            size="small"
+            size="large"
             variant="flat"
             color="orange"
           >
@@ -54,7 +54,7 @@
           </v-chip>
           
           <v-chip
-            size="small"
+            size="large"
             variant="flat"
             color="blue"
           >
@@ -62,7 +62,7 @@
           </v-chip>
           
           <v-chip
-            size="small"
+            size="large"
             variant="flat"
             color="green"
           >
@@ -70,7 +70,7 @@
           </v-chip>
           
           <v-chip
-            size="small"
+            size="large"
             variant="flat"
             color="red"
           >
