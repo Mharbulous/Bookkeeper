@@ -111,8 +111,9 @@
 
             <template #append>
               <div class="d-flex align-center">
-                <!-- Status indicator -->
+                <!-- Status indicator for duplicates and existing files only -->
                 <v-chip
+                  v-if="file.isDuplicate || file.isPreviousUpload"
                   :color="getStatusColor(file.status, file)"
                   size="small"
                   variant="flat"
@@ -121,13 +122,27 @@
                   {{ getStatusText(file.status, file) }}
                 </v-chip>
                 
-                <!-- Remove button -->
-                <v-btn
-                  icon="mdi-close"
-                  size="small"
-                  variant="text"
-                  @click="$emit('remove-file', file.id)"
-                />
+                <!-- Status icon -->
+                <div class="text-h6">
+                  <v-tooltip 
+                    v-if="file.status === 'pending' && !file.isDuplicate"
+                    text="Ready"
+                    location="bottom"
+                  >
+                    <template #activator="{ props }">
+                      <span v-bind="props">🟢</span>
+                    </template>
+                  </v-tooltip>
+                  <v-tooltip 
+                    v-else-if="file.isDuplicate || file.isPreviousUpload" 
+                    text="Skip"
+                    location="bottom"
+                  >
+                    <template #activator="{ props }">
+                      <span v-bind="props">↩️</span>
+                    </template>
+                  </v-tooltip>
+                </div>
               </div>
             </template>
           </v-list-item>
