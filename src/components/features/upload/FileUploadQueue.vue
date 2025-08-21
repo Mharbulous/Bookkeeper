@@ -37,6 +37,17 @@
       <div v-if="files.length > 0" class="mb-4">
         <div class="d-flex gap-2 flex-wrap">
           <v-chip
+            v-if="processingCount > 0"
+            size="large"
+            variant="flat"
+            color="purple"
+            class="text-white"
+          >
+            <v-icon start icon="mdi-cog" />
+            {{ processingCount }} processing
+          </v-chip>
+          
+          <v-chip
             size="large"
             variant="flat"
             color="grey"
@@ -113,7 +124,7 @@
               <div class="d-flex align-center">
                 <!-- Status indicator for duplicates and existing files only -->
                 <v-chip
-                  v-if="file.isDuplicate || file.isPreviousUpload"
+                  v-if="file.isDuplicate || file.isPreviousUpload || file.status === 'processing'"
                   :color="getStatusColor(file.status, file)"
                   size="small"
                   variant="flat"
@@ -125,7 +136,22 @@
                 <!-- Status icon -->
                 <div class="text-h6">
                   <v-tooltip 
-                    v-if="file.status === 'pending' && !file.isDuplicate"
+                    v-if="file.status === 'processing'"
+                    text="Processing..."
+                    location="bottom"
+                  >
+                    <template #activator="{ props }">
+                      <v-progress-circular
+                        v-bind="props"
+                        size="20"
+                        width="2"
+                        color="purple"
+                        indeterminate
+                      />
+                    </template>
+                  </v-tooltip>
+                  <v-tooltip 
+                    v-else-if="file.status === 'pending' && !file.isDuplicate"
                     text="Ready"
                     location="bottom"
                   >
@@ -216,7 +242,14 @@ const hasErrors = computed(() => {
 
 
 const pendingCount = computed(() => {
-  return props.files.filter(file => file.status === 'pending' || (!file.status && !file.isQueueDuplicate && !file.isPreviousUpload)).length
+  return props.files.filter(file => 
+    file.status === 'pending' || 
+    (!file.status && !file.isQueueDuplicate && !file.isPreviousUpload)
+  ).length
+})
+
+const processingCount = computed(() => {
+  return props.files.filter(file => file.status === 'processing').length
 })
 
 const queueDuplicatesCount = computed(() => {
@@ -293,6 +326,7 @@ const formatDate = (date) => {
 
 const getStatusColor = (status, file) => {
   const statusColors = {
+    processing: 'purple',
     pending: 'grey',
     uploading: 'primary',
     completed: 'success',
@@ -310,6 +344,7 @@ const getStatusColor = (status, file) => {
 
 const getStatusText = (status, file) => {
   const statusTexts = {
+    processing: 'Processing',
     pending: 'Ready',
     uploading: 'Uploading',
     completed: 'Completed',

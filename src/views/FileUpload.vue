@@ -144,6 +144,33 @@
         </v-card>
       </v-dialog>
 
+      <!-- Batch Processing Progress -->
+      <v-card
+        v-if="isProcessingHashes"
+        class="mb-6"
+        variant="outlined"
+      >
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-fingerprint" class="me-2" />
+          Calculating File Fingerprints
+        </v-card-title>
+        <v-card-text>
+          <v-progress-linear
+            :model-value="(hashingProgress / hashingTotal) * 100"
+            color="primary"
+            height="8"
+            class="mb-2"
+          />
+          <div class="text-body-2 text-grey-darken-1">
+            Processing {{ Math.floor(hashingProgress) }} of {{ hashingTotal }} files...
+            <!-- UX: Show processing speed indicator -->
+            <span v-if="hashingProgress > 0 && hashingTotal > 0">
+              ({{ Math.round((hashingProgress / hashingTotal) * 100) }}% complete)
+            </span>
+          </div>
+        </v-card-text>
+      </v-card>
+
       <!-- Upload Queue/Preview -->
       <FileUploadQueue
         v-if="uploadQueue.length > 0"
@@ -176,7 +203,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { UploadLogService } from '../services/uploadLogService'
 import FileUploadQueue from '../components/features/upload/FileUploadQueue.vue'
@@ -306,57 +333,229 @@ const processSingleFile = async (file) => {
 }
 
 const addFilesToQueue = async (files) => {
-  // Create file info objects
-  const newFileInfos = await Promise.all(files.map(createFileInfo))
+  if (files.length === 0) {
+    console.log('⚠️ DEBUG: addFilesToQueue called with 0 files')
+    return
+  }
   
-  // Process each file according to new deduplication logic
-  for (const fileInfo of newFileInfos) {
-    // Step 1: Check for exact queue duplicates - skip entirely if found
-    const exactQueueMatch = uploadQueue.value.find(queueFile => areExactDuplicates(fileInfo, queueFile))
-    if (exactQueueMatch) {
-      // Update existing file with longer folder path
-      exactQueueMatch.path = getLongerPath(exactQueueMatch.path, fileInfo.path)
-      continue // Skip adding this file entirely
-    }
+  // Performance measurement: Start detailed timing for each step
+  const stepTimes = {}
+  const overallStartTime = performance.now()
+  
+  console.log('⚡ PERFORMANCE: Starting addFilesToQueue', {
+    fileCount: files.length,
+    fileNames: files.map(f => f.name),
+    currentQueueSize: uploadQueue.value.length,
+    timestamp: new Date().toISOString()
+  })
+  
+  // Step 1: Add files to queue immediately with "processing" status for instant feedback
+  stepTimes.step1Start = performance.now()
+  const fileInfos = files.map(file => createFileInfoSync(file))
+  fileInfos.forEach(fileInfo => {
+    fileInfo.status = 'processing'  // Show immediate feedback
+    uploadQueue.value.push(fileInfo)
+  })
+  stepTimes.step1End = performance.now()
+  console.log('📋 PERFORMANCE: Step 1 - Immediate queue addition', {
+    timeMs: Math.round(stepTimes.step1End - stepTimes.step1Start),
+    filesAdded: fileInfos.length,
+    queueSizeAfterAdd: uploadQueue.value.length,
+    queueFileNames: uploadQueue.value.map(f => f.name)
+  })
+  
+  try {
+    // Step 2: Calculate hashes in parallel using worker pool
+    stepTimes.step2Start = performance.now()
+    console.log('🔢 PERFORMANCE: Step 2 - Starting hash calculation', { fileCount: files.length })
+    const hashes = await calculateFileHashesBatch(files)
+    stepTimes.step2End = performance.now()
+    console.log('🔢 PERFORMANCE: Step 2 - Hash calculation completed', {
+      timeMs: Math.round(stepTimes.step2End - stepTimes.step2Start),
+      avgHashTime: Math.round((stepTimes.step2End - stepTimes.step2Start) / files.length),
+      filesHashed: files.length
+    })
     
-    // Step 2: Check for previous uploads
-    const duplicateResult = await checkForDuplicates(fileInfo)
-    if (duplicateResult.isDuplicate && duplicateResult.exactDuplicate) {
-      fileInfo.status = 'existing'
-      fileInfo.isPreviousUpload = true
-      fileInfo.isDuplicate = false
-      const uploadDate = duplicateResult.exactDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.exactDuplicate.uploadDate)
-      const formattedDate = uploadDate.toLocaleDateString()
-      fileInfo.duplicateMessage = `Previously uploaded by ${duplicateResult.exactDuplicate.uploaderName} on ${formattedDate}.`
-      uploadQueue.value.push(fileInfo)
-      continue
-    }
+    // Step 3: Update file infos with calculated hashes
+    stepTimes.step3Start = performance.now()
+    fileInfos.forEach((fileInfo, index) => {
+      fileInfo.hash = hashes[index]
+    })
+    stepTimes.step3End = performance.now()
     
-    // Step 3: Check for queue duplicates (same hash, different metadata)
-    const queueDuplicateIndex = uploadQueue.value.findIndex(queueFile => 
-      queueFile.hash === fileInfo.hash && !areExactDuplicates(fileInfo, queueFile)
-    )
+    // Step 4: Process exact queue duplicates first (before expensive Firestore queries)
+    stepTimes.step4Start = performance.now()
+    const uniqueFiles = []
+    let exactDuplicatesRemoved = 0
     
-    if (queueDuplicateIndex !== -1) {
-      // This is a queue duplicate - add immediately after the original
-      fileInfo.status = 'duplicate'
-      fileInfo.isQueueDuplicate = true
-      fileInfo.isDuplicate = true
-      uploadQueue.value.splice(queueDuplicateIndex + 1, 0, fileInfo)
-    } else {
-      // Step 4: This is a new file
-      fileInfo.status = 'pending'
-      fileInfo.isDuplicate = false
+    // Get existing queue files (exclude the newly added files from this batch)
+    const newFileIds = new Set(fileInfos.map(f => f.id))
+    const existingQueueFiles = uploadQueue.value.filter(queueFile => !newFileIds.has(queueFile.id))
+    
+    for (const fileInfo of fileInfos) {
+      const exactQueueMatch = existingQueueFiles.find(queueFile => 
+        areExactDuplicates(fileInfo, queueFile)
+      )
       
-      // Check for metadata duplicates from previous uploads (different from exact duplicates)
-      if (duplicateResult.isDuplicate && duplicateResult.metadataDuplicate) {
-        const uploadDate = duplicateResult.metadataDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.metadataDuplicate.uploadDate)
-        const formattedDate = uploadDate.toLocaleDateString()
-        fileInfo.duplicateMessage = `Similar file uploaded by ${duplicateResult.metadataDuplicate.uploaderName} on ${formattedDate}. Proceeding with upload to enable comparison.`
+      if (exactQueueMatch) {
+        // Update existing file with longer folder path and remove duplicate
+        exactQueueMatch.path = getLongerPath(exactQueueMatch.path, fileInfo.path)
+        const index = uploadQueue.value.findIndex(f => f.id === fileInfo.id)
+        if (index !== -1) {
+          console.log('🗑️ DEBUG: Removing exact duplicate from queue', {
+            fileName: fileInfo.name,
+            originalPath: exactQueueMatch.path,
+            duplicatePath: fileInfo.path
+          })
+          uploadQueue.value.splice(index, 1)
+        }
+        exactDuplicatesRemoved++
+        continue
       }
       
-      uploadQueue.value.push(fileInfo)
+      uniqueFiles.push(fileInfo)
     }
+    stepTimes.step4End = performance.now()
+    console.log('🔍 PERFORMANCE: Step 4 - Queue duplicate filtering', {
+      timeMs: Math.round(stepTimes.step4End - stepTimes.step4Start),
+      exactDuplicatesRemoved,
+      uniqueFilesRemaining: uniqueFiles.length
+    })
+    
+    if (uniqueFiles.length === 0) {
+      const overallEndTime = performance.now()
+      console.log('✅ PERFORMANCE: All files were exact duplicates - processing complete', {
+        totalTimeMs: Math.round(overallEndTime - overallStartTime),
+        finalQueueSize: uploadQueue.value.length,
+        finalQueueFiles: uploadQueue.value.map(f => ({ name: f.name, status: f.status }))
+      })
+      return
+    }
+    
+    // Step 5: Batch duplicate detection with single Firestore query
+    stepTimes.step5Start = performance.now()
+    console.log('🔥 PERFORMANCE: Step 5 - Starting batch Firestore duplicate detection', {
+      uniqueFiles: uniqueFiles.length,
+      uniqueFileNames: uniqueFiles.map(f => f.name)
+    })
+    await checkForDuplicatesBatch(uniqueFiles)
+    stepTimes.step5End = performance.now()
+    console.log('🔥 PERFORMANCE: Step 5 - Firestore duplicate detection completed', {
+      timeMs: Math.round(stepTimes.step5End - stepTimes.step5Start),
+      filesChecked: uniqueFiles.length,
+      duplicateResults: uniqueFiles.map(f => ({
+        name: f.name,
+        isDuplicate: f.duplicateResult?.isDuplicate || false,
+        type: f.duplicateResult?.type
+      }))
+    })
+    
+    // Step 6: Process results and update queue positions
+    const processedFiles = []
+    
+    for (const fileInfo of uniqueFiles) {
+      const duplicateResult = fileInfo.duplicateResult
+      
+      if (duplicateResult.isDuplicate && duplicateResult.exactDuplicate) {
+        // Previous exact upload found
+        fileInfo.status = 'existing'
+        fileInfo.isPreviousUpload = true
+        fileInfo.isDuplicate = false
+        const uploadDate = duplicateResult.exactDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.exactDuplicate.uploadDate)
+        const formattedDate = uploadDate.toLocaleDateString()
+        fileInfo.duplicateMessage = `Previously uploaded by ${duplicateResult.exactDuplicate.uploaderName} on ${formattedDate}.`
+      } else {
+        // Check for queue duplicates (same hash, different metadata)  
+        const queueDuplicateIndex = uploadQueue.value.findIndex(queueFile => 
+          !newFileIds.has(queueFile.id) && queueFile.hash === fileInfo.hash && !areExactDuplicates(fileInfo, queueFile)
+        )
+        
+        if (queueDuplicateIndex !== -1) {
+          // This is a queue duplicate - position after the original
+          fileInfo.status = 'duplicate'
+          fileInfo.isQueueDuplicate = true
+          fileInfo.isDuplicate = true
+          
+          // Remove from current position and insert after original
+          const currentIndex = uploadQueue.value.findIndex(f => f.id === fileInfo.id)
+          if (currentIndex !== -1) {
+            uploadQueue.value.splice(currentIndex, 1)
+            uploadQueue.value.splice(queueDuplicateIndex + 1, 0, fileInfo)
+          }
+        } else {
+          // This is a new file
+          fileInfo.status = 'pending'
+          fileInfo.isDuplicate = false
+          
+          // Check for metadata duplicates from previous uploads
+          if (duplicateResult.isDuplicate && duplicateResult.metadataDuplicate) {
+            const uploadDate = duplicateResult.metadataDuplicate.uploadDate?.toDate?.() || new Date(duplicateResult.metadataDuplicate.uploadDate)
+            const formattedDate = uploadDate.toLocaleDateString()
+            fileInfo.duplicateMessage = `Similar file uploaded by ${duplicateResult.metadataDuplicate.uploaderName} on ${formattedDate}. Proceeding with upload to enable comparison.`
+          }
+        }
+      }
+      
+      processedFiles.push(fileInfo)
+    }
+    
+    // Step 7: Update final status for all remaining files
+    stepTimes.step7Start = performance.now()
+    uploadQueue.value.forEach(file => {
+      if (file.status === 'processing') {
+        if (file.isPreviousUpload) {
+          file.status = 'existing'
+        } else if (file.isDuplicate) {
+          file.status = 'duplicate'
+        } else {
+          file.status = 'ready'
+        }
+      }
+    })
+    stepTimes.step7End = performance.now()
+    
+    // Final completion logging
+    const overallEndTime = performance.now()
+    const totalTime = overallEndTime - overallStartTime
+    console.log('🎉 PERFORMANCE: Complete processing pipeline finished', {
+      totalTimeMs: Math.round(totalTime),
+      totalTimeSec: Math.round(totalTime / 1000 * 100) / 100,
+      originalFileCount: files.length,
+      processedFileCount: processedFiles.length,
+      exactDuplicatesRemoved,
+      finalQueueSize: uploadQueue.value.length,
+      finalQueueStatus: uploadQueue.value.map(f => ({ 
+        name: f.name, 
+        status: f.status, 
+        isDuplicate: f.isDuplicate,
+        isPreviousUpload: f.isPreviousUpload 
+      })),
+      avgTimePerFile: Math.round(totalTime / files.length * 100) / 100 + 'ms',
+      stepBreakdown: {
+        queueAddition: Math.round(stepTimes.step1End - stepTimes.step1Start) + 'ms',
+        hashCalculation: Math.round(stepTimes.step2End - stepTimes.step2Start) + 'ms',
+        queueFiltering: Math.round(stepTimes.step4End - stepTimes.step4Start) + 'ms',
+        firestoreQueries: Math.round(stepTimes.step5End - stepTimes.step5Start) + 'ms',
+        statusUpdate: Math.round(stepTimes.step7End - stepTimes.step7Start) + 'ms'
+      }
+    })
+    
+  } catch (error) {
+    const overallEndTime = performance.now()
+    const totalTime = overallEndTime - overallStartTime
+    console.error('❌ PERFORMANCE: Processing failed', {
+      error: error.message,
+      totalTimeBeforeFailure: Math.round(totalTime) + 'ms',
+      fileCount: files.length
+    })
+    
+    // Update failed files with error status
+    fileInfos.forEach(fileInfo => {
+      if (fileInfo.status === 'processing') {
+        fileInfo.status = 'error'
+        fileInfo.error = 'Processing failed'
+      }
+    })
   }
 }
 
@@ -418,10 +617,8 @@ const readDirectoryRecursive = (dirEntry) => {
   })
 }
 
-const createFileInfo = async (file) => {
-  // Calculate file hash (placeholder - would use actual crypto in production)
-  const hash = await calculateFileHash(file)
-  
+// Synchronous file info creation for immediate UI feedback
+const createFileInfoSync = (file) => {
   return {
     id: crypto.randomUUID(),
     file,
@@ -429,19 +626,180 @@ const createFileInfo = async (file) => {
     size: file.size,
     type: file.type,
     lastModified: new Date(file.lastModified),
-    hash,
-    status: 'pending', // pending, uploading, completed, error, skipped
+    hash: null, // Will be calculated asynchronously
+    status: 'processing', // processing, pending, uploading, completed, error, skipped
     progress: 0,
     path: file.webkitRelativePath || file.name
   }
 }
 
-const calculateFileHash = async (file) => {
-  // Calculate hash based on actual file content
+// Legacy async version for compatibility
+const createFileInfo = async (file) => {
+  const fileInfo = createFileInfoSync(file)
+  // Hash will be calculated separately in batch mode
+  return fileInfo
+}
+
+// Worker pool for parallel hash calculation
+const workerPool = ref([])
+const WORKER_COUNT = Math.min(navigator.hardwareConcurrency || 4, 8) // Max 8 workers
+const isProcessingHashes = ref(false)
+const hashingProgress = ref(0)
+const hashingTotal = ref(0)
+
+// Initialize worker pool on component mount
+onMounted(() => {
+  initializeWorkerPool()
+})
+
+// Cleanup workers on component unmount  
+onUnmounted(() => {
+  cleanupWorkerPool()
+})
+
+const initializeWorkerPool = () => {
+  try {
+    for (let i = 0; i < WORKER_COUNT; i++) {
+      const worker = new Worker('/hash-worker.js')
+      workerPool.value.push(worker)
+    }
+    console.log(`Initialized ${WORKER_COUNT} hash calculation workers`)
+  } catch (error) {
+    console.warn('Web Workers not available, falling back to main thread:', error)
+  }
+}
+
+const cleanupWorkerPool = () => {
+  workerPool.value.forEach(worker => {
+    worker.terminate()
+  })
+  workerPool.value = []
+}
+
+// Batch hash calculation using worker pool
+const calculateFileHashesBatch = async (files) => {
+  if (files.length === 0) return []
+  
+  const hashStartTime = performance.now()
+  isProcessingHashes.value = true
+  hashingProgress.value = 0
+  hashingTotal.value = files.length
+  
+  console.log('⚙️ PERFORMANCE: Web Worker hash calculation started', {
+    fileCount: files.length,
+    workerCount: workerPool.value.length,
+    usingWorkers: workerPool.value.length > 0
+  })
+  
+  try {
+    const hashPromises = files.map((file, index) => {
+      return calculateFileHashWithWorker(file, index)
+    })
+    
+    const results = await Promise.allSettled(hashPromises)
+    
+    // Process results and handle any failures
+    const hashes = results.map((result, index) => {
+      if (result.status === 'fulfilled') {
+        return result.value
+      } else {
+        console.error(`Hash calculation failed for file ${index}:`, result.reason)
+        // Fallback to a deterministic hash based on file metadata
+        return generateFallbackHash(files[index])
+      }
+    })
+    
+    const hashEndTime = performance.now()
+    const hashTime = hashEndTime - hashStartTime
+    console.log('⚡ PERFORMANCE: Web Worker hash calculation completed', {
+      totalTimeMs: Math.round(hashTime),
+      fileCount: files.length,
+      avgTimePerFile: Math.round(hashTime / files.length * 100) / 100 + 'ms',
+      successful: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      workerCount: workerPool.value.length
+    })
+    
+    return hashes
+  } finally {
+    isProcessingHashes.value = false
+    hashingProgress.value = 0
+    hashingTotal.value = 0
+  }
+}
+
+const calculateFileHashWithWorker = async (file, index) => {
+  if (workerPool.value.length === 0) {
+    // Fallback to main thread if workers not available
+    return await calculateFileHashMainThread(file)
+  }
+  
+  return new Promise((resolve, reject) => {
+    // Select worker using round-robin
+    const worker = workerPool.value[index % workerPool.value.length]
+    const fileId = crypto.randomUUID()
+    
+    const cleanup = () => {
+      worker.removeEventListener('message', messageHandler)
+      worker.removeEventListener('error', errorHandler)
+    }
+    
+    const messageHandler = (event) => {
+      const { fileId: responseFileId, hash, success, isProgress, error } = event.data
+      
+      if (responseFileId !== fileId) return
+      
+      if (isProgress) {
+        // Update progress for this file
+        hashingProgress.value = Math.min(hashingProgress.value + 0.1, hashingTotal.value)
+        return
+      }
+      
+      cleanup()
+      
+      if (success && hash) {
+        hashingProgress.value += 1
+        resolve(hash)
+      } else {
+        reject(new Error(error || 'Hash calculation failed'))
+      }
+    }
+    
+    const errorHandler = (error) => {
+      cleanup()
+      reject(error)
+    }
+    
+    worker.addEventListener('message', messageHandler)
+    worker.addEventListener('error', errorHandler)
+    
+    // Convert file to ArrayBuffer and send to worker
+    file.arrayBuffer().then(arrayBuffer => {
+      worker.postMessage({
+        fileData: arrayBuffer,
+        fileId
+      })
+    }).catch(error => {
+      cleanup()
+      reject(error)
+    })
+  })
+}
+
+// Fallback hash calculation on main thread
+const calculateFileHashMainThread = async (file) => {
   const arrayBuffer = await file.arrayBuffer()
   const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Generate deterministic fallback hash from file metadata
+const generateFallbackHash = (file) => {
+  const metadata = `${file.name}-${file.size}-${file.lastModified}-${file.type}`
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(metadata))
+    .then(buffer => Array.from(new Uint8Array(buffer))
+      .map(b => b.toString(16).padStart(2, '0')).join(''))
 }
 
 // Helper function for intelligent folder path matching
@@ -502,8 +860,71 @@ const checkForDuplicates = async (fileInfo) => {
   }
 }
 
+// Batch duplicate detection for improved performance
+const checkForDuplicatesBatch = async (fileInfos) => {
+  try {
+    // Get current team ID for multi-tenant isolation
+    const teamId = authStore.currentTeam
+    if (!teamId) {
+      console.warn('No team ID available for duplicate detection')
+      fileInfos.forEach(fileInfo => {
+        fileInfo.duplicateResult = {
+          isDuplicate: false,
+          exactDuplicate: null,
+          metadataDuplicate: null
+        }
+      })
+      return
+    }
+
+    // UX: Single batch query instead of N individual queries
+    const hashes = fileInfos.map(f => f.hash).filter(Boolean)
+    if (hashes.length === 0) {
+      fileInfos.forEach(fileInfo => {
+        fileInfo.duplicateResult = {
+          isDuplicate: false,
+          exactDuplicate: null,
+          metadataDuplicate: null
+        }
+      })
+      return
+    }
+
+    // Batch query to UploadLogService with caching
+    const duplicateResults = await UploadLogService.checkForDuplicatesBatch(fileInfos, teamId)
+    
+    // Apply results back to file infos
+    fileInfos.forEach((fileInfo, index) => {
+      fileInfo.duplicateResult = duplicateResults[index] || {
+        isDuplicate: false,
+        exactDuplicate: null,
+        metadataDuplicate: null
+      }
+    })
+
+  } catch (error) {
+    console.error('Error checking for duplicates in batch:', error)
+    // Return safe fallback if service fails
+    fileInfos.forEach(fileInfo => {
+      fileInfo.duplicateResult = {
+        isDuplicate: false,
+        exactDuplicate: null,
+        metadataDuplicate: null
+      }
+    })
+  }
+}
+
 // Folder options handlers
 const confirmFolderOptions = () => {
+  // Performance measurement: Start timing
+  const startTime = performance.now()
+  console.log('🚀 PERFORMANCE: Folder upload processing started', {
+    timestamp: new Date().toISOString(),
+    totalFiles: pendingFolderFiles.value.length,
+    includeSubfolders: includeSubfolders.value
+  })
+  
   let filesToAdd = pendingFolderFiles.value
   
   if (!includeSubfolders.value) {
@@ -511,7 +932,25 @@ const confirmFolderOptions = () => {
     filesToAdd = filesToAdd.filter(f => !f.path.includes('/') || f.path.split('/').length <= 2)
   }
   
-  addFilesToQueue(filesToAdd.map(f => f.file))
+  console.log('📁 PERFORMANCE: Files filtered for processing', {
+    originalCount: pendingFolderFiles.value.length,
+    filteredCount: filesToAdd.length,
+    includeSubfolders: includeSubfolders.value
+  })
+  
+  addFilesToQueue(filesToAdd.map(f => f.file)).then(() => {
+    // Performance measurement: End timing
+    const endTime = performance.now()
+    const totalTime = endTime - startTime
+    console.log('✅ PERFORMANCE: Folder upload processing completed', {
+      timestamp: new Date().toISOString(),
+      totalTimeMs: Math.round(totalTime),
+      totalTimeSec: Math.round(totalTime / 1000 * 100) / 100,
+      filesProcessed: filesToAdd.length,
+      avgTimePerFile: Math.round(totalTime / filesToAdd.length * 100) / 100 + 'ms'
+    })
+  })
+  
   showFolderOptions.value = false
   pendingFolderFiles.value = []
 }
@@ -531,6 +970,10 @@ const removeFromQueue = (fileId) => {
 
 const clearQueue = () => {
   uploadQueue.value = []
+  // Clear the duplicate detection cache when queue is cleared
+  // This prevents cached results from interfering with re-adding the same files
+  UploadLogService.clearCache()
+  console.log('🧹 PERFORMANCE: Cache cleared along with upload queue')
 }
 
 const startUpload = () => {

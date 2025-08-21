@@ -32,6 +32,53 @@ import { db } from './firebase.js'
  *   }
  * }
  */
+
+// Caching layer for duplicate detection performance
+const duplicateCache = new Map()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes cache TTL
+const CACHE_MAX_SIZE = 1000 // Maximum cache entries
+
+// Cache management utilities
+const cleanupExpiredCache = () => {
+  const now = Date.now()
+  for (const [key, entry] of duplicateCache.entries()) {
+    if (now - entry.timestamp > CACHE_TTL) {
+      duplicateCache.delete(key)
+    }
+  }
+}
+
+const addToCache = (key, result) => {
+  // Clean up expired entries if cache is getting large
+  if (duplicateCache.size > CACHE_MAX_SIZE) {
+    cleanupExpiredCache()
+  }
+  
+  // If still too large, remove oldest entries
+  if (duplicateCache.size > CACHE_MAX_SIZE) {
+    const oldestKey = duplicateCache.keys().next().value
+    duplicateCache.delete(oldestKey)
+  }
+  
+  duplicateCache.set(key, {
+    result,
+    timestamp: Date.now()
+  })
+}
+
+const getFromCache = (key) => {
+  const entry = duplicateCache.get(key)
+  if (!entry) return null
+  
+  // Check if expired
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    duplicateCache.delete(key)
+    return null
+  }
+  
+  return entry.result
+}
+
 export class UploadLogService {
   /**
    * Log a file upload attempt
@@ -147,20 +194,34 @@ export class UploadLogService {
     }
 
     try {
-      const uploadsRef = collection(db, 'uploadLogs')
-      const q = query(
-        uploadsRef,
-        where('fileHash', 'in', fileHashes),
-        where('teamId', '==', teamId)
-      )
+      // Use team-specific upload logs collection (fixed collection path)
+      const uploadsRef = collection(db, 'teams', teamId, 'upload_logs')
       
-      const querySnapshot = await getDocs(q)
+      // Firestore 'in' queries are limited to 10 items, so batch them
+      const BATCH_SIZE = 10
+      const batches = []
+      
+      for (let i = 0; i < fileHashes.length; i += BATCH_SIZE) {
+        const batch = fileHashes.slice(i, i + BATCH_SIZE)
+        const q = query(
+          uploadsRef,
+          where('fileHash', 'in', batch)
+          // No need to filter by teamId since we're already in the team's collection
+        )
+        batches.push(q)
+      }
+      
+      // Execute all queries in parallel
+      const queryPromises = batches.map(q => getDocs(q))
+      const querySnapshots = await Promise.all(queryPromises)
+      
       const uploads = []
-      
-      querySnapshot.forEach((doc) => {
-        uploads.push({
-          id: doc.id,
-          ...doc.data()
+      querySnapshots.forEach(querySnapshot => {
+        querySnapshot.forEach((doc) => {
+          uploads.push({
+            id: doc.id,
+            ...doc.data()
+          })
         })
       })
 
@@ -238,6 +299,125 @@ export class UploadLogService {
   }
 
   /**
+   * Batch check for duplicate files with caching for improved performance
+   * @param {Array<Object>} fileInfos - Array of file information objects with hash and metadata
+   * @param {string} teamId - Team ID for multi-tenant isolation
+   * @returns {Promise<Array<Object>>} - Array of duplicate analysis results
+   */
+  static async checkForDuplicatesBatch(fileInfos, teamId) {
+    if (!fileInfos || fileInfos.length === 0 || !teamId) {
+      throw new Error('File infos array and team ID are required')
+    }
+
+    try {
+      const results = []
+      const uncachedFiles = []
+      const uncachedIndexes = []
+      
+      // Step 1: Check cache for existing results
+      fileInfos.forEach((fileInfo, index) => {
+        const cacheKey = `${teamId}:${fileInfo.hash}`
+        const cachedResult = getFromCache(cacheKey)
+        
+        if (cachedResult) {
+          // UX: Cache hit - instant result without Firestore query
+          results[index] = cachedResult
+        } else {
+          uncachedFiles.push(fileInfo)
+          uncachedIndexes.push(index)
+        }
+      })
+      
+      if (uncachedFiles.length === 0) {
+        return results
+      }
+      
+      // Step 2: Batch query for uncached files only
+      const uniqueHashes = [...new Set(uncachedFiles.map(f => f.hash).filter(Boolean))]
+      
+      if (uniqueHashes.length === 0) {
+        // Fill remaining results with no duplicates found
+        uncachedIndexes.forEach(index => {
+          results[index] = {
+            isDuplicate: false,
+            exactDuplicate: null,
+            metadataDuplicate: null
+          }
+        })
+        return results
+      }
+      
+      // Batch Firestore query with intelligent batching
+      const allUploads = await this.findUploadsByHashes(uniqueHashes, teamId)
+      
+      // Create lookup map for efficient matching
+      const uploadsByHash = new Map()
+      allUploads.forEach(upload => {
+        if (!uploadsByHash.has(upload.fileHash)) {
+          uploadsByHash.set(upload.fileHash, [])
+        }
+        uploadsByHash.get(upload.fileHash).push(upload)
+      })
+      
+      // Step 3: Process results and populate cache
+      uncachedFiles.forEach((fileInfo, uncachedIndex) => {
+        const resultIndex = uncachedIndexes[uncachedIndex]
+        const existingUploads = uploadsByHash.get(fileInfo.hash) || []
+        
+        let result
+        if (existingUploads.length === 0) {
+          result = {
+            isDuplicate: false,
+            exactDuplicate: null,
+            metadataDuplicate: null
+          }
+        } else {
+          // Check for exact duplicates (same hash and metadata)
+          const exactDuplicate = existingUploads.find(upload => 
+            this.compareFileMetadata(fileInfo, upload)
+          )
+          
+          if (exactDuplicate) {
+            result = {
+              isDuplicate: true,
+              type: 'exact',
+              exactDuplicate,
+              metadataDuplicate: null
+            }
+          } else {
+            // Metadata duplicate - same content, different metadata
+            const metadataDuplicate = existingUploads[0] // Get the first/most recent one
+            result = {
+              isDuplicate: true,
+              type: 'metadata',
+              exactDuplicate: null,
+              metadataDuplicate
+            }
+          }
+        }
+        
+        results[resultIndex] = result
+        
+        // Cache the result for future use
+        const cacheKey = `${teamId}:${fileInfo.hash}`
+        addToCache(cacheKey, result)
+      })
+      
+      return results
+      
+    } catch (error) {
+      console.error('Error checking for duplicates in batch:', error)
+      
+      // Return safe fallback for all files if batch fails
+      return fileInfos.map(() => ({
+        isDuplicate: false,
+        exactDuplicate: null,
+        metadataDuplicate: null
+      }))
+    }
+  }
+
+  /**
    * Get recent upload statistics for a team
    * @param {string} teamId - Team ID
    * @param {number} limit - Maximum number of logs to return (default: 100)
@@ -275,6 +455,27 @@ export class UploadLogService {
     } catch (error) {
       console.error('Error getting recent uploads:', error)
       throw new Error(`Failed to get recent uploads: ${error.message}`)
+    }
+  }
+
+  /**
+   * Clear the duplicate detection cache (for testing or memory management)
+   */
+  static clearCache() {
+    duplicateCache.clear()
+  }
+  
+  /**
+   * Get cache statistics for debugging
+   * @returns {Object} Cache statistics
+   */
+  static getCacheStats() {
+    return {
+      size: duplicateCache.size,
+      maxSize: CACHE_MAX_SIZE,
+      ttlMs: CACHE_TTL,
+      // UX: Cache hit ratio could be shown in debug mode
+      entries: Array.from(duplicateCache.keys())
     }
   }
 }
