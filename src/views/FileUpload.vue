@@ -342,7 +342,6 @@ const addFilesToQueue = async (files) => {
       fileInfo.status = 'duplicate'
       fileInfo.isQueueDuplicate = true
       fileInfo.isDuplicate = true
-      fileInfo.duplicateMessage = `Duplicate of file already in queue with different metadata.`
       uploadQueue.value.splice(queueDuplicateIndex + 1, 0, fileInfo)
     } else {
       // Step 4: This is a new file
@@ -438,12 +437,9 @@ const createFileInfo = async (file) => {
 }
 
 const calculateFileHash = async (file) => {
-  // Simplified hash calculation for demo
-  // In production, use Web Crypto API with SHA-256
-  const text = `${file.name}-${file.size}-${file.lastModified}`
-  const encoder = new TextEncoder()
-  const data = encoder.encode(text)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  // Calculate hash based on actual file content
+  const arrayBuffer = await file.arrayBuffer()
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
 }
@@ -474,6 +470,7 @@ const getLongerPath = (path1, path2) => {
 // Helper function to check if two files are exact duplicates
 const areExactDuplicates = (file1, file2) => {
   return file1.hash === file2.hash &&
+         file1.name === file2.name &&
          file1.lastModified.getTime() === file2.lastModified.getTime() &&
          isFolderPathMatch(file1.path, file2.path)
 }

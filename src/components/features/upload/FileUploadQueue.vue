@@ -42,7 +42,7 @@
             color="grey"
             class="text-white"
           >
-            {{ pendingCount }} new files
+            {{ pendingCount }} new
           </v-chip>
           
           <v-chip
@@ -50,7 +50,7 @@
             variant="flat"
             color="orange"
           >
-            {{ queueDuplicatesCount }} queued duplicates
+            {{ queueDuplicatesCount }} duplicates
           </v-chip>
           
           <v-chip
@@ -91,27 +91,6 @@
 
             <v-list-item-title class="d-flex align-center">
               <span class="text-truncate me-2">{{ file.name }}</span>
-              
-              <!-- Duplicate indicators -->
-              <v-chip
-                v-if="file.isQueueDuplicate"
-                size="x-small"
-                color="orange"
-                variant="flat"
-                class="me-1"
-              >
-                Queue Duplicate
-              </v-chip>
-              
-              <v-chip
-                v-if="file.isPreviousUpload"
-                size="x-small"
-                color="blue"
-                variant="flat"
-                class="me-1"
-              >
-                Previously Uploaded
-              </v-chip>
             </v-list-item-title>
 
             <v-list-item-subtitle>
@@ -316,7 +295,7 @@ const getStatusColor = (status, file) => {
 
 const getStatusText = (status, file) => {
   const statusTexts = {
-    pending: 'Pending',
+    pending: 'Ready',
     uploading: 'Uploading',
     completed: 'Completed',
     error: 'Error',
