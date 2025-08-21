@@ -148,9 +148,11 @@
       <FileUploadQueue
         v-if="uploadQueue.length > 0"
         :files="uploadQueue"
+        :is-processing="isProcessingQueue"
         @remove-file="removeFromQueue"
         @start-upload="startUpload"
         @clear-queue="clearQueue"
+        @cancel-processing="cancelProcessing"
       />
 
       <!-- Single File Upload Notification -->
@@ -198,6 +200,10 @@ const pendingFolderFiles = ref([])
 const subfolderCount = ref(0)
 const showSingleFileNotification = ref(false)
 const singleFileNotification = ref({ message: '', color: 'info' })
+
+// Processing state for streaming deduplication
+const isProcessingQueue = ref(false)
+const processingController = ref(null)
 
 // Template refs
 const fileInput = ref(null)
@@ -305,6 +311,19 @@ const processSingleFile = async (file) => {
   }
 }
 
+// Fast synchronous queueing without deduplication
+const addFilesToQueueSynchronous = (files) => {
+  // Create file info objects synchronously (fast - no hash calculation)
+  const newFileInfos = files.map(createFileInfoSynchronous)
+  
+  // Add to queue immediately
+  uploadQueue.value.push(...newFileInfos)
+  
+  // Start streaming deduplication process
+  processQueuedFilesStreamingly()
+}
+
+// Original function - now kept for individual file uploads that need immediate processing
 const addFilesToQueue = async (files) => {
   // Create file info objects
   const newFileInfos = await Promise.all(files.map(createFileInfo))
@@ -392,6 +411,23 @@ const readDirectoryRecursive = (dirEntry) => {
   })
 }
 
+// Fast synchronous file info creation for initial queueing
+const createFileInfoSynchronous = (file) => {
+  return {
+    id: crypto.randomUUID(),
+    file,
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    lastModified: new Date(file.lastModified),
+    hash: null, // Will be calculated during streaming processing
+    status: 'queueing', // queueing, pending, uploading, completed, error, skipped
+    progress: 0,
+    path: file.webkitRelativePath || file.name
+  }
+}
+
+// Complete file info creation with hash calculation and duplicate detection
 const createFileInfo = async (file) => {
   // Create initial file info with 'queueing' status
   const fileInfo = {
@@ -452,6 +488,211 @@ const checkForDuplicates = async (fileInfo) => {
   }
 }
 
+// Streaming deduplication processor with batch processing
+const processQueuedFilesStreamingly = async () => {
+  // Prevent multiple simultaneous processing
+  if (isProcessingQueue.value) return
+  
+  isProcessingQueue.value = true
+  
+  // Create an AbortController for cancellation
+  processingController.value = new AbortController()
+  
+  const BATCH_SIZE = 20 // Process 20 files at a time
+  
+  try {
+    // Process files in batches
+    while (true) {
+      // Check for cancellation
+      if (processingController.value.signal.aborted) {
+        break
+      }
+      
+      // Get the next batch of files in queueing state
+      const queueingFiles = uploadQueue.value
+        .filter(file => file.status === 'queueing')
+        .slice(0, BATCH_SIZE)
+      
+      if (queueingFiles.length === 0) {
+        // No more files to process
+        break
+      }
+      
+      
+      try {
+        // Step 1: Calculate hashes for all files in parallel
+        await Promise.all(queueingFiles.map(async (file) => {
+          if (processingController.value.signal.aborted) return
+          try {
+            file.hash = await calculateFileHash(file.file)
+          } catch (error) {
+            console.error('Error calculating hash for:', file.name, error)
+            file.status = 'error'
+            file.errorMessage = 'Failed to calculate file hash'
+          }
+        }))
+        
+        // Check for cancellation after hash calculation
+        if (processingController.value.signal.aborted) {
+          // Reset files back to queueing state
+          queueingFiles.forEach(file => {
+            file.hash = null
+          })
+          break
+        }
+        
+        // Step 2: Batch duplicate detection with single Firestore query
+        const validFiles = queueingFiles.filter(file => file.hash && file.status === 'queueing')
+        if (validFiles.length > 0) {
+          await checkForDuplicatesBatch(validFiles)
+        }
+        
+        // Step 3: Update file statuses based on duplicate results
+        validFiles.forEach(file => {
+          if (processingController.value.signal.aborted) {
+            file.hash = null
+            return
+          }
+          
+          if (file.duplicateResult && file.duplicateResult.isDuplicate) {
+            if (file.duplicateResult.exactDuplicate) {
+              file.status = 'skipped'
+              file.isDuplicate = true
+              file.isExactDuplicate = true
+              const uploadDate = file.duplicateResult.exactDuplicate.uploadDate?.toDate?.() || new Date(file.duplicateResult.exactDuplicate.uploadDate)
+              const formattedDate = uploadDate.toLocaleDateString()
+              file.duplicateMessage = `File previously uploaded by ${file.duplicateResult.exactDuplicate.uploaderName} on ${formattedDate} and will be skipped.`
+            } else if (file.duplicateResult.metadataDuplicate) {
+              file.status = 'pending'
+              file.isDuplicate = true
+              file.isExactDuplicate = false
+              const uploadDate = file.duplicateResult.metadataDuplicate.uploadDate?.toDate?.() || new Date(file.duplicateResult.metadataDuplicate.uploadDate)
+              const formattedDate = uploadDate.toLocaleDateString()
+              file.duplicateMessage = `Duplicate file with different metadata was uploaded by ${file.duplicateResult.metadataDuplicate.uploaderName} on ${formattedDate}. Proceed with upload to enable comparison of these similar files.`
+            }
+          } else {
+            file.status = 'pending'
+          }
+          
+          // Clean up temporary duplicateResult
+          delete file.duplicateResult
+        })
+        
+        // Small delay between batches to prevent UI blocking
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
+      } catch (error) {
+        console.error('Error processing batch:', error)
+      }
+    }
+  } catch (error) {
+    console.error('Error in streaming processing:', error)
+  } finally {
+    isProcessingQueue.value = false
+    processingController.value = null
+  }
+}
+
+// Batch duplicate detection to reduce Firestore queries
+const checkForDuplicatesBatch = async (files) => {
+  try {
+    const teamId = authStore.currentTeam
+    if (!teamId) {
+      console.warn('No team ID available for duplicate detection')
+      files.forEach(file => {
+        file.duplicateResult = {
+          isDuplicate: false,
+          exactDuplicate: null,
+          metadataDuplicate: null
+        }
+      })
+      return
+    }
+
+    // Get all unique hashes from the batch
+    const hashes = [...new Set(files.map(file => file.hash))]
+    
+    // Single Firestore query for all hashes using 'in' operator
+    // Note: Firestore 'in' queries are limited to 10 items, so we may need to chunk
+    const hashChunks = []
+    for (let i = 0; i < hashes.length; i += 10) {
+      hashChunks.push(hashes.slice(i, i + 10))
+    }
+    
+    // Get all existing uploads for all hashes
+    const allExistingUploads = []
+    for (const hashChunk of hashChunks) {
+      const uploads = await UploadLogService.findUploadsByHashes(hashChunk, teamId)
+      allExistingUploads.push(...uploads)
+    }
+    
+    // Create a hash map for quick lookup
+    const uploadsByHash = new Map()
+    allExistingUploads.forEach(upload => {
+      if (!uploadsByHash.has(upload.fileHash)) {
+        uploadsByHash.set(upload.fileHash, [])
+      }
+      uploadsByHash.get(upload.fileHash).push(upload)
+    })
+    
+    // Check each file against the batched results
+    files.forEach(file => {
+      const existingUploads = uploadsByHash.get(file.hash) || []
+      
+      if (existingUploads.length === 0) {
+        file.duplicateResult = {
+          isDuplicate: false,
+          exactDuplicate: null,
+          metadataDuplicate: null
+        }
+        return
+      }
+
+      // Check for exact duplicates (same hash and metadata)
+      const exactDuplicate = existingUploads.find(upload => 
+        UploadLogService.compareFileMetadata(file, upload)
+      )
+
+      if (exactDuplicate) {
+        file.duplicateResult = {
+          isDuplicate: true,
+          type: 'exact',
+          exactDuplicate,
+          metadataDuplicate: null
+        }
+        return
+      }
+
+      // If no exact duplicate, it's a metadata duplicate
+      const metadataDuplicate = existingUploads[0] // Get the first/most recent one
+      file.duplicateResult = {
+        isDuplicate: true,
+        type: 'metadata',
+        exactDuplicate: null,
+        metadataDuplicate
+      }
+    })
+    
+  } catch (error) {
+    console.error('Error in batch duplicate detection:', error)
+    // Set safe fallback for all files
+    files.forEach(file => {
+      file.duplicateResult = {
+        isDuplicate: false,
+        exactDuplicate: null,
+        metadataDuplicate: null
+      }
+    })
+  }
+}
+
+// Cancel streaming processing
+const cancelProcessing = () => {
+  if (processingController.value) {
+    processingController.value.abort()
+  }
+}
+
 // Folder options handlers
 const confirmFolderOptions = () => {
   let filesToAdd = pendingFolderFiles.value
@@ -461,9 +702,12 @@ const confirmFolderOptions = () => {
     filesToAdd = filesToAdd.filter(f => !f.path.includes('/') || f.path.split('/').length <= 2)
   }
   
-  addFilesToQueue(filesToAdd.map(f => f.file))
+  // Close modal immediately for better UX
   showFolderOptions.value = false
   pendingFolderFiles.value = []
+  
+  // Use synchronous queueing for instant feedback
+  addFilesToQueueSynchronous(filesToAdd.map(f => f.file))
 }
 
 const cancelFolderUpload = () => {

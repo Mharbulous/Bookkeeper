@@ -12,9 +12,20 @@
           size="small"
           prepend-icon="mdi-delete-sweep"
           @click="$emit('clear-queue')"
-          :disabled="files.length === 0"
+          :disabled="files.length === 0 || isProcessing"
         >
           Clear All
+        </v-btn>
+        
+        <v-btn
+          v-if="isProcessing"
+          color="warning"
+          variant="elevated"
+          size="small"
+          prepend-icon="mdi-stop"
+          @click="$emit('cancel-processing')"
+        >
+          Cancel Processing
         </v-btn>
         
         <v-btn
@@ -22,7 +33,7 @@
           variant="elevated"
           prepend-icon="mdi-upload"
           @click="$emit('start-upload')"
-          :disabled="uploadableFiles.length === 0 || hasErrors"
+          :disabled="uploadableFiles.length === 0 || hasErrors || isProcessing"
         >
           Start Upload
         </v-btn>
@@ -210,11 +221,15 @@ const props = defineProps({
     type: Array,
     required: true,
     default: () => []
+  },
+  isProcessing: {
+    type: Boolean,
+    default: false
   }
 })
 
 // Emits
-defineEmits(['remove-file', 'start-upload', 'clear-queue'])
+defineEmits(['remove-file', 'start-upload', 'clear-queue', 'cancel-processing'])
 
 // Computed properties for six categories based on status and duplicates
 const queueingFiles = computed(() => {

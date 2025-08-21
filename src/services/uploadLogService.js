@@ -134,6 +134,42 @@ export class UploadLogService {
   }
 
   /**
+   * Find upload logs by multiple file hashes for batch duplicate detection
+   * @param {Array<string>} fileHashes - Array of SHA-256 hashes
+   * @param {string} teamId - Team ID for multi-tenant isolation
+   * @returns {Promise<Array>} - Array of matching upload logs
+   */
+  static async findUploadsByHashes(fileHashes, teamId) {
+    if (!fileHashes || fileHashes.length === 0 || !teamId) {
+      throw new Error('File hashes array and team ID are required')
+    }
+
+    try {
+      const uploadsRef = collection(db, 'uploadLogs')
+      const q = query(
+        uploadsRef,
+        where('fileHash', 'in', fileHashes),
+        where('teamId', '==', teamId)
+      )
+      
+      const querySnapshot = await getDocs(q)
+      const uploads = []
+      
+      querySnapshot.forEach((doc) => {
+        uploads.push({
+          id: doc.id,
+          ...doc.data()
+        })
+      })
+
+      return uploads
+    } catch (error) {
+      console.error('Error finding uploads by hashes:', error)
+      throw new Error(`Failed to find uploads by hashes: ${error.message}`)
+    }
+  }
+
+  /**
    * Check for duplicate files and categorize them
    * @param {Object} fileInfo - File information with hash and metadata
    * @param {string} teamId - Team ID for multi-tenant isolation
