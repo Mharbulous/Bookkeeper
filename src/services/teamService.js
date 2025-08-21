@@ -175,23 +175,32 @@ export class TeamService {
     }
 
     try {
-      // This is a simple implementation - in production you might want to 
-      // maintain a separate index or use a more efficient query structure
-      const teamsRef = collection(db, 'teams')
-      const teamsSnapshot = await getDocs(teamsRef)
-      
       const userTeams = []
-      teamsSnapshot.forEach((doc) => {
-        const teamData = doc.data()
-        if (teamData.members && teamData.members[userId]) {
-          userTeams.push({
-            id: doc.id,
-            ...teamData,
-            userRole: teamData.members[userId].role
-          })
+      
+      // First, try to get user's solo team (teamId === userId)
+      try {
+        const soloTeamRef = doc(db, 'teams', userId)
+        const soloTeamSnap = await getDoc(soloTeamRef)
+        
+        if (soloTeamSnap.exists()) {
+          const teamData = soloTeamSnap.data()
+          if (teamData.members && teamData.members[userId]) {
+            userTeams.push({
+              id: soloTeamSnap.id,
+              ...teamData,
+              userRole: teamData.members[userId].role
+            })
+          }
         }
-      })
-
+      } catch (soloError) {
+        console.log('Solo team not found or not accessible:', soloError.message)
+      }
+      
+      // TODO: In future phases, we would query for other teams the user belongs to
+      // For now, we only support solo teams (teamId === userId)
+      // When we implement team invitations, we'll add logic here to find
+      // teams where the user is a member but teamId !== userId
+      
       return userTeams
     } catch (error) {
       console.error('Error fetching user teams:', error)
