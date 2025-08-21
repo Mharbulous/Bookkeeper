@@ -503,14 +503,13 @@ const addFilesToQueue = async (files) => {
     stepTimes.step7Start = performance.now()
     uploadQueue.value.forEach(file => {
       if (file.status === 'processing') {
-        if (file.isPreviousUpload) {
-          file.status = 'existing'
-        } else if (file.isDuplicate) {
-          file.status = 'duplicate'
-        } else {
-          file.status = 'ready'
-        }
+        // Convert 'pending' status to 'ready'
+        file.status = 'ready'
+      } else if (file.status === 'pending') {
+        // Convert 'pending' status to 'ready'
+        file.status = 'ready'
       }
+      // Note: 'existing' and 'duplicate' statuses are already set correctly in Step 6
     })
     stepTimes.step7End = performance.now()
     

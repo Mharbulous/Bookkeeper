@@ -151,7 +151,7 @@
                     </template>
                   </v-tooltip>
                   <v-tooltip 
-                    v-else-if="file.status === 'pending' && !file.isDuplicate"
+                    v-else-if="(file.status === 'ready' || file.status === 'pending') && !file.isDuplicate"
                     text="Ready"
                     location="bottom"
                   >
@@ -243,6 +243,7 @@ const hasErrors = computed(() => {
 
 const pendingCount = computed(() => {
   return props.files.filter(file => 
+    file.status === 'ready' || 
     file.status === 'pending' || 
     (!file.status && !file.isQueueDuplicate && !file.isPreviousUpload)
   ).length
