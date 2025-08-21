@@ -4,13 +4,6 @@
       <div class="d-flex align-center">
         <v-icon icon="mdi-format-list-bulleted" class="me-2" />
         Upload Queue
-        <v-chip
-          :color="files.length > 0 ? 'primary' : 'grey'"
-          size="small"
-          class="ms-2"
-        >
-          {{ files.length }} {{ files.length === 1 ? 'file' : 'files' }}
-        </v-chip>
       </div>
       
       <div class="d-flex gap-2">
@@ -40,22 +33,50 @@
 
     <!-- File List -->
     <div class="pa-4">
-      <!-- Duplicate Detection Summary -->
-      <div v-if="duplicateInfo.queueDuplicates.length > 0" class="mb-4">
-        <v-alert
-          type="warning"
-          variant="tonal"
-          density="compact"
-          icon="mdi-content-duplicate"
-        >
-          <template #title>
-            Duplicate Files Detected
-          </template>
-          <div class="text-body-2">
-            {{ duplicateInfo.queueDuplicates.length }} duplicate file(s) found in the upload queue.
-            Only one copy of each will be uploaded.
-          </div>
-        </v-alert>
+      <!-- Status Tags -->
+      <div v-if="files.length > 0" class="mb-4">
+        <div class="d-flex gap-2 flex-wrap">
+          <v-chip
+            size="small"
+            variant="flat"
+            color="grey"
+            class="text-white"
+          >
+            {{ pendingCount }} new uploads
+          </v-chip>
+          
+          <v-chip
+            size="small"
+            variant="flat"
+            color="orange"
+          >
+            {{ queueDuplicatesCount }} queued duplicates
+          </v-chip>
+          
+          <v-chip
+            size="small"
+            variant="flat"
+            color="blue"
+          >
+            {{ previouslyUploadedCount }} previous uploads
+          </v-chip>
+          
+          <v-chip
+            size="small"
+            variant="flat"
+            color="green"
+          >
+            {{ successfulCount }} successful uploads
+          </v-chip>
+          
+          <v-chip
+            size="small"
+            variant="flat"
+            color="red"
+          >
+            {{ failedCount }} failed uploads
+          </v-chip>
+        </div>
       </div>
 
       <!-- Files List -->
@@ -205,8 +226,21 @@ const hasErrors = computed(() => {
   return props.files.some(file => file.status === 'error')
 })
 
-const duplicateInfo = computed(() => {
-  // Analyze files for duplicates within the queue
+const uniqueFileCount = computed(() => {
+  const uniqueHashes = new Set(props.files.map(file => file.hash))
+  return uniqueHashes.size
+})
+
+const pendingCount = computed(() => {
+  // Count unique files that are new uploads (first occurrence of each hash)
+  const uniquePendingHashes = new Set()
+  props.files
+    .filter(file => file.status === 'pending' || !file.status)
+    .forEach(file => uniquePendingHashes.add(file.hash))
+  return uniquePendingHashes.size
+})
+
+const queueDuplicatesCount = computed(() => {
   const hashGroups = {}
   props.files.forEach(file => {
     if (!hashGroups[file.hash]) {
@@ -215,15 +249,24 @@ const duplicateInfo = computed(() => {
     hashGroups[file.hash].push(file)
   })
   
-  const queueDuplicates = Object.values(hashGroups)
-    .filter(group => group.length > 1)
-    .flat()
+  // Count only the excess duplicates (total in duplicate groups minus one copy of each unique file)
+  const duplicateGroups = Object.values(hashGroups).filter(group => group.length > 1)
+  const totalDuplicateFiles = duplicateGroups.reduce((sum, group) => sum + group.length, 0)
+  const uniqueFilesInDuplicateGroups = duplicateGroups.length
   
-  return {
-    queueDuplicates,
-    exactDuplicates: [],
-    metadataDuplicates: []
-  }
+  return totalDuplicateFiles - uniqueFilesInDuplicateGroups
+})
+
+const previouslyUploadedCount = computed(() => {
+  return props.files.filter(file => file.isExactDuplicate).length
+})
+
+const successfulCount = computed(() => {
+  return props.files.filter(file => file.status === 'completed').length
+})
+
+const failedCount = computed(() => {
+  return props.files.filter(file => file.status === 'error').length
 })
 
 // Methods
