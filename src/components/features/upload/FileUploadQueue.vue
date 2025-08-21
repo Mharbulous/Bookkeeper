@@ -42,7 +42,7 @@
             color="grey"
             class="text-white"
           >
-            {{ pendingCount }} new uploads
+            {{ pendingCount }} new files
           </v-chip>
           
           <v-chip
@@ -120,13 +120,7 @@
                 <v-divider vertical class="mx-2" />
                 <span>{{ formatDate(file.lastModified) }}</span>
                 <v-divider vertical class="mx-2" />
-                <span>{{ file.type || 'Unknown type' }}</span>
-              </div>
-              
-              <!-- Path for folder uploads -->
-              <div v-if="file.path && file.path !== file.name" class="text-caption text-grey-darken-2 mt-1">
-                <v-icon icon="mdi-folder-outline" size="12" class="me-1" />
-                {{ file.path }}
+                <span>{{ getRelativePath(file) }}</span>
               </div>
               
               <!-- Duplicate messages -->
@@ -232,7 +226,7 @@ const uniqueFileCount = computed(() => {
 })
 
 const pendingCount = computed(() => {
-  // Count unique files that are new uploads (first occurrence of each hash)
+  // Count unique files that are new files (first occurrence of each hash)
   const uniquePendingHashes = new Set()
   props.files
     .filter(file => file.status === 'pending' || !file.status)
@@ -357,6 +351,22 @@ const getDuplicateIcon = (file) => {
   if (file.isExactDuplicate) return 'mdi-close-circle'
   if (file.isDuplicate) return 'mdi-alert-circle'
   return 'mdi-information'
+}
+
+const getRelativePath = (file) => {
+  if (!file.path || file.path === file.name) {
+    return '\\'
+  }
+  
+  // Extract the folder path by removing the filename
+  const pathParts = file.path.split('/')
+  pathParts.pop() // Remove the filename
+  
+  if (pathParts.length === 0) {
+    return '\\'
+  }
+  
+  return '/' + pathParts.join('/')
 }
 </script>
 
