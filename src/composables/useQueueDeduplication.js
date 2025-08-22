@@ -128,11 +128,7 @@ export function useQueueDeduplication() {
             const chosenFile = oneAndTheSameFiles[0]
             finalFiles.push(chosenFile)
             
-            // Mark others as duplicates
-            oneAndTheSameFiles.slice(1).forEach(fileRef => {
-              fileRef.isDuplicate = true
-              duplicateFiles.push(fileRef)
-            })
+            // Don't mark others as duplicates - they're the same file, just filter them out
           }
         }
         

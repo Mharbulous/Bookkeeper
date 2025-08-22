@@ -92,92 +92,119 @@
         </div>
       </div>
 
-      <!-- Files List -->
-      <v-list lines="two" density="comfortable">
-        <template v-for="(file, index) in files" :key="file.id">
-          <v-list-item class="px-0">
-            <template #prepend>
-              <v-avatar color="grey-lighten-3" size="48">
-                <v-icon :icon="getFileIcon(file.type)" size="24" />
-              </v-avatar>
-            </template>
+      <!-- Files List - Grouped by duplicates -->
+      <div v-for="(group, groupIndex) in groupedFiles" :key="groupIndex">
+        <!-- Files in Group -->
+        <v-list lines="two" density="comfortable">
+          <template v-for="(file, fileIndex) in group.files" :key="file.id || `${groupIndex}-${fileIndex}`">
+            <v-list-item 
+              class="px-0" 
+              :class="{ 'bg-purple-lighten-5': file.isDuplicate }"
+            >
+              <template #prepend>
+                <v-tooltip location="bottom">
+                  <template #activator="{ props: tooltipProps }">
+                    <v-avatar v-bind="tooltipProps" color="grey-lighten-3" size="48" class="cursor-help">
+                      <v-icon :icon="getFileIcon(file.type)" size="24" />
+                    </v-avatar>
+                  </template>
+                  <div v-if="hashDisplayInfo.get(file.id || file.name)">
+                    <div class="text-caption">
+                      <strong>Content Hash:</strong> {{ hashDisplayInfo.get(file.id || file.name).displayHash }}
+                    </div>
+                    <div v-if="hashDisplayInfo.get(file.id || file.name).isShared" class="text-caption text-warning">
+                      ⚠️ Shared with {{ hashDisplayInfo.get(file.id || file.name).sharedCount - 1 }} other file(s)
+                    </div>
+                    <div v-else class="text-caption text-success">
+                      ✅ Unique content
+                    </div>
+                  </div>
+                  <div v-else class="text-caption">
+                    🔄 Processing hash...
+                  </div>
+                </v-tooltip>
+              </template>
 
-            <v-list-item-title class="d-flex align-center">
-              <span class="text-truncate me-2">{{ file.name }}</span>
-            </v-list-item-title>
+              <v-list-item-title class="d-flex align-center">
+                <span class="text-truncate me-2">{{ file.name }}</span>
+              </v-list-item-title>
 
-            <v-list-item-subtitle>
-              <div class="d-flex align-center text-caption text-grey-darken-1">
-                <span>{{ formatFileSize(file.size) }}</span>
-                <v-divider vertical class="mx-2" />
-                <span>{{ formatDate(file.lastModified) }}</span>
-                <v-divider vertical class="mx-2" />
-                <span>{{ getRelativePath(file) }}</span>
-              </div>
-              
-              <!-- Duplicate messages -->
-              <div v-if="file.duplicateMessage" class="text-caption mt-1" :class="getDuplicateMessageClass(file)">
-                <v-icon :icon="getDuplicateIcon(file)" size="12" class="me-1" />
-                {{ file.duplicateMessage }}
-              </div>
-            </v-list-item-subtitle>
-
-            <template #append>
-              <div class="d-flex align-center">
-                <!-- Status indicator for duplicates and existing files only -->
-                <v-chip
-                  v-if="file.isDuplicate || file.isPreviousUpload || file.status === 'processing'"
-                  :color="getStatusColor(file.status, file)"
-                  size="small"
-                  variant="flat"
-                  class="me-2"
-                >
-                  {{ getStatusText(file.status, file) }}
-                </v-chip>
-                
-                <!-- Status icon -->
-                <div class="text-h6">
-                  <v-tooltip 
-                    v-if="file.status === 'processing'"
-                    text="Processing..."
-                    location="bottom"
-                  >
-                    <template #activator="{ props }">
-                      <v-progress-circular
-                        v-bind="props"
-                        size="20"
-                        width="2"
-                        color="purple"
-                        indeterminate
-                      />
-                    </template>
-                  </v-tooltip>
-                  <v-tooltip 
-                    v-else-if="(file.status === 'ready' || file.status === 'pending') && !file.isDuplicate"
-                    text="Ready"
-                    location="bottom"
-                  >
-                    <template #activator="{ props }">
-                      <span v-bind="props">🟢</span>
-                    </template>
-                  </v-tooltip>
-                  <v-tooltip 
-                    v-else-if="file.isDuplicate || file.isPreviousUpload" 
-                    text="Skip"
-                    location="bottom"
-                  >
-                    <template #activator="{ props }">
-                      <span v-bind="props">↩️</span>
-                    </template>
-                  </v-tooltip>
+              <v-list-item-subtitle>
+                <div class="d-flex align-center text-caption text-grey-darken-1">
+                  <span>{{ formatFileSize(file.size) }}</span>
+                  <v-divider vertical class="mx-2" />
+                  <span>{{ formatDate(file.lastModified) }}</span>
+                  <v-divider vertical class="mx-2" />
+                  <span>{{ getRelativePath(file) }}</span>
                 </div>
-              </div>
-            </template>
-          </v-list-item>
-          
-          <v-divider v-if="index < files.length - 1" />
-        </template>
-      </v-list>
+                
+                <!-- Duplicate messages -->
+                <div v-if="file.duplicateMessage" class="text-caption mt-1" :class="getDuplicateMessageClass(file)">
+                  <v-icon :icon="getDuplicateIcon(file)" size="12" class="me-1" />
+                  {{ file.duplicateMessage }}
+                </div>
+              </v-list-item-subtitle>
+
+              <template #append>
+                <div class="d-flex align-center">
+                  <!-- Status indicator for duplicates and existing files only -->
+                  <v-chip
+                    v-if="file.isDuplicate || file.isPreviousUpload || file.status === 'processing'"
+                    :color="getStatusColor(file.status, file)"
+                    size="small"
+                    variant="flat"
+                    class="me-2"
+                  >
+                    {{ getStatusText(file.status, file) }}
+                  </v-chip>
+                  
+                  <!-- Status icon -->
+                  <div class="text-h6">
+                    <v-tooltip 
+                      v-if="file.status === 'processing'"
+                      text="Processing..."
+                      location="bottom"
+                    >
+                      <template #activator="{ props }">
+                        <v-progress-circular
+                          v-bind="props"
+                          size="20"
+                          width="2"
+                          color="purple"
+                          indeterminate
+                        />
+                      </template>
+                    </v-tooltip>
+                    <v-tooltip 
+                      v-else-if="(file.status === 'ready' || file.status === 'pending') && !file.isDuplicate"
+                      text="Ready"
+                      location="bottom"
+                    >
+                      <template #activator="{ props }">
+                        <span v-bind="props">🟢</span>
+                      </template>
+                    </v-tooltip>
+                    <v-tooltip 
+                      v-else-if="file.isDuplicate || file.isPreviousUpload" 
+                      text="Skip"
+                      location="bottom"
+                    >
+                      <template #activator="{ props }">
+                        <span v-bind="props">↩️</span>
+                      </template>
+                    </v-tooltip>
+                  </div>
+                </div>
+              </template>
+            </v-list-item>
+            
+            <v-divider v-if="fileIndex < group.files.length - 1" />
+          </template>
+        </v-list>
+
+        <!-- Spacing between groups -->
+        <div v-if="groupIndex < groupedFiles.length - 1" class="my-4"></div>
+      </div>
 
       <!-- Empty state -->
       <div v-if="files.length === 0" class="text-center py-8">
@@ -232,6 +259,94 @@ const uploadableFiles = computed(() => {
 
 const skippableFiles = computed(() => {
   return props.files.filter(file => file.isDuplicate)
+})
+
+// Group files for better duplicate visualization
+const groupedFiles = computed(() => {
+  const groups = new Map()
+  
+  // Group files by hash (for duplicates) or by unique ID (for singles)
+  props.files.forEach(file => {
+    const groupKey = file.hash || `unique_${file.name}_${file.size}_${file.lastModified}`
+    
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        files: [],
+        isDuplicateGroup: false,
+        groupName: file.name
+      })
+    }
+    
+    groups.get(groupKey).files.push(file)
+  })
+  
+  // Mark groups with multiple files as duplicate groups
+  for (const group of groups.values()) {
+    if (group.files.length > 1) {
+      group.isDuplicateGroup = true
+      // Sort within group: kept files first, then duplicates
+      group.files.sort((a, b) => {
+        if (a.isDuplicate !== b.isDuplicate) {
+          return a.isDuplicate ? 1 : -1 // Non-duplicates first
+        }
+        return a.originalIndex - b.originalIndex
+      })
+    }
+  }
+  
+  return Array.from(groups.values())
+})
+
+// Hash display helper for tooltips
+const hashDisplayInfo = computed(() => {
+  const hashMap = new Map() // clean_hash -> [files_with_that_hash]
+  
+  props.files.forEach(file => {
+    if (file.hash) {
+      // Extract clean hash (remove _size suffix)
+      const cleanHash = file.hash.split('_')[0]
+      
+      if (!hashMap.has(cleanHash)) {
+        hashMap.set(cleanHash, [])
+      }
+      hashMap.get(cleanHash).push(file)
+    }
+  })
+  
+  const result = new Map()
+  
+  props.files.forEach(file => {
+    if (file.hash) {
+      const cleanHash = file.hash.split('_')[0]
+      const filesWithSameHash = hashMap.get(cleanHash) || []
+      const truncatedHash = cleanHash.substring(0, 8) + '...'
+      
+      if (filesWithSameHash.length > 1) {
+        result.set(file.id || file.name, {
+          displayHash: truncatedHash,
+          fullHash: cleanHash,
+          sharedCount: filesWithSameHash.length,
+          isShared: true
+        })
+      } else {
+        result.set(file.id || file.name, {
+          displayHash: truncatedHash,
+          fullHash: cleanHash,
+          sharedCount: 1,
+          isShared: false
+        })
+      }
+    } else {
+      result.set(file.id || file.name, {
+        displayHash: 'Processing...',
+        fullHash: null,
+        sharedCount: 0,
+        isShared: false
+      })
+    }
+  })
+  
+  return result
 })
 
 const totalSize = computed(() => {
@@ -397,5 +512,9 @@ const getRelativePath = (file) => {
 <style scoped>
 .gap-2 {
   gap: 8px;
+}
+
+.cursor-help {
+  cursor: help;
 }
 </style>
