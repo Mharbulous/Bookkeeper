@@ -21,7 +21,8 @@
       "WebSearch",
       "WebFetch(domain:m3.material.io)",
       "Bash(git config:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "WebFetch(domain:firebase.google.com)"
     ],
     "deny": [],
     "ask": []
