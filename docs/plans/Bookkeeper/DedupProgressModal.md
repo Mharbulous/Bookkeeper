@@ -195,7 +195,7 @@ export function useFileQueue() {
 ### Step 5: Deduplication Logic Refactor ✅ SOLUTION IDENTIFIED
 **Complexity: Medium | Risk: Low** (reduced from High/High)
 
-**🔍 Research Finding: ID-based mapping with transferable File objects (proven pattern)**
+**🔍 Research Finding: ID-based mapping with structured clone File objects (proven pattern)**
 
 Modify `src/composables/useQueueDeduplication.js`:
 ```javascript
@@ -210,10 +210,10 @@ export function useQueueDeduplication() {
       // Store original File object in mapping
       fileMapping.set(fileId, file)
       
-      // Send minimal data to worker (File objects are transferable)
+      // Send file data to worker (File objects are cloned via structured clone)
       return {
         id: fileId,
-        file: file,  // File objects can be sent to workers
+        file: file,  // File objects cloned to worker, converted to ArrayBuffer internally
         originalIndex: index
       }
     })
@@ -247,11 +247,11 @@ export function useQueueDeduplication() {
 ```
 
 **✅ Proven Solution Benefits:**
-- **File Objects Transferable**: File objects can be sent to workers (MDN confirmed)
+- **File Objects Structured Clone**: File objects cloned to worker, processed as ArrayBuffers internally
 - **ID-based Mapping**: Standard pattern used by Vue worker libraries
-- **Zero File Loss**: Original File references perfectly preserved
+- **Zero File Loss**: Original File references perfectly preserved on main thread
 - **API Compatibility**: Existing consumers see no changes whatsoever
-- **Performance**: Zero-copy transfer with transferable objects
+- **Performance**: Efficient processing - only lightweight hash results returned from worker
 
 **Tasks:**
 - Implement ID-based file mapping system
