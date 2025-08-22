@@ -276,7 +276,12 @@ const handleFolderSelect = (event) => {
 
 // Helper function to get file path consistently
 const getFilePath = (fileRef) => {
-  return fileRef.path || fileRef.file?.webkitRelativePath || fileRef.file?.name || fileRef.name
+  // Handle direct file objects
+  if (fileRef instanceof File) {
+    return fileRef.path || fileRef.webkitRelativePath || fileRef.name
+  }
+  // Handle file reference objects
+  return fileRef.path || fileRef.file?.webkitRelativePath || fileRef.file?.path || fileRef.file?.name || fileRef.name
 }
 
 // File processing functions
@@ -307,7 +312,7 @@ const processFiles = async (files) => {
     const fileRef = {
       file,
       originalIndex: index,
-      path: getFilePath({ file }),
+      path: getFilePath(file),
       metadata: {
         fileName: file.name,
         fileSize: file.size,
