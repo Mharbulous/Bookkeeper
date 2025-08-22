@@ -560,6 +560,7 @@ const updateUploadQueue = (readyFiles, duplicateFiles) => {
       lastModified: fileRef.file.lastModified,
       path: fileRef.path || fileRef.file.webkitRelativePath || fileRef.file.name,
       isDuplicate: true,
+      isQueueDuplicate: true,
       isPreviousUpload: false,
       duplicateMessage: null
     })

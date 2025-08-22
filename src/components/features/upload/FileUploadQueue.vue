@@ -2,15 +2,16 @@
   <v-card class="mt-6" variant="outlined">
     <v-card-title class="d-flex align-center justify-space-between">
       <div class="d-flex align-center">
-        <v-icon icon="mdi-format-list-bulleted" class="me-2" />
+        <v-icon icon="mdi-file-multiple" class="me-2" />
         Upload Queue
       </div>
       
       <div class="d-flex gap-2">
         <v-btn
-          variant="text"
-          size="small"
-          prepend-icon="mdi-delete-sweep"
+          variant="elevated"
+          color="white"
+          class="text-black"
+          prepend-icon="mdi-broom"
           @click="$emit('clear-queue')"
           :disabled="files.length === 0"
         >
