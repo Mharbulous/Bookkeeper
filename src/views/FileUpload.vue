@@ -179,8 +179,6 @@ defineOptions({
   name: 'FileUploadView'
 })
 
-// No file size constraints - all files accepted
-
 // Reactive data
 const isDragOver = ref(false)
 const uploadQueue = ref([])
@@ -209,6 +207,7 @@ const handleDragLeave = (event) => {
 
 const handleDrop = async (event) => {
   isDragOver.value = false
+  // Using webkit APIs for legacy browser support with drag/drop
   const items = Array.from(event.dataTransfer.items)
   
   const files = []
@@ -268,10 +267,16 @@ const handleFileSelect = (event) => {
 }
 
 const handleFolderSelect = (event) => {
+  // Using webkitdirectory for folder selection (legacy browser API)
   const files = Array.from(event.target.files)
   processFolderFiles(files)
   // Reset input
   event.target.value = ''
+}
+
+// Helper function to get file path consistently
+const getFilePath = (fileRef) => {
+  return fileRef.path || fileRef.file?.webkitRelativePath || fileRef.file?.name || fileRef.name
 }
 
 // File processing functions
@@ -302,7 +307,7 @@ const processFiles = async (files) => {
     const fileRef = {
       file,
       originalIndex: index,
-      path: file.path || file.webkitRelativePath || file.name,
+      path: getFilePath({ file }),
       metadata: {
         fileName: file.name,
         fileSize: file.size,
@@ -413,7 +418,7 @@ const processFiles = async (files) => {
     }
   }
   
-  // Step 6: Combine unique and non-duplicate files
+  // Step 5: Combine unique and non-duplicate files
   const allFinalFiles = [...uniqueFiles, ...finalFiles]
   
   // Prepare for queue
@@ -485,7 +490,9 @@ const processFolderFiles = (files) => {
       file,
       path: file.webkitRelativePath
     }))
-    subfolderCount.value = new Set(files.map(f => f.webkitRelativePath.split('/')[1])).size
+    // Count unique subfolder names
+    const subfolderPaths = files.map(f => f.webkitRelativePath.split('/')[1]).filter(Boolean)
+    subfolderCount.value = new Set(subfolderPaths).size
     showFolderOptions.value = true
   } else {
     addFilesToQueue(files)
@@ -539,10 +546,8 @@ const updateUploadQueue = (readyFiles, duplicateFiles) => {
       size: fileRef.file.size,
       type: fileRef.file.type,
       lastModified: fileRef.file.lastModified,
-      path: fileRef.path || fileRef.file.webkitRelativePath || fileRef.file.name,
-      isDuplicate: false,
-      isPreviousUpload: false,
-      duplicateMessage: null
+      path: getFilePath(fileRef),
+      isDuplicate: false
     })
   })
   
@@ -558,11 +563,8 @@ const updateUploadQueue = (readyFiles, duplicateFiles) => {
       size: fileRef.file.size,
       type: fileRef.file.type,
       lastModified: fileRef.file.lastModified,
-      path: fileRef.path || fileRef.file.webkitRelativePath || fileRef.file.name,
+      path: getFilePath(fileRef),
       isDuplicate: true,
-      isQueueDuplicate: true,
-      isPreviousUpload: false,
-      duplicateMessage: null
     })
   })
 }
@@ -573,8 +575,8 @@ const confirmFolderOptions = () => {
   let filesToAdd = pendingFolderFiles.value
   
   if (!includeSubfolders.value) {
-    // Filter to only main folder files
-    filesToAdd = filesToAdd.filter(f => !f.path.includes('/') || f.path.split('/').length <= 2)
+    // Filter to only main folder files (max 2 path segments: folder/file)
+    filesToAdd = filesToAdd.filter(f => f.path.split('/').length <= 2)
   }
   
   // Preserve path information when adding files to queue
@@ -606,8 +608,8 @@ const clearQueue = () => {
 }
 
 const startUpload = () => {
-  // Placeholder for actual upload implementation (Step 6)
-  console.log('Starting upload for', uploadQueue.value.length, 'files')
+  // Placeholder for actual upload implementation
+  // TODO: Implement file upload logic
 }
 
 // Utility functions
@@ -636,7 +638,4 @@ const showNotification = (message, color = 'info') => {
   transform: scale(1.02);
 }
 
-.gap-3 {
-  gap: 12px;
-}
 </style>
