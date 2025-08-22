@@ -1,9 +1,10 @@
 # Deduplication System Refactor Plan
 
-## Status: ✅ COMPLETED
-**Date Completed:** August 22, 2025  
-**Total Time:** ~4 hours  
-**Code Reduction:** ~80% (from 1000+ to ~200 lines)
+## Status: 🟡 PARTIALLY COMPLETE (~85%)
+**Date Started:** August 22, 2025  
+**Estimated Completion:** Phase 8-9 remaining  
+**Code Reduction:** ~80% (from 1000+ to ~200 lines)  
+**Critical Missing:** Storage-First Metadata Policy implementation
 
 ## Overview
 Refactor the deduplication system to use built-in database constraints while keeping the existing UI. This will reduce code complexity by ~80% while maintaining all functionality.
@@ -326,19 +327,19 @@ src/
 ✅ npm run build - Builds successfully with no errors
 ✅ npm run lint - Passes with no issues
 
-7.2 Commit Changes - 🔄 READY TO COMMIT
-Changes staged and ready for commit:
+7.2 Commit Changes - ✅ COMMITTED
+Changes committed:
 - Modified: src/views/FileUpload.vue (simplified)
-- Modified: src/services/uploadLogService.js (40 vs 481 lines)
+- Modified: src/services/uploadLogService.js (batch transactions implemented)
 - Modified: firestore.rules (constraint-based rules)
 - Deleted: public/hash-worker.js
 
-Commit message ready:
+Commit message:
 ```
 refactor: simplify deduplication using database constraints
 
 - Replace complex deduplication logic with hash-as-ID pattern
-- Reduce code complexity by ~80% (481 → 40 lines in uploadLogService)
+- Implement batch database transactions for deduplication
 - Add file size limits (100MB batch, 500MB video)
 - Add SHA-256 collision safety with size suffix
 - Remove worker pool and complex caching systems
@@ -349,8 +350,112 @@ refactor: simplify deduplication using database constraints
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-7.3 Create PR - 🔄 READY
-Ready to push branch and create pull request
+7.3 Create PR - 📋 BRANCH READY
+Branch `refactor/constraint-based-dedup` ready for storage implementation
+
+## Phase 8: Storage-First Implementation - 🔄 IN PROGRESS
+**Critical Requirement:** Implement the Storage-First Metadata Policy for data consistency
+
+8.1 Create Firebase Storage Service - ⏳ PENDING
+Create `src/services/storageService.js` with:
+```javascript
+// Storage-First upload pattern
+const uploadFileWithMetadata = async (file, hash, metadata, teamId) => {
+  const storagePath = `teams/${teamId}/files/${hash}.${getFileExtension(file.name)}`
+  const storageRef = storage.ref(storagePath)
+  
+  try {
+    // Step 1: Upload to Storage FIRST (critical data consistency requirement)
+    await storageRef.put(file)
+    
+    // Step 2: Only write metadata after successful storage upload
+    await UploadLogService.writeFileMetadata(hash, {
+      ...metadata,
+      storagePath,
+      uploadedAt: serverTimestamp()
+    }, teamId)
+    
+    return { status: 'uploaded', hash, storagePath }
+  } catch (error) {
+    // If storage upload failed, no metadata was written - system stays consistent
+    throw new Error(`Upload failed: ${error.message}`)
+  }
+}
+```
+
+8.2 Update UploadLogService - ⏳ PENDING
+Split `registerFileBatch()` into two phases:
+- Phase 1: Check duplicates (current implementation)
+- Phase 2: Write metadata only after storage upload (new requirement)
+
+8.3 Implement Actual Upload Flow - ⏳ PENDING
+Replace placeholder `startUpload()` in `FileUpload.vue:518` with:
+- Process ready files through storage service
+- Handle storage-first error scenarios
+- Update UI with upload progress and results
+
+8.4 Add Duplicate File Storage Verification - ⏳ PENDING
+For duplicate files, verify storage exists before allowing metadata references:
+```javascript
+const handleDuplicateFile = async (hash, metadata, teamId) => {
+  const storagePath = `teams/${teamId}/files/${hash}`
+  const storageRef = storage.ref(storagePath)
+  
+  try {
+    // Verify file exists in Storage (should exist from previous upload)
+    await storageRef.getMetadata()
+    
+    // Safe to create metadata reference - file confirmed in Storage
+    return { status: 'duplicate', existing: existingData }
+  } catch (error) {
+    // Edge case: metadata exists but file doesn't - repair needed
+    throw new Error(`Duplicate file not found in Storage: ${error.message}`)
+  }
+}
+```
+
+## Phase 9: Final Integration - ⏳ PENDING
+9.1 Data Consistency Validation - ⏳ PENDING
+- Test Storage-First policy under network failures
+- Verify no orphaned metadata can be created
+- Test duplicate file storage verification
+
+9.2 Error Handling Enhancement - ⏳ PENDING
+- Implement retry logic for failed uploads
+- Add progress indicators for large files
+- Handle storage quota exceeded scenarios
+
+9.3 Performance Optimization - ⏳ PENDING
+- Implement parallel uploads for multiple files
+- Add upload progress tracking
+- Optimize for large file handling
+
+## Critical Data Consistency Requirements
+
+### ⚠️ Storage-First Metadata Policy
+**CRITICAL:** Firestore metadata must **NEVER** be written unless the file exists in Firebase Storage.
+
+#### Two Valid Scenarios:
+1. **New Files:** Upload to Storage first, then write metadata
+2. **Duplicate Files:** File already exists in Storage, safe to write additional metadata references
+
+#### Implementation Pattern:
+```javascript
+// ✅ CORRECT for NEW files: Storage upload first, then metadata
+await storage.ref(storagePath).put(file)
+await db.collection('teams').doc(teamId).collection('files').doc(hash).set(metadata)
+
+// ✅ CORRECT for DUPLICATE files: File already in storage, safe to add metadata
+const storageExists = await storage.ref(storagePath).getMetadata().catch(() => null)
+if (storageExists) {
+  await db.collection('teams').doc(teamId).collection('files').doc(hash).set(metadata)
+}
+
+// ❌ WRONG: Creates orphaned metadata if upload fails
+await db.collection('teams').doc(teamId).collection('files').doc(hash).set(metadata)
+await storage.ref(storagePath).put(file) // If this fails, metadata is orphaned
+```
+
 ## Results Achieved ✅
 
 ### Before Refactor
@@ -391,9 +496,17 @@ git checkout -b hotfix/urgent-fix
 ✅ Performance architecture optimized for targets
 
 ## Summary
-**🎉 Refactor completed successfully!** 
-- **Code reduction:** 481 → 40 lines (92% reduction in uploadLogService)
+**🔄 Refactor 85% complete - Storage implementation remaining** 
+- **Code reduction:** 481 → 97 lines (80% reduction in uploadLogService with batch transactions)
 - **Architecture:** Complex worker pool → Simple constraint-based deduplication
 - **Performance:** Eliminated caching overhead, simplified hash generation
 - **Maintainability:** Dramatically simplified codebase
+- **Security:** Team-scoped isolation maintains law firm confidentiality requirements
+- **Remaining:** Storage-First Metadata Policy implementation (Phase 8-9)
 - **Risk:** Low - all existing UI preserved, robust rollback plan available
+
+### Next Steps Priority
+1. **Implement Storage Service** with Storage-First pattern
+2. **Complete upload flow** by replacing startUpload() placeholder
+3. **Add storage verification** for duplicate file handling
+4. **Test data consistency** under failure scenarios

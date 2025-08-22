@@ -135,59 +135,180 @@ The **team-scoped constraint-based deduplication** approach is **cryptographical
 
 This architecture provides the performance benefits of constraint-based deduplication while maintaining the strict confidentiality requirements essential for law firm environments.
 
-## Simplified Process Flow Diagram
+## Three-Layer Architecture Flow Diagram
 
 ```mermaid
 %%{ init: { 'theme': 'base', 'themeVariables': { 'primaryColor': '#000000', 'primaryTextColor': '#ffffff', 'nodeBorder': '#000000', 'tertiaryColor': '#ffff00', 'clusterBkg': '#f0f8ff', 'clusterBorder': '#4682b4' } } }%%
 flowchart TD
-    A[Files Selected for Upload] --> B[Step 1: Generate File Hashes]
+    subgraph Layer1 [Layer 1: JavaScript Deduplication Logic]
+        A[Files Selected for Upload] --> B[Generate File Hashes Web Crypto API SHA-256]
+        B --> C[Extract File Metadata name size timestamps]
+        C --> D[Batch Database Query Check for Existing Files]
+        D --> E[Categorize File Status ready existing duplicate]
+        E --> FlagB[Flag Files with Properties status isPreviousUpload]
+    end
     
-    B --> C[Parallel Hash Generation<br/>Web Crypto API SHA-256]
-    C --> D[Step 2: Client-Side Deduplication]
+    subgraph Layer2 [Layer 2: Pinia Multi-Dimensional Array]
+        F[Multi-Dimensional Array Insert]
+        ConstraintA[Hash-Level Constraint Groups Same Content Files]
+        ConstraintB[Filename-Level Constraint Groups File Variants]
+        ConstraintC[Metadata-Level Constraint Exact Duplicate Detection]
+        TagA[Apply UI Tags Based on Grouping Structure]
+        G[Automatic Duplicate Grouping Sort by Hash for Display]
+        H[Display Upload Summary Groups X Variants Y Exact Z]
+        I[User Review Interface Expandable Group Management]
+        J{User Clicks Start Upload}
+        K[Wait for User Action Queue Persists Across Pages]
+    end
     
-    D --> E[JavaScript Set/Map<br/>Automatic Duplicate Removal]
-    E --> TagA[🏷️ Tag Queue Duplicates<br/>status: duplicate]
+    subgraph Layer3 [Layer 3: Firebase Storage]
+        L[Process Ready Files Only Filter by Status Property]
+        FlagC[Flag Uploading status uploading]
+        TagB[Update UI Tags Show Upload Progress]
+        M[Storage-First Upload Firebase Storage PUT]
+        N[Write Metadata Only After Successful Storage Upload]
+        FlagD[Flag Upload Results status successful failed]
+        TagC[Update Final UI Tags Show Completion Status]
+        O[Atomic Firestore Operations Team-Scoped Collections]
+        P[Upload Complete Files Permanently Stored]
+    end
     
-    TagA --> F[Step 3: Batch Database Query]
-    F --> G[Batch Query All Hashes<br/>db.getAll hash array]
-    G --> H[Categorize Files by Status]
-    H --> TagB[🏷️ Tag Files<br/>status: ready, existing]
-    
-    TagB --> CountA[📊 Count File Status<br/>Ready, Existing, Duplicates]
-    CountA --> I[Display Upload Summary<br/>Ready: X, Existing: Y, Duplicates: Z]
-    I --> DisplayA[🖥️ Show File List<br/>User Review Interface]
-    
-    DisplayA --> J{User Clicks Start Upload?}
-    J -->|No| K[Wait for User Action]
-    J -->|Yes| L[Process Ready Files Only]
-    
+    %% Flow between layers
+    FlagB --> F
+    F --> ConstraintA
+    ConstraintA --> ConstraintB
+    ConstraintB --> ConstraintC
+    ConstraintC --> TagA
+    TagA --> G
+    G --> H
+    H --> I
+    I --> J
+    J -->|No| K
     K --> J
-    L --> TagC[🏷️ Tag Uploading<br/>status: uploading]
-    TagC --> M[Batch Upload File Data<br/>Promise.all uploads]
-    M --> TagD[🏷️ Tag Upload Results<br/>status: successful, failed]
+    J -->|Yes| L
+    L --> FlagC
+    FlagC --> TagB
+    TagB --> M
+    M --> N
+    N --> FlagD
+    FlagD --> TagC
+    TagC --> O
+    O --> P
     
-    TagD --> N[Update File Registry<br/>Atomic Batch Operations]
-    N --> CountB[📊 Count Final Results<br/>Successful, Failed, Skipped]
-    CountB --> O[Display Final Results<br/>Uploaded: X, Skipped: Y, Failed: Z]
-    O --> DisplayB[🖥️ Show Results Summary<br/>Completion Interface]
-    DisplayB --> P[Process Complete]
+    %% Layer 1 styling Blue Temporary Processing
+    classDef layer1Node fill:#2563eb,color:#ffffff,stroke:#1d4ed8,stroke-width:2px
+    class A,B,C,D,E layer1Node
     
-    classDef startNode fill:#008000,color:#ffffff
-    classDef decisionNode fill:#000000,color:#ffff00
-    classDef endNode fill:#dc143c,color:#ffffff
-    classDef standardNode fill:#ffffff,color:#000000
-    classDef tagInterface fill:#ffecb3,color:#000000
-    classDef countInterface fill:#e8f5e8,color:#000000
-    classDef displayInterface fill:#e1f5fe,color:#000000
+    %% Layer 2 styling Purple Persistent Queue
+    classDef layer2Node fill:#7c3aed,color:#ffffff,stroke:#5b21b6,stroke-width:2px
+    class F,G,H,I,K layer2Node
     
-    class A startNode
+    %% Layer 3 styling Green Permanent Storage
+    classDef layer3Node fill:#059669,color:#ffffff,stroke:#047857,stroke-width:2px
+    class L,M,N,O,P layer3Node
+    
+    %% Flag nodes styling Orange Data Properties
+    classDef flagNode fill:#ea580c,color:#ffffff,stroke:#c2410c,stroke-width:2px
+    class FlagB,FlagC,FlagD flagNode
+    
+    %% Tag nodes styling Yellow UI Display
+    classDef tagNode fill:#f59e0b,color:#ffffff,stroke:#d97706,stroke-width:2px
+    class TagA,TagB,TagC tagNode
+    
+    %% Constraint nodes styling Cyan Multi-Dimensional Array Constraints
+    classDef constraintNode fill:#0891b2,color:#ffffff,stroke:#0e7490,stroke-width:3px
+    class ConstraintA,ConstraintB,ConstraintC constraintNode
+    
+    %% Decision node
+    classDef decisionNode fill:#dc2626,color:#ffffff,stroke:#991b1b,stroke-width:3px
     class J decisionNode
-    class P endNode
-    class B,C,D,E,F,G,H,I,K,L,M,N,O standardNode
-    class TagA,TagB,TagC,TagD tagInterface
-    class CountA,CountB countInterface
-    class DisplayA,DisplayB displayInterface
 ```
+
+## Three-Layer Architecture Explanation
+
+### 🔄 Layer 1: JavaScript Deduplication Logic (Blue Nodes)
+**Purpose**: Temporary processing to determine what files should be queued  
+**Duration**: During file selection only  
+**Location**: `FileUpload.vue` processing functions  
+**Operations**:
+- Generate SHA-256 hashes using Web Crypto API
+- Client-side deduplication with JavaScript Set/Map
+- Batch database queries to check for existing files
+- Categorize files as ready/existing/duplicate
+
+### 💾 Layer 2: Pinia Multi-Dimensional Array (Purple Nodes)  
+**Purpose**: Persistent queue with automatic duplicate grouping  
+**Duration**: Until upload completion or manual removal  
+**Location**: `stores/upload.js` with multi-dimensional array structure  
+**Structure**: `Array[hash][filename][size][modified][created] = File`  
+**Benefits**:
+- Queue persists across navigation and page refreshes
+- Automatic grouping of duplicate files by hash
+- Multiple levels of deduplication through array constraints
+- Elegant constraint-based logic at every dimension
+- User can see file variants and exact duplicates clearly
+- Multi-dimensional array provides natural duplicate grouping without custom logic
+
+### ☁️ Layer 3: Firebase Storage (Green Nodes)
+**Purpose**: Permanent file storage with data consistency guarantees  
+**Duration**: Permanent (until user deletion)  
+**Location**: Firebase Storage + Firestore metadata  
+**Critical Requirements**:
+- **Storage-First Policy**: Upload to Firebase Storage before writing metadata
+- Team-scoped collections for law firm confidentiality
+- Atomic Firestore operations to prevent orphaned metadata
+- Only write metadata after successful storage upload
+
+### 🏴 File Property Flagging (Orange Nodes)
+**Purpose**: Set data properties on file objects during processing  
+**Type**: JavaScript object properties (data attributes)  
+**Flag Points**:
+- **FlagA**: After client-side deduplication → `isDuplicate: true`
+- **FlagB**: After database categorization → `status: 'ready'/'existing'`, `isPreviousUpload: true/false`
+- **FlagC**: When upload starts → `status: 'uploading'`
+- **FlagD**: After upload completion → `status: 'successful'/'failed'`
+
+### 🏷️ UI Status Tagging (Yellow Nodes)
+**Purpose**: Apply visual tags in UI components based on file properties  
+**Type**: UI display elements (chips, badges, icons)  
+**Tag Points**:
+- **TagA**: Apply initial UI tags based on file flags from Layer 1
+- **TagB**: Update UI tags during upload progress
+- **TagC**: Update final UI tags showing completion status
+
+### 🎯 Multi-Dimensional Array Constraints (Cyan Nodes)
+**Purpose**: Leverage array index uniqueness for automatic deduplication  
+**Type**: Built-in JavaScript array constraint enforcement  
+**Constraint Levels**:
+- **Hash-Level**: Groups files with identical content (same SHA-256)
+- **Filename-Level**: Groups variants of same file with different names
+- **Metadata-Level**: Detects exact duplicates with same size/timestamps
+
+### Multi-Stage Constraint System
+```
+Layer 1: Flag Properties → Layer 2: Multi-Dimensional Insert → Constraint Grouping → UI Tags → Layer 3: Update Properties → Update UI Tags
+      🏴 (data)              💾 Array[hash][name][size]    🎯 (constraints)    🏷️ (visual)    🏴 (data)        🏷️ (visual)
+```
+
+### Architecture Flow Summary
+```
+File Selection → JS Processing → Pinia Multi-Array → Firebase Storage
+   (temporary)    (temporary)      (persistent)        (permanent)
+     Blue Nodes   Blue Nodes      Purple Nodes        Green Nodes
+      🏴 Flags     🏴 Flags       🎯 Constraints      🏴🏷️ Both
+     (Orange)      (Orange)         (Cyan)           (Orange/Yellow)
+```
+
+This three-layer approach provides:
+- **Robust deduplication** without complex caching
+- **Persistent user experience** across navigation  
+- **Automatic duplicate grouping** by content hash
+- **Multi-level constraint enforcement** through array dimensions
+- **Clear separation** between data properties and UI display
+- **Real-time status tracking** with visual file tagging
+- **Data consistency** with Storage-First guarantees
+- **Legal compliance** through team-scoped isolation
+- **Elegant constraint-based logic** at every layer
 
 ## File Status Legend
 
