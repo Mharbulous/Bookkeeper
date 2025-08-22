@@ -316,7 +316,7 @@ This three-layer approach provides:
 |--------|-------|------------|--------------|
 | **Ready** | 🟢 Green | New files that will be uploaded | Upload to storage |
 | **Existing** | 🔵 Blue | Files already uploaded previously | Skip upload, show notification |
-| **Duplicates** | 🟡 Yellow | Same file selected multiple times in current batch | Keep one copy, skip duplicates |
+| **Duplicates** | 🟣 Purple | Same file selected multiple times in current batch | Keep one copy, skip duplicates |
 | **Uploading** | 🟠 Orange | Files currently being processed | Show progress indicator |
 | **Successful** | ✅ Green | Files uploaded successfully | Mark as complete |
 | **Failed** | 🔴 Red | Upload failed due to error | Show error, allow retry |
@@ -328,7 +328,7 @@ Selection → Ready/Existing/Duplicates → Uploading → Successful/Failed/Skip
 ```
 
 ### Color Usage in Interface
-- **Pre-upload**: Files show Ready (green), Existing (blue), Duplicates (yellow)
+- **Pre-upload**: Files show Ready (green), Existing (blue), Duplicates (purple)
 - **During upload**: Ready files change to Uploading (orange)
 - **Post-upload**: Files show final status Successful (green), Failed (red), Skipped (gray)
 

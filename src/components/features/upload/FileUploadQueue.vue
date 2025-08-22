@@ -60,7 +60,8 @@
           <v-chip
             size="large"
             variant="flat"
-            color="orange"
+            color="purple"
+            class="text-white"
           >
             {{ queueDuplicatesCount }} duplicates
           </v-chip>
@@ -333,12 +334,12 @@ const getStatusColor = (status, file) => {
     uploading: 'primary',
     completed: 'success',
     error: 'error',
-    duplicate: 'orange',
+    duplicate: 'purple',
     existing: 'blue'
   }
   
   // Handle special cases based on file properties
-  if (file?.isQueueDuplicate) return 'orange'
+  if (file?.isQueueDuplicate) return 'purple'
   if (file?.isPreviousUpload) return 'blue'
   
   return statusColors[status] || 'grey'
@@ -364,7 +365,7 @@ const getStatusText = (status, file) => {
 
 const getDuplicateMessageClass = (file) => {
   if (file.isPreviousUpload) return 'text-blue'
-  if (file.isQueueDuplicate) return 'text-orange'
+  if (file.isQueueDuplicate) return 'text-purple'
   return 'text-info'
 }
 
