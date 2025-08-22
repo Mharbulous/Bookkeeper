@@ -29,17 +29,24 @@ export function useQueueDeduplication() {
         return a.metadata.lastModified - b.metadata.lastModified
       }
       
-      // Priority 2: Shortest filename
+      // Priority 2: Longest folder path
+      const aFolderPath = a.path.substring(0, a.path.lastIndexOf('/') + 1)
+      const bFolderPath = b.path.substring(0, b.path.lastIndexOf('/') + 1)
+      if (aFolderPath.length !== bFolderPath.length) {
+        return bFolderPath.length - aFolderPath.length // Descending (longest first)
+      }
+      
+      // Priority 3: Shortest filename
       if (a.metadata.fileName.length !== b.metadata.fileName.length) {
         return a.metadata.fileName.length - b.metadata.fileName.length
       }
       
-      // Priority 3: Alphanumeric filename sort
+      // Priority 4: Alphanumeric filename sort
       if (a.metadata.fileName !== b.metadata.fileName) {
         return a.metadata.fileName.localeCompare(b.metadata.fileName)
       }
       
-      // Priority 4: Original selection order (stable sort)
+      // Priority 5: Original selection order (stable sort)
       return a.originalIndex - b.originalIndex
     })[0]
   }
