@@ -384,7 +384,6 @@ const processFiles = async (files) => {
           // Mark others as duplicates
           identicalFiles.slice(1).forEach(fileRef => {
             fileRef.isDuplicate = true
-            fileRef.duplicateReason = 'Identical file selected multiple times'
             duplicateFiles.push(fileRef)
           })
         }
@@ -411,7 +410,6 @@ const processFiles = async (files) => {
                 finalFiles.splice(index, 1)
               }
               fileRef.isDuplicate = true
-              fileRef.duplicateReason = 'Duplicate content with different metadata'
               duplicateFiles.push(fileRef)
             }
           })
@@ -561,7 +559,7 @@ const updateUploadQueue = (readyFiles, duplicateFiles) => {
       lastModified: fileRef.file.lastModified,
       isDuplicate: true,
       isPreviousUpload: false,
-      duplicateMessage: fileRef.duplicateReason || 'Duplicate file detected'
+      duplicateMessage: null
     })
   })
 }
