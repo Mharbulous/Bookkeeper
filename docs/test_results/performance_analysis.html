@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Processing Performance Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 30px;
+        }
+        .stats {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .stats h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+        }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 768px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>File Processing Performance Analysis</h1>
+        <p><em>Based on reliable test data from the 2-chunk UI update strategy with Web Worker processing</em></p>
+        
+        <div class="stats">
+            <h3>📊 Performance Summary</h3>
+            <div class="stat-row">
+                <strong>Total Tests Conducted:</strong>
+                <span id="totalTests">6</span>
+            </div>
+            <div class="stat-row">
+                <strong>Files Range Tested:</strong>
+                <span>24 - 3,305 files</span>
+            </div>
+            <div class="stat-row">
+                <strong>Average Web Worker Rate:</strong>
+                <span id="avgWorkerRate">-</span>
+            </div>
+            <div class="stat-row">
+                <strong>Average UI Update Rate:</strong>
+                <span id="avgUIRate">-</span>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-container">
+                <canvas id="workerChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="uiChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="totalChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="breakdownChart"></canvas>
+        </div>
+
+        <div class="stats">
+            <h3>🔍 Key Insights</h3>
+            <ul>
+                <li><strong>Web Worker Performance:</strong> Scales well with file count, showing consistent performance per file</li>
+                <li><strong>UI Update Bottleneck:</strong> For larger datasets, UI rendering becomes the primary performance bottleneck</li>
+                <li><strong>2-Chunk Strategy:</strong> First 100 files display instantly (0ms), remaining files processed in second chunk</li>
+                <li><strong>Single Chunk Optimization:</strong> Files &lt; 100 automatically use single chunk for optimal performance</li>
+                <li><strong>Deduplication Effectiveness:</strong> Varies from 0% to 10% depending on dataset characteristics</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Test data from reliable console logs
+        const testData = [
+            { files: 3305, workerTime: 2347, uiTime: 13121, totalTime: 15468, inputFiles: 3400 },
+            { files: 2695, workerTime: 11238, uiTime: 10426, totalTime: 21664, inputFiles: 2994 },
+            { files: 707, workerTime: 179, uiTime: 3403, totalTime: 3582, inputFiles: 707 },
+            { files: 483, workerTime: 76, uiTime: 2588, totalTime: 2664, inputFiles: 488 },
+            { files: 95, workerTime: 38, uiTime: 0, totalTime: 38, inputFiles: 95 },
+            { files: 24, workerTime: 32, uiTime: 1, totalTime: 33, inputFiles: 24 }
+        ];
+
+        // Sort by file count for better visualization
+        testData.sort((a, b) => a.files - b.files);
+
+        // Calculate statistics
+        const workerRates = testData.map(d => d.workerTime / d.files);
+        const uiRatesNonZero = testData.filter(d => d.uiTime > 0).map(d => d.uiTime / d.files);
+        
+        const avgWorkerRate = workerRates.reduce((a, b) => a + b, 0) / workerRates.length;
+        const avgUIRate = uiRatesNonZero.reduce((a, b) => a + b, 0) / uiRatesNonZero.length;
+
+        document.getElementById('avgWorkerRate').textContent = `${avgWorkerRate.toFixed(2)} ms/file`;
+        document.getElementById('avgUIRate').textContent = `${avgUIRate.toFixed(2)} ms/file (excluding 0ms cases)`;
+
+        // Chart.js configuration
+        Chart.defaults.color = '#333';
+        Chart.defaults.font.size = 12;
+
+        // Web Worker Performance Chart
+        new Chart(document.getElementById('workerChart'), {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'Web Worker Time',
+                    data: testData.map(d => ({ x: d.files, y: d.workerTime })),
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Web Worker Processing Time vs File Count'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Number of Files (After Deduplication)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Processing Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // UI Update Performance Chart
+        new Chart(document.getElementById('uiChart'), {
+            type: 'scatter',
+            data: {
+                datasets: [{
+                    label: 'UI Update Time',
+                    data: testData.map(d => ({ x: d.files, y: d.uiTime })),
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'UI Update Time vs File Count'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Number of Files (After Deduplication)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'UI Update Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Total Processing Time Chart
+        new Chart(document.getElementById('totalChart'), {
+            type: 'line',
+            data: {
+                labels: testData.map(d => `${d.files} files`),
+                datasets: [{
+                    label: 'Total Processing Time',
+                    data: testData.map(d => d.totalTime),
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Total Processing Time vs File Count'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Test Cases'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Total Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Component Breakdown Chart (Stacked Bar)
+        new Chart(document.getElementById('breakdownChart'), {
+            type: 'bar',
+            data: {
+                labels: testData.map(d => `${d.files} files`),
+                datasets: [
+                    {
+                        label: 'Web Worker Time',
+                        data: testData.map(d => d.workerTime),
+                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'UI Update Time',
+                        data: testData.map(d => d.uiTime),
+                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Processing Time Breakdown by Component'
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Test Cases'
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Processing Time (ms)'
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

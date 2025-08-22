@@ -21,6 +21,9 @@
         :show="showFolderOptions"
         :subfolder-count="subfolderCount"
         :include-subfolders="includeSubfolders"
+        :is-analyzing="isAnalyzing"
+        :main-folder-analysis="mainFolderAnalysis"
+        :all-files-analysis="allFilesAnalysis"
         @update:show="showFolderOptions = $event"
         @update:include-subfolders="includeSubfolders = $event"
         @confirm="confirmFolderOptions"
@@ -125,6 +128,9 @@ const {
   showFolderOptions,
   includeSubfolders,
   subfolderCount,
+  isAnalyzing,
+  mainFolderAnalysis,
+  allFilesAnalysis,
   processFolderEntry,
   processFolderFiles,
   confirmFolderOptions: baseConfirmFolderOptions,

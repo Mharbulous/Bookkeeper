@@ -1,4 +1,4 @@
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef, nextTick } from 'vue'
 
 export function useFileQueue() {
   // Reactive data - Use shallowRef for better performance with large file arrays
@@ -55,7 +55,11 @@ export function useFileQueue() {
 
   const addFilesToQueue = async (files, processFiles) => {
     if (files.length === 0) return
+    console.log(`🚀 USER ACTION: Files selected/dropped - Starting end-to-end processing at ${Date.now()}ms`)
+    const startTime = Date.now()
     await processFiles(files)
+    // Note: Total time will be logged when UI update completes
+    window.endToEndStartTime = startTime
   }
 
   // Worker progress update handler
@@ -174,12 +178,23 @@ export function useFileQueue() {
         phase: 'complete'
       }
       
+      // Wait for Vue to complete DOM rendering
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0)) // Additional frame wait
+      
       const chunk2Duration = Date.now() - chunk2Start
       console.info(`✅ Chunk 2 COMPLETE: Displayed final ${remainingFiles} files in ${chunk2Duration}ms`)
     }
     
     const duration = Date.now() - startTime
     console.info(`2-chunk UI update completed in ${duration}ms`)
+    
+    // Log end-to-end timing from user action to UI completion
+    if (window.endToEndStartTime) {
+      const endToEndDuration = Date.now() - window.endToEndStartTime
+      console.info(`🎯 END-TO-END COMPLETE: From file selection to UI display in ${endToEndDuration}ms (${(endToEndDuration/1000).toFixed(1)}s)`)
+      window.endToEndStartTime = null // Clean up
+    }
     
     // Complete the UI update process
     isProcessingUIUpdate.value = false

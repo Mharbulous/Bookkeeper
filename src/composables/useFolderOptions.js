@@ -1,4 +1,5 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { analyzeFiles } from '../utils/fileAnalysis.js'
 
 export function useFolderOptions() {
   // Reactive data
@@ -6,6 +7,98 @@ export function useFolderOptions() {
   const includeSubfolders = ref(true)
   const pendingFolderFiles = ref([])
   const subfolderCount = ref(0)
+  
+  // Analysis state
+  const isAnalyzing = ref(false)
+  const mainFolderAnalysis = ref(null)
+  const allFilesAnalysis = ref(null)
+
+  // Analysis function
+  const analyzeFilesForOptions = async () => {
+    if (pendingFolderFiles.value.length === 0) return
+    
+    isAnalyzing.value = true
+    
+    try {
+      // Separate files into main folder vs all files
+      const allFiles = pendingFolderFiles.value.map(f => f.file)
+      
+      // Debug: Log path structures to understand filtering
+      console.log('📁 Analyzing folder structure:')
+      
+      // Show path segment distribution
+      const pathAnalysis = pendingFolderFiles.value.map(f => {
+        const pathParts = f.path.split('/').filter(part => part !== '')
+        return { path: f.path, segments: pathParts.length }
+      })
+      
+      const segmentCounts = {}
+      pathAnalysis.forEach(p => {
+        segmentCounts[p.segments] = (segmentCounts[p.segments] || 0) + 1
+      })
+      
+      console.log('📊 Path segments distribution:', segmentCounts)
+      
+      // Show examples of each segment type
+      const examplesBySegments = {}
+      pathAnalysis.forEach(p => {
+        if (!examplesBySegments[p.segments]) examplesBySegments[p.segments] = []
+        if (examplesBySegments[p.segments].length < 2) {
+          examplesBySegments[p.segments].push(p.path)
+        }
+      })
+      
+      console.log('📄 Example paths by segment count:', examplesBySegments)
+      
+      const mainFolderFiles = pendingFolderFiles.value
+        .filter(f => {
+          const pathParts = f.path.split('/').filter(part => part !== '') // Remove empty parts
+          const isMainFolder = pathParts.length === 2  // Exactly 2 parts: folder/file (no subfolders)
+          return isMainFolder
+        })
+        .map(f => f.file)
+        
+      console.log(`📊 Filtering results: ${mainFolderFiles.length} main folder files, ${allFiles.length} total files`)
+      
+      // Debug: Show path analysis
+      if (pendingFolderFiles.value.length > 0) {
+        const exampleAnalysis = pendingFolderFiles.value.slice(0, 3).map(f => {
+          const pathParts = f.path.split('/').filter(part => part !== '')
+          return {
+            path: f.path,
+            parts: pathParts,
+            segments: pathParts.length,
+            isMainFolder: pathParts.length === 2
+          }
+        })
+        console.log('📄 Path analysis examples:', exampleAnalysis)
+      }
+      
+      // Analyze both sets concurrently
+      const [allFilesResult, mainFolderResult] = await Promise.all([
+        Promise.resolve(analyzeFiles(allFiles)),
+        Promise.resolve(analyzeFiles(mainFolderFiles))
+      ])
+      
+      allFilesAnalysis.value = allFilesResult
+      mainFolderAnalysis.value = mainFolderResult
+      
+    } catch (error) {
+      console.error('Error analyzing files for folder options:', error)
+      // Set fallback analysis
+      allFilesAnalysis.value = analyzeFiles([])
+      mainFolderAnalysis.value = analyzeFiles([])
+    } finally {
+      isAnalyzing.value = false
+    }
+  }
+
+  // Watch for when folder options dialog opens to trigger analysis
+  watch(showFolderOptions, (newValue) => {
+    if (newValue && pendingFolderFiles.value.length > 0) {
+      analyzeFilesForOptions()
+    }
+  })
 
   const readDirectoryRecursive = (dirEntry) => {
     return new Promise((resolve) => {
@@ -103,12 +196,18 @@ export function useFolderOptions() {
     includeSubfolders,
     pendingFolderFiles,
     subfolderCount,
+    
+    // Analysis state
+    isAnalyzing,
+    mainFolderAnalysis,
+    allFilesAnalysis,
 
     // Methods
     readDirectoryRecursive,
     processFolderEntry,
     processFolderFiles,
     confirmFolderOptions,
-    cancelFolderUpload
+    cancelFolderUpload,
+    analyzeFilesForOptions
   }
 }

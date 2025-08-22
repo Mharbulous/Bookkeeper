@@ -23,7 +23,10 @@
       "Bash(git config:*)",
       "Bash(firebase deploy:*)",
       "WebFetch(domain:firebase.google.com)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(python:*)",
+      "Bash(where python)",
+      "Bash(\"C:\\Users\\Brahm\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe\" generate_performance_graph.py)"
     ],
     "deny": [],
     "ask": []
