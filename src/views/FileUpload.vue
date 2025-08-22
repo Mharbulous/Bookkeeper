@@ -185,22 +185,7 @@ defineOptions({
   name: 'FileUploadView'
 })
 
-// File size limits
-const MAX_BATCH_SIZE = 1024 * 1024 * 1024  // 1GB for batch
-const MAX_VIDEO_SIZE = 500 * 1024 * 1024  // 500MB for single video
-const VIDEO_TYPES = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo']
-
-// Validate file sizes
-const validateFileSize = (files) => {
-  // Single video file gets larger limit
-  if (files.length === 1 && VIDEO_TYPES.includes(files[0].type)) {
-    return files[0].size <= MAX_VIDEO_SIZE
-  }
-  
-  // Batch upload limit
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0)
-  return totalSize <= MAX_BATCH_SIZE
-}
+// No file size constraints - all files accepted
 
 // Reactive data
 const isDragOver = ref(false)
@@ -315,14 +300,6 @@ const generateFileHash = async (file) => {
 
 // Improved constraint-based deduplication using JavaScript Maps
 const processFiles = async (files) => {
-  // Step 1: Validate size limits
-  if (!validateFileSize(files)) {
-    const limit = files.length === 1 && VIDEO_TYPES.includes(files[0].type) 
-      ? '500MB' : '1GB'
-    showNotification(`File size exceeds ${limit} limit`, 'error')
-    return
-  }
-  
   // Step 1: Group files by size to identify unique-sized files
   const fileSizeGroups = new Map() // file_size -> [file_references]
   
@@ -335,9 +312,7 @@ const processFiles = async (files) => {
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type,
-        lastModified: file.lastModified,
-        // Note: File creation time not available in browser, using selection time
-        selectionTimestamp: new Date().getTime()
+        lastModified: file.lastModified
       }
     }
     
@@ -377,7 +352,7 @@ const processFiles = async (files) => {
   const finalFiles = []
   const duplicateFiles = []
   
-  // Step 4: Process hash groups to identify true duplicates vs different files
+  // Step 4: Process hash groups to identify true duplicates vs or the identical files selected twice
   for (const [, fileRefs] of hashGroups) {
     if (fileRefs.length === 1) {
       // Unique hash - not a duplicate
@@ -387,7 +362,7 @@ const processFiles = async (files) => {
       const identicalGroups = new Map() // metadata_key -> [file_references]
       
       fileRefs.forEach(fileRef => {
-        // Create metadata signature (excluding selection timestamp)
+        // Create metadata signature for identical file detection
         const metadataKey = `${fileRef.metadata.fileName}_${fileRef.metadata.fileSize}_${fileRef.metadata.lastModified}`
         
         if (!identicalGroups.has(metadataKey)) {
@@ -402,22 +377,20 @@ const processFiles = async (files) => {
           // Unique file (different metadata from others with same hash)
           finalFiles.push(identicalFiles[0])
         } else {
-          // Identical files selected multiple times - choose best one
-          const bestFile = chooseBestFile(identicalFiles)
-          finalFiles.push(bestFile)
+          // Identical files selected multiple times - just pick the first one
+          const chosenFile = identicalFiles[0]
+          finalFiles.push(chosenFile)
           
           // Mark others as duplicates
-          identicalFiles.forEach(fileRef => {
-            if (fileRef !== bestFile) {
-              fileRef.isDuplicate = true
-              fileRef.duplicateReason = 'Identical file selected multiple times'
-              duplicateFiles.push(fileRef)
-            }
+          identicalFiles.slice(1).forEach(fileRef => {
+            fileRef.isDuplicate = true
+            fileRef.duplicateReason = 'Identical file selected multiple times'
+            duplicateFiles.push(fileRef)
           })
         }
       }
       
-      // If we have multiple unique files with same hash (true duplicates), choose the best one
+      // If we have multiple distinct files with same hash (true duplicates), choose the best one
       if (identicalGroups.size > 1) {
         const allUniqueFiles = Array.from(identicalGroups.values()).map(group => group[0])
         if (allUniqueFiles.length > 1) {
@@ -473,22 +446,17 @@ const chooseBestFile = (fileRefs) => {
       return a.metadata.lastModified - b.metadata.lastModified
     }
     
-    // Priority 2: Earliest selection timestamp (proxy for creation in browser context)
-    if (a.metadata.selectionTimestamp !== b.metadata.selectionTimestamp) {
-      return a.metadata.selectionTimestamp - b.metadata.selectionTimestamp
-    }
-    
-    // Priority 3: Shortest filename
+    // Priority 2: Shortest filename
     if (a.metadata.fileName.length !== b.metadata.fileName.length) {
       return a.metadata.fileName.length - b.metadata.fileName.length
     }
     
-    // Priority 4: Alphanumeric filename sort
+    // Priority 3: Alphanumeric filename sort
     if (a.metadata.fileName !== b.metadata.fileName) {
       return a.metadata.fileName.localeCompare(b.metadata.fileName)
     }
     
-    // Priority 5: Original selection order (stable sort)
+    // Priority 4: Original selection order (stable sort)
     return a.originalIndex - b.originalIndex
   })[0]
 }
