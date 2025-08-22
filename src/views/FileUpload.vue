@@ -431,24 +431,24 @@ const checkDatabaseDuplicates = async (uniqueFiles) => {
     return uniqueFiles.map(f => ({ ...f, status: 'ready' }))
   }
   
-  // Check each file against database
-  const results = await Promise.all(
-    uniqueFiles.map(async (fileData) => {
-      const result = await UploadLogService.registerFile(
-        fileData.hash,
-        fileData.metadata,
-        teamId
-      )
-      
-      return {
-        ...fileData,
-        status: result.status === 'duplicate' ? 'existing' : 'ready',
-        existingData: result.existing
-      }
-    })
+  // Use atomic batch registration for all files
+  const results = await UploadLogService.registerFileBatch(
+    uniqueFiles.map(fileData => ({
+      hash: fileData.hash,
+      metadata: fileData.metadata
+    })),
+    teamId
   )
   
-  return results
+  // Transform results to match expected format
+  return results.map(result => {
+    const originalFile = uniqueFiles.find(f => f.hash === result.hash)
+    return {
+      ...originalFile,
+      status: result.status === 'duplicate' ? 'existing' : 'ready',
+      existingData: result.existing
+    }
+  })
 }
 
 const updateUploadQueue = (checkedFiles, clientDuplicates) => {

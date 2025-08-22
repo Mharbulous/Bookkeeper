@@ -373,37 +373,55 @@ const generateHashes = async (files) => {
 };
 ```
 
-### Step 2: Atomic Batch Operations
+### Step 2: Storage-First Upload with Atomic Operations
 ```javascript
-const uploadFileBatch = async (uniqueFiles) => {
-  const batch = db.batch();
+const uploadFileBatch = async (uniqueFiles, teamId) => {
   const results = [];
   
   for (const { hash, file, metadata } of uniqueFiles) {
-    const fileRef = db.collection('teams').doc(currentTeam).collection('files').doc(hash);
-    const indexRef = db.collection('teams').doc(currentTeam)
-      .collection('fileIndex').doc(hash);
+    const fileRef = db.collection('teams').doc(teamId).collection('files').doc(hash);
+    const indexRef = db.collection('teams').doc(teamId).collection('fileIndex').doc(hash);
+    const storagePath = `teams/${teamId}/files/${hash}.${getFileExtension(file.name)}`;
+    const storageRef = storage.ref(storagePath);
     
-    // Check if document exists first
-    const doc = await fileRef.get();
-    if (doc.exists) {
-      results.push({ hash, status: 'duplicate', existing: doc.data() });
-      continue;
+    try {
+      // Step 1: Check if metadata exists (indicates successful previous upload)
+      const existingDoc = await fileRef.get();
+      if (existingDoc.exists()) {
+        results.push({ hash, status: 'duplicate', existing: existingDoc.data() });
+        continue;
+      }
+      
+      // Step 2: Upload to Storage FIRST - this is the critical data consistency requirement
+      await storageRef.put(file);
+      
+      // Step 3: Only write metadata after successful storage upload
+      const batch = db.batch();
+      batch.set(fileRef, { 
+        ...metadata, 
+        hash, 
+        teamId, 
+        storagePath,
+        uploadedAt: serverTimestamp() 
+      });
+      batch.set(indexRef, {
+        fileName: file.name,
+        fileSize: file.size,
+        uploadedAt: serverTimestamp()
+      });
+      
+      // Atomic commit of metadata only after storage success
+      await batch.commit();
+      
+      results.push({ hash, status: 'uploaded', storagePath });
+      
+    } catch (error) {
+      // If storage upload failed, no metadata was written - system stays consistent
+      console.error(`Upload failed for ${file.name}:`, error);
+      results.push({ hash, status: 'error', error: error.message });
     }
-    
-    // Add to batch
-    batch.set(fileRef, { ...metadata, hash, teamId: currentTeam });
-    batch.set(indexRef, {
-      fileName: file.name,
-      fileSize: file.size,
-      uploadedAt: new Date()
-    });
-    
-    results.push({ hash, status: 'uploaded' });
   }
   
-  // Atomic commit
-  await batch.commit();
   return results;
 };
 ```
@@ -431,6 +449,138 @@ const handleDuplicates = async (results) => {
       return await replaceExistingFiles(duplicates);
   }
 };
+```
+
+## Critical Data Consistency Requirement
+
+### ⚠️ Storage-First Metadata Policy
+
+**CRITICAL**: Firestore metadata must **NEVER** be written unless the file exists in Firebase Storage.
+
+#### Two Valid Scenarios for Writing Metadata:
+1. **New Files**: Upload to Storage first, then write metadata
+2. **Duplicate Files**: File already exists in Storage, safe to write additional metadata references
+
+#### The Data Consistency Problem
+```javascript
+// ❌ WRONG: Creates orphaned metadata if upload fails
+await db.collection('teams').doc(teamId).collection('files').doc(hash).set(metadata)
+await storage.ref(storagePath).put(file) // If this fails, metadata is orphaned
+
+// ✅ CORRECT for NEW files: Storage upload first, then metadata
+await storage.ref(storagePath).put(file)
+await db.collection('teams').doc(teamId).collection('files').doc(hash).set(metadata)
+
+// ✅ CORRECT for DUPLICATE files: File already in storage, safe to add metadata
+const storageExists = await storage.ref(storagePath).getMetadata().catch(() => null)
+if (storageExists) {
+  // File confirmed in storage - safe to write metadata reference
+  await db.collection('teams').doc(teamId).collection('files').doc(hash).set(metadata)
+}
+```
+
+#### Why This Matters
+- **Orphaned Metadata**: If NEW file upload fails after metadata is written, Firestore contains records for non-existent files
+- **Broken References**: Users see files in the UI that cannot be downloaded
+- **Deduplication Errors**: False positives when metadata exists but file doesn't
+- **Audit Trail Corruption**: Upload logs reference files that don't exist
+
+#### The Duplicate File Exception
+For duplicate files, writing metadata is safe because:
+- **File already exists in Storage** - confirmed by previous successful upload
+- **No upload failure risk** - we're not uploading, just creating additional metadata references
+- **Consistent state maintained** - metadata always points to existing Storage files
+
+#### Implementation Pattern for New Files
+```javascript
+const uploadNewFile = async (file, hash, metadata, teamId) => {
+  const storagePath = `teams/${teamId}/files/${hash}`
+  const storageRef = storage.ref(storagePath)
+  
+  try {
+    // Step 1: Upload to Storage FIRST (for new files)
+    await storageRef.put(file)
+    
+    // Step 2: Only write metadata after successful upload
+    await db.collection('teams').doc(teamId).collection('files').doc(hash).set({
+      ...metadata,
+      storagePath,
+      uploadedAt: serverTimestamp()
+    })
+    
+    return { status: 'uploaded', hash }
+  } catch (error) {
+    // If upload failed, no metadata was written - system stays consistent
+    throw new Error(`Upload failed: ${error.message}`)
+  }
+}
+```
+
+#### Implementation Pattern for Duplicate Files
+```javascript
+const handleDuplicateFile = async (hash, metadata, teamId) => {
+  const storagePath = `teams/${teamId}/files/${hash}`
+  const storageRef = storage.ref(storagePath)
+  
+  try {
+    // Step 1: Verify file exists in Storage (should exist from previous upload)
+    await storageRef.getMetadata()
+    
+    // Step 2: Safe to write metadata - file confirmed in Storage
+    await db.collection('teams').doc(teamId).collection('files').doc(hash).set({
+      ...metadata,
+      storagePath,
+      isDuplicateReference: true,
+      referencedAt: serverTimestamp()
+    })
+    
+    return { status: 'duplicate', hash }
+  } catch (error) {
+    // If file doesn't exist in Storage, this is an error state
+    throw new Error(`Duplicate file not found in Storage: ${error.message}`)
+  }
+}
+```
+
+#### Deduplication Flow with Storage-First Policy
+```javascript
+const uploadWithDeduplication = async (file, hash, metadata, teamId) => {
+  const fileRef = db.collection('teams').doc(teamId).collection('files').doc(hash)
+  const storagePath = `teams/${teamId}/files/${hash}`
+  const storageRef = storage.ref(storagePath)
+  
+  // Step 1: Check if metadata exists (indicates successful previous upload)
+  const existingDoc = await fileRef.get()
+  if (existingDoc.exists()) {
+    return { status: 'duplicate', existing: existingDoc.data() }
+  }
+  
+  // Step 2: Check if file exists in storage (edge case: metadata was deleted but file remains)
+  const storageExists = await storageRef.getMetadata().catch(() => null)
+  if (storageExists) {
+    // Repair: recreate metadata for existing storage file
+    await fileRef.set({
+      ...metadata,
+      storagePath,
+      uploadedAt: serverTimestamp(),
+      repairedAt: serverTimestamp(),
+      note: 'Metadata recreated for existing storage file'
+    })
+    return { status: 'duplicate', repaired: true }
+  }
+  
+  // Step 3: New file - upload to storage first
+  await storageRef.put(file)
+  
+  // Step 4: Create metadata only after successful storage upload
+  await fileRef.set({
+    ...metadata,
+    storagePath,
+    uploadedAt: serverTimestamp()
+  })
+  
+  return { status: 'uploaded', hash }
+}
 ```
 
 ## Error Handling and Edge Cases
