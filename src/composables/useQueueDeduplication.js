@@ -105,40 +105,40 @@ export function useQueueDeduplication() {
         // Unique hash - not a duplicate
         finalFiles.push(fileRefs[0])
       } else {
-        // Multiple files with same hash - check if they're identical or true duplicates
-        const identicalGroups = new Map() // metadata_key -> [file_references]
+        // Multiple files with same hash - check if they're one-and-the-same or duplicate files
+        const oneAndTheSameGroups = new Map() // metadata_key -> [file_references]
         
         fileRefs.forEach(fileRef => {
-          // Create metadata signature for identical file detection
+          // Create metadata signature for one-and-the-same file detection
           const metadataKey = `${fileRef.metadata.fileName}_${fileRef.metadata.fileSize}_${fileRef.metadata.lastModified}`
           
-          if (!identicalGroups.has(metadataKey)) {
-            identicalGroups.set(metadataKey, [])
+          if (!oneAndTheSameGroups.has(metadataKey)) {
+            oneAndTheSameGroups.set(metadataKey, [])
           }
-          identicalGroups.get(metadataKey).push(fileRef)
+          oneAndTheSameGroups.get(metadataKey).push(fileRef)
         })
         
-        // Step 5: Handle identical files and true duplicates
-        for (const [, identicalFiles] of identicalGroups) {
-          if (identicalFiles.length === 1) {
+        // Step 5: Handle one-and-the-same files and duplicate files
+        for (const [, oneAndTheSameFiles] of oneAndTheSameGroups) {
+          if (oneAndTheSameFiles.length === 1) {
             // Unique file (different metadata from others with same hash)
-            finalFiles.push(identicalFiles[0])
+            finalFiles.push(oneAndTheSameFiles[0])
           } else {
-            // Identical files selected multiple times - just pick the first one
-            const chosenFile = identicalFiles[0]
+            // One-and-the-same file selected multiple times - just pick the first one
+            const chosenFile = oneAndTheSameFiles[0]
             finalFiles.push(chosenFile)
             
             // Mark others as duplicates
-            identicalFiles.slice(1).forEach(fileRef => {
+            oneAndTheSameFiles.slice(1).forEach(fileRef => {
               fileRef.isDuplicate = true
               duplicateFiles.push(fileRef)
             })
           }
         }
         
-        // If we have multiple distinct files with same hash (true duplicates), choose the best one
-        if (identicalGroups.size > 1) {
-          const allUniqueFiles = Array.from(identicalGroups.values()).map(group => group[0])
+        // If we have multiple distinct files with same hash (duplicate files), choose the best one
+        if (oneAndTheSameGroups.size > 1) {
+          const allUniqueFiles = Array.from(oneAndTheSameGroups.values()).map(group => group[0])
           if (allUniqueFiles.length > 1) {
             const bestFile = chooseBestFile(allUniqueFiles)
             
