@@ -386,7 +386,9 @@ const getRelativePath = (file) => {
     return '\\'
   }
   
-  return '/' + pathParts.join('/')
+  // Join path parts and ensure single leading slash
+  const folderPath = pathParts.join('/')
+  return folderPath.startsWith('/') ? folderPath : '/' + folderPath
 }
 </script>
 

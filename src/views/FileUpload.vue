@@ -308,6 +308,7 @@ const processFiles = async (files) => {
     const fileRef = {
       file,
       originalIndex: index,
+      path: file.path || file.webkitRelativePath || file.name,
       metadata: {
         fileName: file.name,
         fileSize: file.size,
@@ -473,7 +474,12 @@ const processFolderEntry = async (dirEntry) => {
     subfolderCount.value = new Set(files.map(f => f.path.split('/')[0])).size
     showFolderOptions.value = true
   } else {
-    addFilesToQueue(files.map(f => f.file))
+    // Preserve path information when adding files to queue
+    const filesWithPath = files.map(f => {
+      f.file.path = f.path
+      return f.file
+    })
+    addFilesToQueue(filesWithPath)
   }
 }
 
@@ -539,6 +545,7 @@ const updateUploadQueue = (readyFiles, duplicateFiles) => {
       size: fileRef.file.size,
       type: fileRef.file.type,
       lastModified: fileRef.file.lastModified,
+      path: fileRef.path || fileRef.file.webkitRelativePath || fileRef.file.name,
       isDuplicate: false,
       isPreviousUpload: false,
       duplicateMessage: null
@@ -557,6 +564,7 @@ const updateUploadQueue = (readyFiles, duplicateFiles) => {
       size: fileRef.file.size,
       type: fileRef.file.type,
       lastModified: fileRef.file.lastModified,
+      path: fileRef.path || fileRef.file.webkitRelativePath || fileRef.file.name,
       isDuplicate: true,
       isPreviousUpload: false,
       duplicateMessage: null
@@ -574,7 +582,12 @@ const confirmFolderOptions = () => {
     filesToAdd = filesToAdd.filter(f => !f.path.includes('/') || f.path.split('/').length <= 2)
   }
   
-  addFilesToQueue(filesToAdd.map(f => f.file))
+  // Preserve path information when adding files to queue
+  const filesWithPath = filesToAdd.map(f => {
+    f.file.path = f.path
+    return f.file
+  })
+  addFilesToQueue(filesWithPath)
   
   showFolderOptions.value = false
   pendingFolderFiles.value = []
