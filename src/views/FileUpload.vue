@@ -30,8 +30,10 @@
 
       <!-- Upload Queue/Preview -->
       <FileUploadQueue
-        v-if="uploadQueue.length > 0"
+        v-if="uploadQueue.length > 0 || isProcessingUIUpdate"
         :files="uploadQueue"
+        :is-processing-ui-update="isProcessingUIUpdate"
+        :ui-update-progress="uiUpdateProgress"
         @remove-file="removeFromQueue"
         @start-upload="startUpload"
         @clear-queue="clearQueue"
@@ -94,12 +96,13 @@ const {
   fileInput,
   folderInput,
   processingProgress,
+  isProcessingUIUpdate,
+  uiUpdateProgress,
   triggerFileSelect,
   triggerFolderSelect,
   processSingleFile,
   addFilesToQueue,
   updateUploadQueue,
-  updateProgress,
   resetProgress,
   removeFromQueue,
   clearQueue,

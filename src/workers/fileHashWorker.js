@@ -8,7 +8,9 @@ const MESSAGE_TYPES = {
   PROCESS_FILES: 'PROCESS_FILES',
   PROGRESS_UPDATE: 'PROGRESS_UPDATE',
   PROCESSING_COMPLETE: 'PROCESSING_COMPLETE',
-  ERROR: 'ERROR'
+  ERROR: 'ERROR',
+  HEALTH_CHECK: 'HEALTH_CHECK',
+  HEALTH_CHECK_RESPONSE: 'HEALTH_CHECK_RESPONSE'
 }
 
 // Helper function to generate SHA-256 hash with size suffix
@@ -255,11 +257,22 @@ function chooseBestFile(fileRefs) {
 
 // Worker message handler
 self.onmessage = async function(event) {
-  const { type, files, batchId, options } = event.data
+  const { type, files, batchId, options, timestamp } = event.data
   
   switch (type) {
     case MESSAGE_TYPES.PROCESS_FILES:
       await processFiles(files, batchId, options)
+      break
+    
+    case MESSAGE_TYPES.HEALTH_CHECK:
+      // Respond to health check immediately
+      self.postMessage({
+        type: MESSAGE_TYPES.HEALTH_CHECK_RESPONSE,
+        batchId,
+        timestamp: timestamp,
+        responseTime: Date.now(),
+        status: 'healthy'
+      })
       break
     
     default:

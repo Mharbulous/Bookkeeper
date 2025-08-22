@@ -92,6 +92,46 @@
         </div>
       </div>
 
+      <!-- UI Update Progress Indicator -->
+      <v-card 
+        v-if="isProcessingUIUpdate" 
+        class="mb-4 bg-blue-lighten-5 border-blue-lighten-2" 
+        variant="outlined"
+      >
+        <v-card-text class="py-3">
+          <div class="d-flex align-center">
+            <v-progress-circular
+              indeterminate
+              color="blue"
+              size="20"
+              width="2"
+              class="me-3"
+            />
+            <div class="flex-grow-1">
+              <div class="text-body-2 font-weight-medium text-blue-darken-2">
+                {{ getLoadingMessage() }}
+              </div>
+              <div class="text-caption text-blue-darken-1 mt-1">
+                {{ uiUpdateProgress.current }} of {{ uiUpdateProgress.total }} files loaded ({{ uiUpdateProgress.percentage }}%)
+              </div>
+            </div>
+            <div class="text-caption text-blue-darken-1">
+              {{ getPhaseMessage() }}
+            </div>
+          </div>
+          
+          <!-- Progress bar -->
+          <v-progress-linear
+            :model-value="uiUpdateProgress.percentage"
+            color="blue"
+            bg-color="blue-lighten-4"
+            height="4"
+            rounded
+            class="mt-3"
+          />
+        </v-card-text>
+      </v-card>
+
       <!-- Files List - Grouped by duplicates -->
       <div v-for="(group, groupIndex) in groupedFiles" :key="groupIndex">
         <!-- Files in Group -->
@@ -243,6 +283,19 @@ const props = defineProps({
     type: Array,
     required: true,
     default: () => []
+  },
+  isProcessingUIUpdate: {
+    type: Boolean,
+    default: false
+  },
+  uiUpdateProgress: {
+    type: Object,
+    default: () => ({
+      current: 0,
+      total: 0,
+      percentage: 0,
+      phase: 'loading'
+    })
   }
 })
 
@@ -437,6 +490,46 @@ const formatDate = (date) => {
     hour: '2-digit',
     minute: '2-digit'
   }).format(date)
+}
+
+// 3-chunk loading message generator
+const getLoadingMessage = () => {
+  if (!props.isProcessingUIUpdate) return 'Loading files into queue...'
+  
+  const { total, percentage } = props.uiUpdateProgress
+  
+  if (total <= 50) {
+    return 'Loading files into queue...'
+  }
+  
+  if (percentage <= 10) {
+    return 'Showing initial files...'
+  } else if (percentage <= 85) {
+    return 'Loading remaining files...'
+  } else {
+    return 'Finalizing file list...'
+  }
+}
+
+// Phase message for 3-chunk strategy
+const getPhaseMessage = () => {
+  if (!props.isProcessingUIUpdate) return 'Loading...'
+  
+  const { total, percentage } = props.uiUpdateProgress
+  
+  if (total <= 50) {
+    return 'Loading...'
+  }
+  
+  if (percentage <= 10) {
+    return 'Step 1/3'
+  } else if (percentage <= 85) {
+    return 'Step 2/3'
+  } else if (percentage < 100) {
+    return 'Step 3/3'
+  } else {
+    return 'Complete!'
+  }
 }
 
 const getStatusColor = (status, file) => {

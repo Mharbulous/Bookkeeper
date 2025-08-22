@@ -10,10 +10,19 @@ export function useWebWorker(workerPath) {
   const worker = ref(null)
   const isWorkerReady = ref(false)
   const workerError = ref(null)
+  const isWorkerHealthy = ref(true)
   
   // Message handling
-  const pendingMessages = new Map() // batchId -> { resolve, reject, timeout }
+  const pendingMessages = new Map() // batchId -> { resolve, reject, timeout, startTime }
   const messageListeners = new Map() // messageType -> callback[]
+  
+  // Health monitoring
+  let healthCheckInterval = null
+  let lastHealthCheck = null
+  let consecutiveHealthFailures = 0
+  const MAX_HEALTH_FAILURES = 3
+  const HEALTH_CHECK_INTERVAL = 10000 // 10 seconds
+  const HEALTH_CHECK_TIMEOUT = 5000 // 5 seconds
   
   // Initialize worker
   const initializeWorker = () => {
@@ -32,6 +41,12 @@ export function useWebWorker(workerPath) {
       worker.value.onerror = (error) => {
         workerError.value = error
         isWorkerReady.value = false
+        isWorkerHealthy.value = false
+        
+        console.error('Worker error:', error)
+        
+        // Stop health checks
+        stopHealthChecking()
         
         // Reject all pending messages
         for (const [batchId, { reject }] of pendingMessages) {
@@ -45,12 +60,92 @@ export function useWebWorker(workerPath) {
       }
       
       isWorkerReady.value = true
+      isWorkerHealthy.value = true
       workerError.value = null
+      
+      // Start health monitoring
+      startHealthChecking()
+      
       return true
     } catch (error) {
       workerError.value = error
       isWorkerReady.value = false
+      isWorkerHealthy.value = false
       return false
+    }
+  }
+  
+  // Health check functionality
+  const startHealthChecking = () => {
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval)
+    }
+    
+    healthCheckInterval = setInterval(async () => {
+      try {
+        await performHealthCheck()
+      } catch (error) {
+        console.warn('Health check failed:', error.message)
+        handleHealthCheckFailure()
+      }
+    }, HEALTH_CHECK_INTERVAL)
+  }
+  
+  const stopHealthChecking = () => {
+    if (healthCheckInterval) {
+      clearInterval(healthCheckInterval)
+      healthCheckInterval = null
+    }
+  }
+  
+  const performHealthCheck = () => {
+    return new Promise((resolve, reject) => {
+      if (!isWorkerReady.value || !worker.value) {
+        reject(new Error('Worker not ready for health check'))
+        return
+      }
+      
+      const healthCheckId = `health_${Date.now()}`
+      const timeout = setTimeout(() => {
+        reject(new Error('Health check timeout'))
+      }, HEALTH_CHECK_TIMEOUT)
+      
+      // Listen for health check response
+      const healthResponseHandler = (data) => {
+        if (data.type === 'HEALTH_CHECK_RESPONSE' && data.batchId === healthCheckId) {
+          clearTimeout(timeout)
+          lastHealthCheck = Date.now()
+          consecutiveHealthFailures = 0
+          isWorkerHealthy.value = true
+          resolve()
+        }
+      }
+      
+      const unsubscribe = addMessageListener('HEALTH_CHECK_RESPONSE', healthResponseHandler)
+      
+      // Clean up listener after timeout
+      setTimeout(() => {
+        unsubscribe()
+      }, HEALTH_CHECK_TIMEOUT + 1000)
+      
+      // Send health check
+      worker.value.postMessage({
+        type: 'HEALTH_CHECK',
+        batchId: healthCheckId,
+        timestamp: Date.now()
+      })
+    })
+  }
+  
+  const handleHealthCheckFailure = () => {
+    consecutiveHealthFailures++
+    
+    if (consecutiveHealthFailures >= MAX_HEALTH_FAILURES) {
+      console.error(`Worker failed ${MAX_HEALTH_FAILURES} consecutive health checks, marking as unhealthy`)
+      isWorkerHealthy.value = false
+      
+      // Optionally auto-restart worker
+      // restartWorker()
     }
   }
   
@@ -64,6 +159,9 @@ export function useWebWorker(workerPath) {
       
       if (type === 'PROCESSING_COMPLETE') {
         clearTimeout(timeout)
+        const { startTime } = pendingMessages.get(batchId)
+        const duration = Date.now() - startTime
+        console.debug(`Worker operation completed in ${duration}ms`)
         pendingMessages.delete(batchId)
         resolve(data.result)
         return
@@ -71,6 +169,9 @@ export function useWebWorker(workerPath) {
       
       if (type === 'ERROR') {
         clearTimeout(timeout)
+        const { startTime } = pendingMessages.get(batchId)
+        const duration = Date.now() - startTime
+        console.error(`Worker operation failed after ${duration}ms:`, data.error)
         pendingMessages.delete(batchId)
         reject(new Error(data.error.message || 'Worker processing failed'))
         return
@@ -98,20 +199,33 @@ export function useWebWorker(workerPath) {
         return
       }
       
+      if (!isWorkerHealthy.value && !options.ignoreHealth) {
+        reject(new Error('Worker is not healthy'))
+        return
+      }
+      
       const batchId = message.batchId || generateBatchId()
       const timeout = options.timeout || 30000 // 30 second default timeout
+      const startTime = Date.now()
       
-      // Set up timeout
+      // Set up timeout with enhanced error message
       const timeoutId = setTimeout(() => {
+        const operation = message.type || 'operation'
         pendingMessages.delete(batchId)
-        reject(new Error('Worker operation timed out'))
+        reject(new Error(`Worker ${operation} timed out after ${timeout}ms`))
       }, timeout)
       
-      // Store promise handlers
-      pendingMessages.set(batchId, { resolve, reject, timeout: timeoutId })
+      // Store promise handlers with start time for performance tracking
+      pendingMessages.set(batchId, { resolve, reject, timeout: timeoutId, startTime })
       
-      // Send message with batchId
-      worker.value.postMessage({ ...message, batchId })
+      try {
+        // Send message with batchId
+        worker.value.postMessage({ ...message, batchId })
+      } catch (error) {
+        clearTimeout(timeoutId)
+        pendingMessages.delete(batchId)
+        reject(new Error(`Failed to send message to worker: ${error.message}`))
+      }
     })
   }
   
@@ -153,10 +267,14 @@ export function useWebWorker(workerPath) {
   
   // Terminate worker
   const terminateWorker = () => {
+    // Stop health checking
+    stopHealthChecking()
+    
     if (worker.value) {
       worker.value.terminate()
       worker.value = null
       isWorkerReady.value = false
+      isWorkerHealthy.value = false
     }
     
     // Reject all pending messages
@@ -167,12 +285,23 @@ export function useWebWorker(workerPath) {
     
     // Clear message listeners
     messageListeners.clear()
+    
+    // Reset health state
+    consecutiveHealthFailures = 0
+    lastHealthCheck = null
   }
   
   // Restart worker
   const restartWorker = () => {
+    console.info('Restarting worker...')
     terminateWorker()
-    return initializeWorker()
+    const success = initializeWorker()
+    if (success) {
+      console.info('Worker restarted successfully')
+    } else {
+      console.error('Worker restart failed')
+    }
+    return success
   }
   
   // Generate unique batch ID
@@ -185,8 +314,21 @@ export function useWebWorker(workerPath) {
     return {
       supported: isWorkerSupported.value,
       ready: isWorkerReady.value,
+      healthy: isWorkerHealthy.value,
       error: workerError.value,
-      pendingMessages: pendingMessages.size
+      pendingMessages: pendingMessages.size,
+      consecutiveHealthFailures,
+      lastHealthCheck: lastHealthCheck ? new Date(lastHealthCheck).toISOString() : null
+    }
+  }
+  
+  // Force health check (for debugging/testing)
+  const forceHealthCheck = async () => {
+    try {
+      await performHealthCheck()
+      return { success: true, message: 'Health check passed' }
+    } catch (error) {
+      return { success: false, message: error.message }
     }
   }
   
@@ -199,6 +341,7 @@ export function useWebWorker(workerPath) {
     // Reactive state
     isWorkerSupported: isWorkerSupported.value,
     isWorkerReady,
+    isWorkerHealthy,
     workerError,
     
     // Methods
@@ -208,6 +351,7 @@ export function useWebWorker(workerPath) {
     removeMessageListener,
     terminateWorker,
     restartWorker,
-    getWorkerStatus
+    getWorkerStatus,
+    forceHealthCheck
   }
 }

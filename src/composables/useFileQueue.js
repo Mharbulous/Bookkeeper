@@ -14,6 +14,15 @@ export function useFileQueue() {
     currentFile: '',
     isProcessing: false
   })
+  
+  // UI update progress tracking
+  const isProcessingUIUpdate = ref(false)
+  const uiUpdateProgress = ref({
+    current: 0,
+    total: 0,
+    percentage: 0,
+    phase: 'loading' // 'loading', 'complete'
+  })
 
   // Template refs
   const fileInput = ref(null)
@@ -70,43 +79,134 @@ export function useFileQueue() {
       isProcessing: false
     }
   }
+  
+  // Reset UI update progress
+  const resetUIProgress = () => {
+    isProcessingUIUpdate.value = false
+    uiUpdateProgress.value = {
+      current: 0,
+      total: 0,
+      percentage: 0,
+      phase: 'loading'
+    }
+  }
 
-  // When worker sends results, replace entire array (triggers reactivity)
-  const updateFromWorkerResults = (readyFiles, duplicateFiles) => {
-    // Build new array and replace entire reference
-    const newQueue = [
-      ...readyFiles.map(fileRef => ({
-        id: crypto.randomUUID(),
-        file: fileRef.file,
-        metadata: fileRef.metadata,
-        hash: fileRef.hash,
-        status: fileRef.status,
-        name: fileRef.file.name,
-        size: fileRef.file.size,
-        type: fileRef.file.type,
-        lastModified: fileRef.file.lastModified,
-        path: getFilePath(fileRef),
-        isDuplicate: false
-      })),
-      ...duplicateFiles.map(fileRef => ({
-        id: crypto.randomUUID(),
-        file: fileRef.file,
-        metadata: fileRef.metadata,
-        hash: fileRef.hash,
-        status: fileRef.status,
-        name: fileRef.file.name,
-        size: fileRef.file.size,
-        type: fileRef.file.type,
-        lastModified: fileRef.file.lastModified,
-        path: getFilePath(fileRef),
-        isDuplicate: true
-      }))
-    ]
+  // Helper function to process a chunk of files into queue format
+  const processFileChunk = (files) => {
+    return files.map(fileRef => ({
+      id: crypto.randomUUID(),
+      file: fileRef.file,
+      metadata: fileRef.metadata,
+      hash: fileRef.hash,
+      status: fileRef.status,
+      name: fileRef.file.name,
+      size: fileRef.file.size,
+      type: fileRef.file.type,
+      lastModified: fileRef.file.lastModified,
+      path: getFilePath(fileRef),
+      isDuplicate: fileRef.status === 'duplicate'
+    }))
+  }
+  
+  // Smart 3-chunk UI updates for optimal performance with large file sets
+  const updateFromWorkerResults = async (readyFiles, duplicateFiles) => {
+    const allFiles = [...readyFiles, ...duplicateFiles]
+    const totalFiles = allFiles.length
     
-    // Replace entire array reference (triggers reactivity)
-    uploadQueue.value = newQueue
+    // Start UI update process
+    isProcessingUIUpdate.value = true
+    uiUpdateProgress.value = {
+      current: 0,
+      total: totalFiles,
+      percentage: 0,
+      phase: 'loading'
+    }
     
-    // Reset progress when complete
+    console.info(`Starting 3-chunk UI update for ${totalFiles} files...`)
+    const startTime = Date.now()
+    
+    if (totalFiles <= 50) {
+      // For small file sets, just load everything at once
+      const chunk1Start = Date.now()
+      uploadQueue.value = processFileChunk(allFiles)
+      const chunk1Duration = Date.now() - chunk1Start
+      
+      uiUpdateProgress.value = {
+        current: totalFiles,
+        total: totalFiles,
+        percentage: 100,
+        phase: 'complete'
+      }
+      
+      console.info(`Single chunk: Loaded ${totalFiles} files in ${chunk1Duration}ms`)
+    } else {
+      // Smart 3-chunk strategy for large file sets
+      
+      // CHUNK 1: Instant preview (first 20 files) - immediate user feedback
+      const chunk1Start = Date.now()
+      const chunk1Size = 20
+      const chunk1 = allFiles.slice(0, chunk1Size)
+      uploadQueue.value = processFileChunk(chunk1)
+      const chunk1Duration = Date.now() - chunk1Start
+      
+      uiUpdateProgress.value = {
+        current: chunk1Size,
+        total: totalFiles,
+        percentage: Math.round((chunk1Size / totalFiles) * 100),
+        phase: 'loading'
+      }
+      
+      console.info(`✅ Chunk 1 COMPLETE: Displayed first ${chunk1Size} files in ${chunk1Duration}ms`)
+      
+      // Small delay to let the UI render the first chunk
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      // CHUNK 2: Bulk loading (most of the remaining files) - efficient processing
+      const chunk2Start = Date.now()
+      const chunk2Size = Math.min(totalFiles - chunk1Size, Math.floor(totalFiles * 0.8))
+      const chunk2EndIndex = chunk1Size + chunk2Size
+      const chunk2Files = allFiles.slice(0, chunk2EndIndex)
+      
+      uploadQueue.value = processFileChunk(chunk2Files)
+      const chunk2Duration = Date.now() - chunk2Start
+      
+      uiUpdateProgress.value = {
+        current: chunk2EndIndex,
+        total: totalFiles,
+        percentage: Math.round((chunk2EndIndex / totalFiles) * 100),
+        phase: 'loading'
+      }
+      
+      console.info(`✅ Chunk 2 COMPLETE: Loaded ${chunk2Size} more files in ${chunk2Duration}ms (total: ${chunk2EndIndex})`)
+      
+      // Small delay before final chunk
+      await new Promise(resolve => setTimeout(resolve, 50))
+      
+      // CHUNK 3: Final completion (remaining files) - complete the job
+      if (chunk2EndIndex < totalFiles) {
+        const chunk3Start = Date.now()
+        const remainingFiles = totalFiles - chunk2EndIndex
+        uploadQueue.value = processFileChunk(allFiles)
+        const chunk3Duration = Date.now() - chunk3Start
+        
+        console.info(`✅ Chunk 3 COMPLETE: Loaded final ${remainingFiles} files in ${chunk3Duration}ms`)
+      }
+      
+      uiUpdateProgress.value = {
+        current: totalFiles,
+        total: totalFiles,
+        percentage: 100,
+        phase: 'complete'
+      }
+    }
+    
+    const duration = Date.now() - startTime
+    console.info(`3-chunk UI update completed in ${duration}ms`)
+    
+    // Complete the UI update process
+    isProcessingUIUpdate.value = false
+    
+    // Reset processing progress when complete
     resetProgress()
   }
 
@@ -146,6 +246,8 @@ export function useFileQueue() {
     fileInput,
     folderInput,
     processingProgress,
+    isProcessingUIUpdate,
+    uiUpdateProgress,
 
     // Methods
     getFilePath,
@@ -157,6 +259,8 @@ export function useFileQueue() {
     updateFromWorkerResults, // New worker-optimized method
     updateProgress,
     resetProgress,
+    resetUIProgress,
+    processFileChunk,
     removeFromQueue,
     clearQueue,
     startUpload,

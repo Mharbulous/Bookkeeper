@@ -1,9 +1,26 @@
 import { useWebWorker } from './useWebWorker'
+import { useWorkerManager } from './useWorkerManager'
+import { createApplicationError, isRecoverableError, getRetryDelay } from '../utils/errorMessages'
 
 export function useQueueDeduplication() {
   
-  // Initialize Web Worker
-  const workerInstance = useWebWorker('../workers/fileHashWorker.js')
+  // Initialize Worker Manager
+  const workerManager = useWorkerManager()
+  
+  // Create dedicated deduplication worker
+  const WORKER_ID = 'file-deduplication-worker'
+  const workerState = workerManager.createWorker(
+    WORKER_ID, 
+    '../workers/fileHashWorker.js',
+    {
+      autoRestart: true,
+      maxRestartAttempts: 3,
+      enableMonitoring: true
+    }
+  )
+  
+  // Get worker instance for direct usage (fallback to direct worker if manager fails)
+  const workerInstance = workerState?.instance || useWebWorker('../workers/fileHashWorker.js')
   
   // Helper function to get file path consistently
   const getFilePath = (fileRef) => {
@@ -58,19 +75,71 @@ export function useQueueDeduplication() {
 
   // Web Worker-based file processing with progress support
   const processFiles = async (files, updateUploadQueue, onProgress = null) => {
+    // Check if files array is valid
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      const error = createApplicationError('Invalid files array provided', {
+        validation: true,
+        fileCount: files ? files.length : 0
+      })
+      throw error
+    }
+    
+    // Check if Web Workers are supported
+    if (!workerInstance.isWorkerSupported) {
+      console.warn('Web Workers not supported in this browser, falling back to main thread processing')
+      return processFilesMainThread(files, updateUploadQueue, onProgress)
+    }
+    
+    // Check worker manager state if available
+    if (workerState) {
+      const stats = workerManager.getWorkerStatistics()
+      console.debug('Worker statistics:', stats)
+    }
+    
     // Initialize worker if not ready
     if (!workerInstance.isWorkerReady.value) {
+      console.info('Initializing Web Worker...')
       const initialized = workerInstance.initializeWorker()
       if (!initialized) {
-        console.warn('Web Worker not available, falling back to main thread processing')
-        return processFilesMainThread(files, updateUploadQueue)
+        console.warn('Web Worker initialization failed, falling back to main thread processing')
+        return processFilesMainThread(files, updateUploadQueue, onProgress)
+      }
+    }
+    
+    // Check worker health before proceeding
+    if (!workerInstance.isWorkerHealthy.value) {
+      console.warn('Web Worker is unhealthy, attempting restart...')
+      
+      // Use worker manager for restart if available
+      let restarted = false
+      if (workerState) {
+        restarted = await workerManager.restartWorker(WORKER_ID)
+      } else {
+        restarted = workerInstance.restartWorker()
+      }
+      
+      if (!restarted) {
+        console.warn('Web Worker restart failed, falling back to main thread processing')
+        return processFilesMainThread(files, updateUploadQueue, onProgress)
       }
     }
 
     try {
+      console.info(`Processing ${files.length} files using Web Worker...`)
+      
       // Create mapping structure that preserves original File objects
       const fileMapping = new Map()
       const filesToProcess = files.map((file, index) => {
+        // Validate individual file
+        if (!(file instanceof File)) {
+          const error = createApplicationError(`Invalid file at index ${index}: expected File object`, {
+            validation: true,
+            fileIndex: index,
+            fileType: typeof file
+          })
+          throw error
+        }
+        
         const fileId = `file_${index}_${Date.now()}`
         
         // Store original File object in mapping
@@ -93,11 +162,21 @@ export function useQueueDeduplication() {
       }
 
       try {
-        // Send to worker
+        const startTime = Date.now()
+        
+        // Send to worker with timeout based on file count and size
+        const totalSize = files.reduce((sum, file) => sum + file.size, 0)
+        const estimatedTime = Math.max(30000, Math.min(300000, totalSize / 1000)) // 30s min, 5min max
+        
         const workerResult = await workerInstance.sendMessage({
           type: 'PROCESS_FILES',
           files: filesToProcess
+        }, {
+          timeout: estimatedTime
         })
+        
+        const duration = Date.now() - startTime
+        console.info(`Web Worker processing completed in ${duration}ms`)
 
         // Map worker results back to original File objects
         const readyFiles = workerResult.readyFiles.map(fileRef => ({
@@ -126,13 +205,53 @@ export function useQueueDeduplication() {
       }
 
     } catch (error) {
-      console.error('Web Worker processing failed, falling back to main thread:', error)
-      return processFilesMainThread(files, updateUploadQueue)
+      const appError = createApplicationError(error, {
+        source: 'worker',
+        fileCount: files.length,
+        processingMode: 'worker'
+      })
+      
+      console.error('Web Worker processing failed:', appError)
+      
+      // Determine if we should restart the worker or just fallback
+      if (isRecoverableError(appError.type)) {
+        console.warn('Worker appears to be stuck, restarting...')
+        
+        // Use worker manager for restart if available
+        if (workerState) {
+          await workerManager.restartWorker(WORKER_ID)
+        } else {
+          workerInstance.restartWorker()
+        }
+      }
+      
+      console.info('Falling back to main thread processing...')
+      return processFilesMainThread(files, updateUploadQueue, onProgress)
     }
   }
 
   // Legacy main thread processing (fallback implementation)
-  const processFilesMainThread = async (files, updateUploadQueue) => {
+  const processFilesMainThread = async (files, updateUploadQueue, onProgress = null) => {
+    console.info(`Processing ${files.length} files on main thread (fallback mode)...`)
+    const startTime = Date.now()
+    
+    // Track progress for main thread processing
+    let processedCount = 0
+    const totalFiles = files.length
+    
+    const sendProgress = () => {
+      if (onProgress) {
+        onProgress({
+          current: processedCount,
+          total: totalFiles,
+          percentage: Math.round((processedCount / totalFiles) * 100),
+          currentFile: processedCount < totalFiles ? files[processedCount]?.name : ''
+        })
+      }
+    }
+    
+    // Send initial progress
+    sendProgress()
     // Step 1: Group files by size to identify unique-sized files
     const fileSizeGroups = new Map() // file_size -> [file_references]
     
@@ -174,13 +293,33 @@ export function useQueueDeduplication() {
     const hashGroups = new Map() // hash_value -> [file_references]
     
     for (const fileRef of duplicateCandidates) {
-      const hash = await generateFileHash(fileRef.file)
-      fileRef.hash = hash
-      
-      if (!hashGroups.has(hash)) {
-        hashGroups.set(hash, [])
+      try {
+        const hash = await generateFileHash(fileRef.file)
+        fileRef.hash = hash
+        
+        if (!hashGroups.has(hash)) {
+          hashGroups.set(hash, [])
+        }
+        hashGroups.get(hash).push(fileRef)
+        
+        // Update progress
+        processedCount++
+        sendProgress()
+        
+      } catch (error) {
+        const appError = createApplicationError(error, {
+          fileProcessing: true,
+          fileName: fileRef.file.name,
+          fileSize: fileRef.file.size,
+          processingMode: 'fallback'
+        })
+        
+        console.error(`Failed to hash file ${fileRef.file.name}:`, appError)
+        // Include file anyway without hash to avoid data loss
+        finalFiles.push(fileRef)
+        processedCount++
+        sendProgress()
       }
-      hashGroups.get(hash).push(fileRef)
     }
     
     const finalFiles = []
@@ -265,19 +404,85 @@ export function useQueueDeduplication() {
     // Update UI using existing API
     updateUploadQueue(readyFiles, duplicatesForQueue)
     
+    const duration = Date.now() - startTime
+    console.info(`Main thread processing completed in ${duration}ms`)
+    
     // Return in exact same format as current API
     return { readyFiles, duplicatesForQueue }
   }
 
+  // Get processing status
+  const getProcessingStatus = () => {
+    const workerStatus = workerInstance.getWorkerStatus()
+    const managerStats = workerState ? workerManager.getWorkerStatistics() : null
+    
+    return {
+      ...workerStatus,
+      fallbackAvailable: true,
+      recommendedMode: workerStatus.supported && workerStatus.healthy ? 'worker' : 'fallback',
+      workerManager: managerStats,
+      managedWorker: workerState ? {
+        id: WORKER_ID,
+        restartAttempts: workerState.restartAttempts,
+        lastRestart: workerState.lastRestart,
+        errors: workerState.errors.length,
+        stats: workerState.stats
+      } : null
+    }
+  }
+  
+  // Force worker restart
+  const forceWorkerRestart = async () => {
+    if (workerState) {
+      return await workerManager.restartWorker(WORKER_ID)
+    } else {
+      return workerInstance.restartWorker()
+    }
+  }
+  
+  // Terminate worker (cleanup)
+  const terminateWorker = () => {
+    if (workerState) {
+      return workerManager.terminateWorker(WORKER_ID)
+    } else {
+      workerInstance.terminateWorker()
+      return true
+    }
+  }
+  
+  // Force fallback mode (for testing or troubleshooting)
+  const forceMainThreadProcessing = async (files, updateUploadQueue, onProgress = null) => {
+    console.info('Force fallback: Processing files on main thread')
+    return processFilesMainThread(files, updateUploadQueue, onProgress)
+  }
+  
+  // Enhanced error handler for UI consumption
+  const handleProcessingError = (error, context = {}) => {
+    const appError = createApplicationError(error, context)
+    
+    // Add retry recommendations
+    appError.canRetry = isRecoverableError(appError.type, context)
+    appError.retryDelay = getRetryDelay(appError.type, context.retryAttempt || 1)
+    appError.canUseFallback = context.processingMode !== 'fallback'
+    
+    return appError
+  }
+  
   return {
     // Methods
     generateFileHash,
     chooseBestFile,
     processFiles,
     processFilesMainThread,
+    forceMainThreadProcessing,
     getFilePath,
+    getProcessingStatus,
+    handleProcessingError,
     
     // Worker management
-    workerInstance
+    workerInstance,
+    workerManager,
+    forceWorkerRestart,
+    terminateWorker
   }
 }
