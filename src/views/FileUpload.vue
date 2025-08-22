@@ -55,6 +55,14 @@
           </v-btn>
         </template>
       </v-snackbar>
+
+      <!-- Processing Progress Modal -->
+      <ProcessingProgressModal
+        v-model="processingProgress.isProcessing"
+        :progress="processingProgress"
+        :can-cancel="true"
+        @cancel="handleCancelProcessing"
+      />
     </div>
   </v-container>
 </template>
@@ -64,6 +72,7 @@ import { ref } from 'vue'
 import FileUploadQueue from '../components/features/upload/FileUploadQueue.vue'
 import UploadDropzone from '../components/features/upload/UploadDropzone.vue'
 import FolderOptionsDialog from '../components/features/upload/FolderOptionsDialog.vue'
+import ProcessingProgressModal from '../components/features/upload/ProcessingProgressModal.vue'
 import { useFileQueue } from '../composables/useFileQueue.js'
 import { useFileDragDrop } from '../composables/useFileDragDrop.js'
 import { useQueueDeduplication } from '../composables/useQueueDeduplication.js'
@@ -84,11 +93,14 @@ const {
   singleFileNotification,
   fileInput,
   folderInput,
+  processingProgress,
   triggerFileSelect,
   triggerFolderSelect,
   processSingleFile,
   addFilesToQueue,
   updateUploadQueue,
+  updateProgress,
+  resetProgress,
   removeFromQueue,
   clearQueue,
   startUpload,
@@ -178,6 +190,12 @@ const triggerFileSelectWrapper = () => {
 const triggerFolderSelectWrapper = () => {
   updateRefs()
   triggerFolderSelect()
+}
+
+// Handle cancel processing for progress modal
+const handleCancelProcessing = () => {
+  // TODO: Implement in Step 8 - Integration
+  resetProgress()
 }
 </script>
 

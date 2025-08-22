@@ -1,6 +1,6 @@
 <template>
   <v-dialog
-    v-model="modelValue"
+    v-model="dialogVisible"
     max-width="600"
     persistent
     :close-on-content-click="false"
@@ -112,9 +112,13 @@ const props = defineProps({
 })
 
 // Emits
-defineEmits(['update:modelValue', 'cancel', 'retry'])
+const emit = defineEmits(['update:modelValue', 'cancel', 'retry'])
 
-// No additional methods needed for simplified modal
+// Computed property to handle v-model properly
+const dialogVisible = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
+})
 </script>
 
 <style scoped>

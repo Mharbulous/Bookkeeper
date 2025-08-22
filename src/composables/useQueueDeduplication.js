@@ -1,4 +1,9 @@
+import { useWebWorker } from './useWebWorker'
+
 export function useQueueDeduplication() {
+  
+  // Initialize Web Worker
+  const workerInstance = useWebWorker('../workers/fileHashWorker.js')
   
   // Helper function to get file path consistently
   const getFilePath = (fileRef) => {
@@ -10,7 +15,7 @@ export function useQueueDeduplication() {
     return fileRef.path || fileRef.file?.webkitRelativePath || fileRef.file?.path || fileRef.file?.name || fileRef.name
   }
 
-  // Simple hash generation with collision safety
+  // Legacy hash generation (kept for fallback compatibility)
   const generateFileHash = async (file) => {
     const buffer = await file.arrayBuffer()
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
@@ -21,7 +26,7 @@ export function useQueueDeduplication() {
     return `${hash}_${file.size}`
   }
 
-  // Helper function to choose the best file based on priority rules
+  // Legacy chooseBestFile (kept for fallback compatibility)
   const chooseBestFile = (fileRefs) => {
     return fileRefs.sort((a, b) => {
       // Priority 1: Earliest modification date
@@ -51,8 +56,83 @@ export function useQueueDeduplication() {
     })[0]
   }
 
-  // Improved constraint-based deduplication using JavaScript Maps
-  const processFiles = async (files, updateUploadQueue) => {
+  // Web Worker-based file processing with progress support
+  const processFiles = async (files, updateUploadQueue, onProgress = null) => {
+    // Initialize worker if not ready
+    if (!workerInstance.isWorkerReady.value) {
+      const initialized = workerInstance.initializeWorker()
+      if (!initialized) {
+        console.warn('Web Worker not available, falling back to main thread processing')
+        return processFilesMainThread(files, updateUploadQueue)
+      }
+    }
+
+    try {
+      // Create mapping structure that preserves original File objects
+      const fileMapping = new Map()
+      const filesToProcess = files.map((file, index) => {
+        const fileId = `file_${index}_${Date.now()}`
+        
+        // Store original File object in mapping
+        fileMapping.set(fileId, file)
+        
+        // Send file data to worker (File objects are cloned via structured clone)
+        return {
+          id: fileId,
+          file: file,  // File objects cloned to worker, converted to ArrayBuffer internally
+          originalIndex: index
+        }
+      })
+
+      // Set up progress listener if provided
+      let progressUnsubscribe = null
+      if (onProgress) {
+        progressUnsubscribe = workerInstance.addMessageListener('PROGRESS_UPDATE', (data) => {
+          onProgress(data.progress)
+        })
+      }
+
+      try {
+        // Send to worker
+        const workerResult = await workerInstance.sendMessage({
+          type: 'PROCESS_FILES',
+          files: filesToProcess
+        })
+
+        // Map worker results back to original File objects
+        const readyFiles = workerResult.readyFiles.map(fileRef => ({
+          ...fileRef,
+          file: fileMapping.get(fileRef.id),  // Restore original File object
+          status: 'ready'
+        }))
+
+        const duplicateFiles = workerResult.duplicateFiles.map(fileRef => ({
+          ...fileRef,
+          file: fileMapping.get(fileRef.id),  // Restore original File object
+          status: 'duplicate'
+        }))
+
+        // Update UI using existing API
+        updateUploadQueue(readyFiles, duplicateFiles)
+
+        // Return in exact same format as current API
+        return { readyFiles, duplicateFiles }
+
+      } finally {
+        // Clean up progress listener
+        if (progressUnsubscribe) {
+          progressUnsubscribe()
+        }
+      }
+
+    } catch (error) {
+      console.error('Web Worker processing failed, falling back to main thread:', error)
+      return processFilesMainThread(files, updateUploadQueue)
+    }
+  }
+
+  // Legacy main thread processing (fallback implementation)
+  const processFilesMainThread = async (files, updateUploadQueue) => {
     // Step 1: Group files by size to identify unique-sized files
     const fileSizeGroups = new Map() // file_size -> [file_references]
     
@@ -168,7 +248,7 @@ export function useQueueDeduplication() {
       }
     }
     
-    // Step 5: Combine unique and non-duplicate files
+    // Step 6: Combine unique and non-duplicate files
     const allFinalFiles = [...uniqueFiles, ...finalFiles]
     
     // Prepare for queue
@@ -182,8 +262,11 @@ export function useQueueDeduplication() {
       status: 'duplicate'
     }))
     
-    // Update UI
+    // Update UI using existing API
     updateUploadQueue(readyFiles, duplicatesForQueue)
+    
+    // Return in exact same format as current API
+    return { readyFiles, duplicatesForQueue }
   }
 
   return {
@@ -191,6 +274,10 @@ export function useQueueDeduplication() {
     generateFileHash,
     chooseBestFile,
     processFiles,
-    getFilePath
+    processFilesMainThread,
+    getFilePath,
+    
+    // Worker management
+    workerInstance
   }
 }

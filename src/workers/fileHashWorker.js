@@ -38,7 +38,7 @@ async function processFiles(files, batchId) {
   let lastProgressUpdate = 0
   
   // Helper function to send throttled progress updates (max 1 per second)
-  const sendProgressUpdate = (stage, currentFile) => {
+  const sendProgressUpdate = () => {
     const now = Date.now()
     if (now - lastProgressUpdate >= 1000) { // 1 second throttle
       self.postMessage({
@@ -58,11 +58,13 @@ async function processFiles(files, batchId) {
     // Step 1: Group files by size to identify unique-sized files
     const fileSizeGroups = new Map() // file_size -> [file_references]
     
-    files.forEach((file, index) => {
+    files.forEach((fileData) => {
+      const { id, file, originalIndex } = fileData
       const fileSize = file.size
       const fileRef = {
+        id,
         file,
-        originalIndex: index,
+        originalIndex,
         path: getFilePath(file),
         metadata: {
           fileName: file.name,
@@ -178,14 +180,23 @@ async function processFiles(files, batchId) {
     // Step 6: Combine unique and non-duplicate files
     const allFinalFiles = [...uniqueFiles, ...finalFiles]
     
-    // Prepare result
+    // Prepare result - remove File objects since they can't be transferred back
     const readyFiles = allFinalFiles.map(fileRef => ({
-      ...fileRef,
+      id: fileRef.id,
+      originalIndex: fileRef.originalIndex,
+      path: fileRef.path,
+      metadata: fileRef.metadata,
+      hash: fileRef.hash,
       status: 'ready'
     }))
     
     const duplicatesForQueue = duplicateFiles.map(fileRef => ({
-      ...fileRef,
+      id: fileRef.id,
+      originalIndex: fileRef.originalIndex,
+      path: fileRef.path,
+      metadata: fileRef.metadata,
+      hash: fileRef.hash,
+      isDuplicate: fileRef.isDuplicate,
       status: 'duplicate'
     }))
     

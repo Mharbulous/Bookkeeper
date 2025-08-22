@@ -4,13 +4,14 @@
 
 This plan outlines the implementation of a Web Worker-based file deduplication system with a progress modal to provide real-time user feedback during file processing without impacting UI performance.
 
-## 🎯 CURRENT STATUS: Steps 1-4 Complete
+## 🎯 CURRENT STATUS: Steps 1-5 Complete
 
 **✅ Completed Steps:**
 - **Step 1**: Web Worker Creation - `src/workers/fileHashWorker.js`
 - **Step 2**: Worker Communication Infrastructure - `src/composables/useWebWorker.js`  
 - **Step 3**: Progress Modal Component - `src/components/features/upload/ProcessingProgressModal.vue`
 - **Step 4**: Progress State Management - `src/composables/useFileQueue.js`
+- **Step 5**: Deduplication Logic Refactor - `src/composables/useQueueDeduplication.js`
 
 **📝 Implementation Notes:**
 - Progress modal simplified following KISS principle (basic progress bar only)
@@ -19,7 +20,7 @@ This plan outlines the implementation of a Web Worker-based file deduplication s
 - Progress state management implemented using `shallowRef()` for optimal performance
 - Full backward compatibility maintained with existing API
 
-**🔄 Next Steps:** Step 5 (Deduplication Refactor)
+**🔄 Next Steps:** Step 6 (Error Handling & Fallbacks)
 
 ## Current State Analysis
 
@@ -88,7 +89,7 @@ This plan outlines the implementation of a Web Worker-based file deduplication s
 | 2 | Worker Communication | **Medium** | **Low** | ✅ **Complete** | Add message passing infrastructure |
 | 3 | Progress Modal Component | **Low** | **Low** | ✅ **Complete** | Create Vue progress modal component |
 | 4 | Progress State Management | **Low** | **Low** | ✅ **Complete** | Add shallowRef reactivity (proven solution) |
-| 5 | Deduplication Refactor | **Medium** | **Low** | 🔄 **Next** | ID-based mapping pattern (proven solution) |
+| 5 | Deduplication Refactor | **Medium** | **Low** | ✅ **Complete** | ID-based mapping pattern (proven solution) |
 | 6 | Error Handling | **Medium** | **Medium** | ⏸️ **Pending** | Add comprehensive error handling and fallbacks |
 | 7 | Performance Optimization | **Low** | **Low** | ⏸️ **Pending** | Implement batching and throttling |
 | 8 | Integration & Testing | **Medium** | **Medium** | ⏸️ **Pending** | Wire everything together and test edge cases |
@@ -259,7 +260,129 @@ export function useQueueDeduplication() {
 - Maintain identical external API format
 - Preserve all File object references
 
-**Risk Assessment:** Low - battle-tested pattern, no API changes
+**✅ Implementation Complete: ID-based mapping with Web Worker integration successfully implemented**
+
+Refactored `src/composables/useQueueDeduplication.js`:
+```javascript
+export function useQueueDeduplication() {
+  
+  // Initialize Web Worker
+  const workerInstance = useWebWorker('../workers/fileHashWorker.js')
+  
+  // Web Worker-based file processing with progress support
+  const processFiles = async (files, updateUploadQueue, onProgress = null) => {
+    // Initialize worker if not ready
+    if (!workerInstance.isWorkerReady.value) {
+      const initialized = workerInstance.initializeWorker()
+      if (!initialized) {
+        console.warn('Web Worker not available, falling back to main thread processing')
+        return processFilesMainThread(files, updateUploadQueue)
+      }
+    }
+
+    try {
+      // Create mapping structure that preserves original File objects
+      const fileMapping = new Map()
+      const filesToProcess = files.map((file, index) => {
+        const fileId = `file_${index}_${Date.now()}`
+        
+        // Store original File object in mapping
+        fileMapping.set(fileId, file)
+        
+        // Send file data to worker (File objects are cloned via structured clone)
+        return {
+          id: fileId,
+          file: file,  // File objects cloned to worker, converted to ArrayBuffer internally
+          originalIndex: index
+        }
+      })
+
+      // Set up progress listener if provided
+      let progressUnsubscribe = null
+      if (onProgress) {
+        progressUnsubscribe = workerInstance.addMessageListener('PROGRESS_UPDATE', (data) => {
+          onProgress(data.progress)
+        })
+      }
+
+      try {
+        // Send to worker
+        const workerResult = await workerInstance.sendMessage({
+          type: 'PROCESS_FILES',
+          files: filesToProcess
+        })
+
+        // Map worker results back to original File objects
+        const readyFiles = workerResult.readyFiles.map(fileRef => ({
+          ...fileRef,
+          file: fileMapping.get(fileRef.id),  // Restore original File object
+          status: 'ready'
+        }))
+
+        const duplicateFiles = workerResult.duplicateFiles.map(fileRef => ({
+          ...fileRef,
+          file: fileMapping.get(fileRef.id),  // Restore original File object
+          status: 'duplicate'
+        }))
+
+        // Update UI using existing API
+        updateUploadQueue(readyFiles, duplicateFiles)
+
+        // Return in exact same format as current API
+        return { readyFiles, duplicateFiles }
+
+      } finally {
+        // Clean up progress listener
+        if (progressUnsubscribe) {
+          progressUnsubscribe()
+        }
+      }
+
+    } catch (error) {
+      console.error('Web Worker processing failed, falling back to main thread:', error)
+      return processFilesMainThread(files, updateUploadQueue)
+    }
+  }
+
+  // Legacy main thread processing (fallback implementation)
+  const processFilesMainThread = async (files, updateUploadQueue) => {
+    // ... existing logic preserved for fallback
+  }
+
+  return {
+    // Methods
+    generateFileHash,
+    chooseBestFile,
+    processFiles,
+    processFilesMainThread,
+    getFilePath,
+    
+    // Worker management
+    workerInstance
+  }
+}
+```
+
+**✅ Proven Solution Benefits:**
+- **File Objects Structured Clone**: File objects cloned to worker, processed as ArrayBuffers internally
+- **ID-based Mapping**: Standard pattern used by Vue worker libraries
+- **Zero File Loss**: Original File references perfectly preserved on main thread
+- **API Compatibility**: Existing consumers see no changes whatsoever
+- **Performance**: Efficient processing - only lightweight hash results returned from worker
+- **Fallback Support**: Graceful degradation to main thread if worker fails
+- **Progress Integration**: Built-in progress listener support for modal updates
+
+**✅ Completed Tasks:**
+- ✅ Implement ID-based file mapping system
+- ✅ Refactor `processFiles` to use worker communication  
+- ✅ Maintain identical external API format
+- ✅ Preserve all File object references
+- ✅ Add comprehensive fallback to main thread processing
+- ✅ Integrate progress listener support
+- ✅ Update worker to handle ID-based file structure
+- ✅ Remove File objects from worker return data (use IDs for mapping)
+
+**Risk Assessment:** Low - battle-tested pattern, no API changes, comprehensive fallback
 
 ### Step 6: Error Handling & Fallbacks
 **Complexity: Medium | Risk: Medium**
