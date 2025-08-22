@@ -1,10 +1,31 @@
-# Simplified Deduplication Using Built-in Database Constraints
+# Team-Scoped Constraint-Based Deduplication
 
-This diagram illustrates a streamlined file deduplication system that leverages built-in database constraints and data structures to eliminate custom deduplication logic while maintaining high performance and reliability.
+This diagram illustrates a streamlined file deduplication system that leverages built-in database constraints and data structures to eliminate custom deduplication logic while maintaining high performance, reliability, and **critical confidentiality requirements for law firms**.
 
 ## Overview
 
-Instead of complex multi-tier caching and progressive hashing, this approach uses native database features and browser APIs to automatically handle duplicates. The system relies on unique constraints, document IDs, and Set/Map data structures for zero-maintenance deduplication.
+Instead of complex multi-tier caching and progressive hashing, this approach uses native database features and browser APIs to automatically handle duplicates **within each team's isolated storage**. The system relies on unique constraints, document IDs, and Set/Map data structures for zero-maintenance deduplication while ensuring that teams cannot discover if other teams have uploaded the same files.
+
+## ⚠️ Critical Security Requirement: Team Isolation
+
+**Global deduplication across teams would create a serious confidentiality breach for law firms:**
+
+### The Problem with Global Deduplication
+- **Law Firm A** uploads confidential email chain → hash `abc123`
+- **Law Firm B** (opposing counsel) tries to upload same email → system says "duplicate exists"  
+- **Result**: Law Firm B now knows Law Firm A has that document = **attorney-client privilege violation**
+
+### Real-World Scenario
+```
+Litigation: ABC Corp vs. XYZ Corp
+- ABC Corp's law firm uploads email: ceo@abc.com → cfo@abc.com
+- XYZ Corp's law firm tries to upload same email during discovery
+- Global dedup would reveal that ABC's lawyers already have this document
+- This violates ethical obligations and could compromise the case
+```
+
+### Solution: Team-Scoped Deduplication
+Each team gets **isolated constraint-based deduplication** within their own storage namespace, preventing cross-team information leakage.
 
 ## Simplified Process Flow Diagram
 
@@ -113,7 +134,7 @@ const uploadFiles = async (files) => {
   const results = await Promise.all(
     Array.from(uniqueFiles.values()).map(async ({ hash, file, metadata }) => {
       try {
-        await db.collection('files').doc(hash).set({
+        await db.collection('teams').doc(currentTeam).collection('files').doc(hash).set({
           ...metadata,
           hash,
           teamId: currentTeam,
@@ -142,16 +163,16 @@ const uploadFiles = async (files) => {
 
 ## Database Schema Design
 
-### Firestore Collections
+### Firestore Collections (Team-Scoped)
 ```javascript
-// Primary file storage - hash as document ID
-/files/{hash}
+// Primary file storage - hash as document ID within team scope
+/teams/{teamId}/files/{hash}
 {
-  hash: string,           // Document ID (automatic uniqueness)
+  hash: string,           // Document ID (automatic uniqueness within team)
   fileName: string,
   fileSize: number,
   mimeType: string,
-  teamId: string,         // Team isolation
+  teamId: string,         // Team ownership (redundant but explicit)
   uploadedBy: string,     // User ID
   uploadedAt: Timestamp,
   downloadURL: string,
@@ -171,8 +192,8 @@ const uploadFiles = async (files) => {
   uploadedBy: string
 }
 
-// File versions - when user chooses to keep duplicates
-/files/{hash}/versions/{versionId}
+// File versions - when user chooses to keep duplicates (team-scoped)
+/teams/{teamId}/files/{hash}/versions/{versionId}
 {
   originalHash: string,
   versionId: string,
@@ -183,21 +204,27 @@ const uploadFiles = async (files) => {
 }
 ```
 
-### Firestore Security Rules
+### Firestore Security Rules (Team-Isolated)
 ```javascript
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Files accessible only by team members
-    match /files/{hash} {
+    // Team files - only team members can access their team's files
+    match /teams/{teamId}/files/{hash} {
       allow read, write: if request.auth != null 
-        && resource.data.teamId == request.auth.token.teamId;
+        && request.auth.token.teamId == teamId;
     }
     
-    // Team file index
+    // Team file index - team isolation at path level
     match /teams/{teamId}/fileIndex/{hash} {
       allow read, write: if request.auth != null 
         && teamId == request.auth.token.teamId;
+    }
+    
+    // File versions - team-scoped
+    match /teams/{teamId}/files/{hash}/versions/{versionId} {
+      allow read, write: if request.auth != null 
+        && request.auth.token.teamId == teamId;
     }
   }
 }
@@ -245,7 +272,7 @@ const uploadFileBatch = async (uniqueFiles) => {
   const results = [];
   
   for (const { hash, file, metadata } of uniqueFiles) {
-    const fileRef = db.collection('files').doc(hash);
+    const fileRef = db.collection('teams').doc(currentTeam).collection('files').doc(hash);
     const indexRef = db.collection('teams').doc(currentTeam)
       .collection('fileIndex').doc(hash);
     
@@ -303,9 +330,9 @@ const handleDuplicates = async (results) => {
 ### Concurrent Upload Protection
 ```javascript
 // Use Firestore transactions for race conditions
-const safeUpload = async (hash, fileData) => {
+const safeUpload = async (hash, fileData, teamId) => {
   return await db.runTransaction(async (transaction) => {
-    const fileRef = db.collection('files').doc(hash);
+    const fileRef = db.collection('teams').doc(teamId).collection('files').doc(hash);
     const doc = await transaction.get(fileRef);
     
     if (doc.exists) {
@@ -373,8 +400,8 @@ const migrateExistingFiles = async () => {
     const data = doc.data();
     const hash = await generateHashFromURL(data.downloadURL);
     
-    // Create new document with hash ID
-    const newRef = db.collection('files').doc(hash);
+    // Create new document with hash ID (team-scoped)
+    const newRef = db.collection('teams').doc(data.teamId).collection('files').doc(hash);
     batch.set(newRef, { ...data, hash, migratedFrom: doc.id });
   }
   
@@ -393,7 +420,13 @@ const migrateExistingFiles = async () => {
 2. **Better Reliability**: Database constraints prevent inconsistencies
 3. **Improved Performance**: No cache warming or complex lookups needed
 4. **Lower Maintenance**: Built-in features handle edge cases
-5. **Cost Effective**: No redundant storage, optimal Firestore usage
+5. **Cost Effective**: No redundant storage within teams, optimal Firestore usage
 6. **Developer Experience**: Easier to understand and debug
+7. **✅ Legal Compliance**: Team isolation prevents confidentiality breaches
+8. **✅ Ethical Requirements**: No cross-team information leakage
 
-This constraint-based approach transforms complex deduplication logic into simple, reliable database operations while maintaining all the benefits of the original system with significantly reduced implementation complexity.
+This **team-scoped constraint-based approach** transforms complex deduplication logic into simple, reliable database operations while maintaining all the benefits of the original system with significantly reduced implementation complexity **and full compliance with law firm confidentiality requirements**.
+
+## Critical Security Note
+
+**Never implement global deduplication in a law firm environment** - it violates attorney-client privilege and creates serious ethical violations. Always scope deduplication to individual teams/organizations to maintain proper information barriers.

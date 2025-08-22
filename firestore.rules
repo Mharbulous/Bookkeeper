@@ -15,7 +15,29 @@ service cloud.firestore {
                       request.auth.uid == teamId;  // Solo team only for now
     }
     
-    // Team subcollections
+    // Files use hash as document ID for automatic dedup
+    match /teams/{teamId}/files/{hash} {
+      allow read: if request.auth != null && 
+                     (request.auth.uid == teamId || 
+                      request.auth.token.teamId == teamId);
+      
+      // Create only if document doesn't exist (no merge)
+      allow create: if request.auth != null && 
+                       (request.auth.uid == teamId || 
+                        request.auth.token.teamId == teamId);
+      
+      // No updates or deletes for immutability
+      allow update, delete: if false;
+    }
+    
+    // File index for queries
+    match /teams/{teamId}/fileIndex/{hash} {
+      allow read, write: if request.auth != null && 
+                            (request.auth.uid == teamId || 
+                             request.auth.token.teamId == teamId);
+    }
+    
+    // Team subcollections (fallback for other collections)
     match /teams/{teamId}/{collection}/{document} {
       allow read, write: if request.auth != null && 
                            request.auth.uid == teamId;  // Solo team
