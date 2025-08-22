@@ -108,7 +108,7 @@ export function useFileQueue() {
     }))
   }
   
-  // Smart 3-chunk UI updates for optimal performance with large file sets
+  // Simple 2-chunk UI updates for optimal user feedback
   const updateFromWorkerResults = async (readyFiles, duplicateFiles) => {
     const allFiles = [...readyFiles, ...duplicateFiles]
     const totalFiles = allFiles.length
@@ -122,10 +122,10 @@ export function useFileQueue() {
       phase: 'loading'
     }
     
-    console.info(`Starting 3-chunk UI update for ${totalFiles} files...`)
+    console.info(`Starting 2-chunk UI update for ${totalFiles} files...`)
     const startTime = Date.now()
     
-    if (totalFiles <= 50) {
+    if (totalFiles <= 100) {
       // For small file sets, just load everything at once
       const chunk1Start = Date.now()
       uploadQueue.value = processFileChunk(allFiles)
@@ -140,14 +140,13 @@ export function useFileQueue() {
       
       console.info(`Single chunk: Loaded ${totalFiles} files in ${chunk1Duration}ms`)
     } else {
-      // Smart 3-chunk strategy for large file sets
+      // Simple 2-chunk strategy for large file sets
       
-      // CHUNK 1: Instant preview (first 20 files) - immediate user feedback
+      // CHUNK 1: Initial batch (first 100 files) - immediate user feedback
       const chunk1Start = Date.now()
-      const chunk1Size = 20
-      const chunk1 = allFiles.slice(0, chunk1Size)
-      uploadQueue.value = processFileChunk(chunk1)
-      const chunk1Duration = Date.now() - chunk1Start
+      const chunk1Size = 100
+      const chunk1Files = allFiles.slice(0, chunk1Size)
+      uploadQueue.value = processFileChunk(chunk1Files)
       
       uiUpdateProgress.value = {
         current: chunk1Size,
@@ -156,41 +155,17 @@ export function useFileQueue() {
         phase: 'loading'
       }
       
+      const chunk1Duration = Date.now() - chunk1Start
       console.info(`✅ Chunk 1 COMPLETE: Displayed first ${chunk1Size} files in ${chunk1Duration}ms`)
       
-      // Small delay to let the UI render the first chunk
-      await new Promise(resolve => setTimeout(resolve, 50))
+      // Delay to let user see the first chunk
+      await new Promise(resolve => setTimeout(resolve, 200))
       
-      // CHUNK 2: Bulk loading (most of the remaining files) - efficient processing
+      // CHUNK 2: Complete the rest - all remaining files
       const chunk2Start = Date.now()
-      const chunk2Size = Math.min(totalFiles - chunk1Size, Math.floor(totalFiles * 0.8))
-      const chunk2EndIndex = chunk1Size + chunk2Size
-      const chunk2Files = allFiles.slice(0, chunk2EndIndex)
+      const remainingFiles = totalFiles - chunk1Size
       
-      uploadQueue.value = processFileChunk(chunk2Files)
-      const chunk2Duration = Date.now() - chunk2Start
-      
-      uiUpdateProgress.value = {
-        current: chunk2EndIndex,
-        total: totalFiles,
-        percentage: Math.round((chunk2EndIndex / totalFiles) * 100),
-        phase: 'loading'
-      }
-      
-      console.info(`✅ Chunk 2 COMPLETE: Loaded ${chunk2Size} more files in ${chunk2Duration}ms (total: ${chunk2EndIndex})`)
-      
-      // Small delay before final chunk
-      await new Promise(resolve => setTimeout(resolve, 50))
-      
-      // CHUNK 3: Final completion (remaining files) - complete the job
-      if (chunk2EndIndex < totalFiles) {
-        const chunk3Start = Date.now()
-        const remainingFiles = totalFiles - chunk2EndIndex
-        uploadQueue.value = processFileChunk(allFiles)
-        const chunk3Duration = Date.now() - chunk3Start
-        
-        console.info(`✅ Chunk 3 COMPLETE: Loaded final ${remainingFiles} files in ${chunk3Duration}ms`)
-      }
+      uploadQueue.value = processFileChunk(allFiles) // All files
       
       uiUpdateProgress.value = {
         current: totalFiles,
@@ -198,10 +173,13 @@ export function useFileQueue() {
         percentage: 100,
         phase: 'complete'
       }
+      
+      const chunk2Duration = Date.now() - chunk2Start
+      console.info(`✅ Chunk 2 COMPLETE: Displayed final ${remainingFiles} files in ${chunk2Duration}ms`)
     }
     
     const duration = Date.now() - startTime
-    console.info(`3-chunk UI update completed in ${duration}ms`)
+    console.info(`2-chunk UI update completed in ${duration}ms`)
     
     // Complete the UI update process
     isProcessingUIUpdate.value = false

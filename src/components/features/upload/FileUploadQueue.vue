@@ -492,41 +492,39 @@ const formatDate = (date) => {
   }).format(date)
 }
 
-// 3-chunk loading message generator
+// 2-chunk loading message generator
 const getLoadingMessage = () => {
   if (!props.isProcessingUIUpdate) return 'Loading files into queue...'
   
   const { total, percentage } = props.uiUpdateProgress
   
-  if (total <= 50) {
+  if (total <= 100) {
     return 'Loading files into queue...'
   }
   
-  if (percentage <= 10) {
+  if (percentage <= 15) {
     return 'Showing initial files...'
-  } else if (percentage <= 85) {
+  } else if (percentage < 100) {
     return 'Loading remaining files...'
   } else {
-    return 'Finalizing file list...'
+    return 'Complete!'
   }
 }
 
-// Phase message for 3-chunk strategy
+// Phase message for 2-chunk strategy
 const getPhaseMessage = () => {
   if (!props.isProcessingUIUpdate) return 'Loading...'
   
   const { total, percentage } = props.uiUpdateProgress
   
-  if (total <= 50) {
+  if (total <= 100) {
     return 'Loading...'
   }
   
-  if (percentage <= 10) {
-    return 'Step 1/3'
-  } else if (percentage <= 85) {
-    return 'Step 2/3'
+  if (percentage <= 15) {
+    return 'Step 1/2'
   } else if (percentage < 100) {
-    return 'Step 3/3'
+    return 'Step 2/2'
   } else {
     return 'Complete!'
   }
