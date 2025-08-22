@@ -108,20 +108,7 @@
                       <v-icon :icon="getFileIcon(file.type)" size="24" />
                     </v-avatar>
                   </template>
-                  <div v-if="hashDisplayInfo.get(file.id || file.name)">
-                    <div class="text-caption">
-                      <strong>Content Hash:</strong> {{ hashDisplayInfo.get(file.id || file.name).displayHash }}
-                    </div>
-                    <div v-if="hashDisplayInfo.get(file.id || file.name).isShared" class="text-caption text-warning">
-                      ⚠️ Shared with {{ hashDisplayInfo.get(file.id || file.name).sharedCount - 1 }} other file(s)
-                    </div>
-                    <div v-else class="text-caption text-success">
-                      ✅ Unique content
-                    </div>
-                  </div>
-                  <div v-else class="text-caption">
-                    🔄 Processing hash...
-                  </div>
+                  {{ hashDisplayInfo.get(file.id || file.name)?.displayHash || 'Processing...' }}
                 </v-tooltip>
               </template>
 
