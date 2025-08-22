@@ -117,6 +117,8 @@ export default {
           return 'Settings';
         case '/profile':
           return 'Profile';
+        case '/upload':
+          return 'File Upload Center';
         case '/':
         case '/home':
           return 'Home';

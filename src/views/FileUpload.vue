@@ -1,23 +1,17 @@
 <template>
   <v-container fluid class="pa-6">
-    <div class="max-w-4xl mx-auto">
-      <!-- Header -->
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-slate-800 mb-2">File Upload Center</h1>
-        <p class="text-slate-600">
-          Upload individual files or entire folders with drag and drop support
-        </p>
-      </div>
+    <div class="max-w-4xl mx-auto mt-16">
 
       <!-- Main Upload Area -->
       <v-card
+        v-if="uploadQueue.length === 0"
         class="upload-dropzone pa-8 mb-6"
         :class="{ 'dropzone-active': isDragOver }"
         @dragover.prevent="handleDragOver"
         @dragleave.prevent="handleDragLeave"
         @drop.prevent="handleDrop"
         variant="outlined"
-        height="300"
+        :style="{ height: '60vh', width: '60vw', minHeight: '400px', minWidth: '600px', margin: '0 auto' }"
       >
         <div class="text-center h-100 d-flex flex-column justify-center align-center">
           <v-icon
