@@ -127,6 +127,16 @@
 
               <v-list-item-title class="d-flex align-center">
                 <span class="text-truncate me-2">{{ file.name }}</span>
+                <!-- Duplicate indicator next to filename (only for files being skipped) -->
+                <v-chip
+                  v-if="group.isDuplicateGroup && file.isDuplicate"
+                  color="purple"
+                  size="x-small"
+                  variant="flat"
+                  class="ms-2"
+                >
+                  duplicate
+                </v-chip>
               </v-list-item-title>
 
               <v-list-item-subtitle>
@@ -147,9 +157,9 @@
 
               <template #append>
                 <div class="d-flex align-center">
-                  <!-- Status indicator for duplicates and existing files only -->
+                  <!-- Status indicator for existing files and processing only -->
                   <v-chip
-                    v-if="file.isDuplicate || file.isPreviousUpload || file.status === 'processing'"
+                    v-if="file.isPreviousUpload || file.status === 'processing'"
                     :color="getStatusColor(file.status, file)"
                     size="small"
                     variant="flat"
