@@ -178,8 +178,6 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { UploadLogService } from '../services/uploadLogService'
 import FileUploadQueue from '../components/features/upload/FileUploadQueue.vue'
 
 // Component configuration
@@ -187,11 +185,8 @@ defineOptions({
   name: 'FileUploadView'
 })
 
-// Store access
-const authStore = useAuthStore()
-
 // File size limits
-const MAX_BATCH_SIZE = 100 * 1024 * 1024  // 100MB for batch
+const MAX_BATCH_SIZE = 1024 * 1024 * 1024  // 1GB for batch
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024  // 500MB for single video
 const VIDEO_TYPES = ['video/mp4', 'video/mpeg', 'video/quicktime', 'video/x-msvideo']
 
@@ -318,47 +313,184 @@ const generateFileHash = async (file) => {
   return `${hash}_${file.size}`
 }
 
-// Process files for upload
+// Improved constraint-based deduplication using JavaScript Maps
 const processFiles = async (files) => {
   // Step 1: Validate size limits
   if (!validateFileSize(files)) {
     const limit = files.length === 1 && VIDEO_TYPES.includes(files[0].type) 
-      ? '500MB' : '100MB'
+      ? '500MB' : '1GB'
     showNotification(`File size exceeds ${limit} limit`, 'error')
     return
   }
   
-  // Step 2: Generate hashes for all files
-  const hashedFiles = await Promise.all(
-    files.map(async (file) => ({
+  // Step 1: Group files by size to identify unique-sized files
+  const fileSizeGroups = new Map() // file_size -> [file_references]
+  
+  files.forEach((file, index) => {
+    const fileSize = file.size
+    const fileRef = {
       file,
-      hash: await generateFileHash(file),
+      originalIndex: index,
       metadata: {
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type,
-        lastModified: file.lastModified
+        lastModified: file.lastModified,
+        // Note: File creation time not available in browser, using selection time
+        selectionTimestamp: new Date().getTime()
       }
-    }))
-  )
-  
-  // Step 3: Client-side deduplication
-  const uniqueFiles = new Map()
-  const duplicates = []
-  
-  hashedFiles.forEach(item => {
-    if (uniqueFiles.has(item.hash)) {
-      duplicates.push(item)
-    } else {
-      uniqueFiles.set(item.hash, item)
     }
+    
+    if (!fileSizeGroups.has(fileSize)) {
+      fileSizeGroups.set(fileSize, [])
+    }
+    fileSizeGroups.get(fileSize).push(fileRef)
   })
   
-  // Step 4: Check against database
-  const results = await checkDatabaseDuplicates(Array.from(uniqueFiles.values()))
+  const uniqueFiles = []
+  const duplicateCandidates = []
   
-  // Step 5: Update UI
-  updateUploadQueue(results, duplicates)
+  // Step 2: Separate unique-sized files from potential duplicates
+  for (const [, fileRefs] of fileSizeGroups) {
+    if (fileRefs.length === 1) {
+      // Unique file size - definitely not a duplicate
+      uniqueFiles.push(fileRefs[0])
+    } else {
+      // Multiple files with same size - need hash verification
+      duplicateCandidates.push(...fileRefs)
+    }
+  }
+  
+  // Step 3: Hash potential duplicates and group by hash
+  const hashGroups = new Map() // hash_value -> [file_references]
+  
+  for (const fileRef of duplicateCandidates) {
+    const hash = await generateFileHash(fileRef.file)
+    fileRef.hash = hash
+    
+    if (!hashGroups.has(hash)) {
+      hashGroups.set(hash, [])
+    }
+    hashGroups.get(hash).push(fileRef)
+  }
+  
+  const finalFiles = []
+  const duplicateFiles = []
+  
+  // Step 4: Process hash groups to identify true duplicates vs different files
+  for (const [, fileRefs] of hashGroups) {
+    if (fileRefs.length === 1) {
+      // Unique hash - not a duplicate
+      finalFiles.push(fileRefs[0])
+    } else {
+      // Multiple files with same hash - check if they're identical or true duplicates
+      const identicalGroups = new Map() // metadata_key -> [file_references]
+      
+      fileRefs.forEach(fileRef => {
+        // Create metadata signature (excluding selection timestamp)
+        const metadataKey = `${fileRef.metadata.fileName}_${fileRef.metadata.fileSize}_${fileRef.metadata.lastModified}`
+        
+        if (!identicalGroups.has(metadataKey)) {
+          identicalGroups.set(metadataKey, [])
+        }
+        identicalGroups.get(metadataKey).push(fileRef)
+      })
+      
+      // Step 5: Handle identical files and true duplicates
+      for (const [, identicalFiles] of identicalGroups) {
+        if (identicalFiles.length === 1) {
+          // Unique file (different metadata from others with same hash)
+          finalFiles.push(identicalFiles[0])
+        } else {
+          // Identical files selected multiple times - choose best one
+          const bestFile = chooseBestFile(identicalFiles)
+          finalFiles.push(bestFile)
+          
+          // Mark others as duplicates
+          identicalFiles.forEach(fileRef => {
+            if (fileRef !== bestFile) {
+              fileRef.isDuplicate = true
+              fileRef.duplicateReason = 'Identical file selected multiple times'
+              duplicateFiles.push(fileRef)
+            }
+          })
+        }
+      }
+      
+      // If we have multiple unique files with same hash (true duplicates), choose the best one
+      if (identicalGroups.size > 1) {
+        const allUniqueFiles = Array.from(identicalGroups.values()).map(group => group[0])
+        if (allUniqueFiles.length > 1) {
+          const bestFile = chooseBestFile(allUniqueFiles)
+          
+          // Remove best file from finalFiles and add back with priority
+          const bestIndex = finalFiles.findIndex(f => f === bestFile)
+          if (bestIndex > -1) {
+            finalFiles.splice(bestIndex, 1)
+          }
+          finalFiles.push(bestFile)
+          
+          // Mark others as duplicates
+          allUniqueFiles.forEach(fileRef => {
+            if (fileRef !== bestFile) {
+              const index = finalFiles.findIndex(f => f === fileRef)
+              if (index > -1) {
+                finalFiles.splice(index, 1)
+              }
+              fileRef.isDuplicate = true
+              fileRef.duplicateReason = 'Duplicate content with different metadata'
+              duplicateFiles.push(fileRef)
+            }
+          })
+        }
+      }
+    }
+  }
+  
+  // Step 6: Combine unique and non-duplicate files
+  const allFinalFiles = [...uniqueFiles, ...finalFiles]
+  
+  // Prepare for queue
+  const readyFiles = allFinalFiles.map(fileRef => ({
+    ...fileRef,
+    status: 'ready'
+  }))
+  
+  const duplicatesForQueue = duplicateFiles.map(fileRef => ({
+    ...fileRef,
+    status: 'duplicate'
+  }))
+  
+  // Update UI
+  updateUploadQueue(readyFiles, duplicatesForQueue)
+}
+
+// Helper function to choose the best file based on priority rules
+const chooseBestFile = (fileRefs) => {
+  return fileRefs.sort((a, b) => {
+    // Priority 1: Earliest modification date
+    if (a.metadata.lastModified !== b.metadata.lastModified) {
+      return a.metadata.lastModified - b.metadata.lastModified
+    }
+    
+    // Priority 2: Earliest selection timestamp (proxy for creation in browser context)
+    if (a.metadata.selectionTimestamp !== b.metadata.selectionTimestamp) {
+      return a.metadata.selectionTimestamp - b.metadata.selectionTimestamp
+    }
+    
+    // Priority 3: Shortest filename
+    if (a.metadata.fileName.length !== b.metadata.fileName.length) {
+      return a.metadata.fileName.length - b.metadata.fileName.length
+    }
+    
+    // Priority 4: Alphanumeric filename sort
+    if (a.metadata.fileName !== b.metadata.fileName) {
+      return a.metadata.fileName.localeCompare(b.metadata.fileName)
+    }
+    
+    // Priority 5: Original selection order (stable sort)
+    return a.originalIndex - b.originalIndex
+  })[0]
 }
 
 const addFilesToQueue = async (files) => {
@@ -424,60 +556,44 @@ const readDirectoryRecursive = (dirEntry) => {
   })
 }
 
-const checkDatabaseDuplicates = async (uniqueFiles) => {
-  const teamId = authStore.currentTeam
-  if (!teamId) {
-    console.warn('No team context for deduplication')
-    return uniqueFiles.map(f => ({ ...f, status: 'ready' }))
-  }
-  
-  // Use atomic batch registration for all files
-  const results = await UploadLogService.registerFileBatch(
-    uniqueFiles.map(fileData => ({
-      hash: fileData.hash,
-      metadata: fileData.metadata
-    })),
-    teamId
-  )
-  
-  // Transform results to match expected format
-  return results.map(result => {
-    const originalFile = uniqueFiles.find(f => f.hash === result.hash)
-    return {
-      ...originalFile,
-      status: result.status === 'duplicate' ? 'existing' : 'ready',
-      existingData: result.existing
-    }
-  })
-}
 
-const updateUploadQueue = (checkedFiles, clientDuplicates) => {
+const updateUploadQueue = (readyFiles, duplicateFiles) => {
   // Clear and rebuild queue
   uploadQueue.value = []
   
-  // Add checked files with their status
-  checkedFiles.forEach(file => {
+  // Add ready files (unique and chosen duplicates)
+  readyFiles.forEach(fileRef => {
     uploadQueue.value.push({
       id: crypto.randomUUID(),
-      ...file,
-      status: file.status,
+      file: fileRef.file,
+      metadata: fileRef.metadata,
+      hash: fileRef.hash,
+      status: fileRef.status,
+      name: fileRef.file.name,
+      size: fileRef.file.size,
+      type: fileRef.file.type,
+      lastModified: fileRef.file.lastModified,
       isDuplicate: false,
-      isPreviousUpload: file.status === 'existing',
-      duplicateMessage: file.existingData 
-        ? `Previously uploaded on ${new Date(file.existingData.uploadedAt).toLocaleDateString()}`
-        : null
+      isPreviousUpload: false,
+      duplicateMessage: null
     })
   })
   
-  // Add client duplicates
-  clientDuplicates.forEach(file => {
+  // Add duplicate files (to show user what was skipped)
+  duplicateFiles.forEach(fileRef => {
     uploadQueue.value.push({
       id: crypto.randomUUID(),
-      ...file,
-      status: 'duplicate',
+      file: fileRef.file,
+      metadata: fileRef.metadata,
+      hash: fileRef.hash,
+      status: fileRef.status,
+      name: fileRef.file.name,
+      size: fileRef.file.size,
+      type: fileRef.file.type,
+      lastModified: fileRef.file.lastModified,
       isDuplicate: true,
       isPreviousUpload: false,
-      duplicateMessage: 'Duplicate file in current selection'
+      duplicateMessage: fileRef.duplicateReason || 'Duplicate file detected'
     })
   })
 }
