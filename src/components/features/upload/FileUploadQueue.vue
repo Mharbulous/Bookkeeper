@@ -256,7 +256,7 @@ const processingCount = computed(() => {
 })
 
 const queueDuplicatesCount = computed(() => {
-  return props.files.filter(file => file.isQueueDuplicate).length
+  return props.files.filter(file => file.isDuplicate).length
 })
 
 const previouslyUploadedCount = computed(() => {
