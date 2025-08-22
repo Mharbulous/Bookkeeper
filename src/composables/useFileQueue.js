@@ -1,10 +1,19 @@
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 
 export function useFileQueue() {
-  // Reactive data
-  const uploadQueue = ref([])
+  // Reactive data - Use shallowRef for better performance with large file arrays
+  const uploadQueue = shallowRef([])
   const showSingleFileNotification = ref(false)
   const singleFileNotification = ref({ message: '', color: 'info' })
+  
+  // Progress state tracking
+  const processingProgress = shallowRef({
+    current: 0,
+    total: 0,
+    percentage: 0,
+    currentFile: '',
+    isProcessing: false
+  })
 
   // Template refs
   const fileInput = ref(null)
@@ -40,13 +49,33 @@ export function useFileQueue() {
     await processFiles(files)
   }
 
-  const updateUploadQueue = (readyFiles, duplicateFiles) => {
-    // Clear and rebuild queue
-    uploadQueue.value = []
-    
-    // Add ready files (unique and chosen duplicates)
-    readyFiles.forEach(fileRef => {
-      uploadQueue.value.push({
+  // Worker progress update handler
+  const updateProgress = (progressData) => {
+    processingProgress.value = {
+      current: progressData.current || 0,
+      total: progressData.total || 0,
+      percentage: progressData.percentage || 0,
+      currentFile: progressData.currentFile || '',
+      isProcessing: true
+    }
+  }
+
+  // Reset progress when processing completes
+  const resetProgress = () => {
+    processingProgress.value = {
+      current: 0,
+      total: 0,
+      percentage: 0,
+      currentFile: '',
+      isProcessing: false
+    }
+  }
+
+  // When worker sends results, replace entire array (triggers reactivity)
+  const updateFromWorkerResults = (readyFiles, duplicateFiles) => {
+    // Build new array and replace entire reference
+    const newQueue = [
+      ...readyFiles.map(fileRef => ({
         id: crypto.randomUUID(),
         file: fileRef.file,
         metadata: fileRef.metadata,
@@ -58,12 +87,8 @@ export function useFileQueue() {
         lastModified: fileRef.file.lastModified,
         path: getFilePath(fileRef),
         isDuplicate: false
-      })
-    })
-    
-    // Add duplicate files (to show user what was skipped)
-    duplicateFiles.forEach(fileRef => {
-      uploadQueue.value.push({
+      })),
+      ...duplicateFiles.map(fileRef => ({
         id: crypto.randomUUID(),
         file: fileRef.file,
         metadata: fileRef.metadata,
@@ -74,9 +99,20 @@ export function useFileQueue() {
         type: fileRef.file.type,
         lastModified: fileRef.file.lastModified,
         path: getFilePath(fileRef),
-        isDuplicate: true,
-      })
-    })
+        isDuplicate: true
+      }))
+    ]
+    
+    // Replace entire array reference (triggers reactivity)
+    uploadQueue.value = newQueue
+    
+    // Reset progress when complete
+    resetProgress()
+  }
+
+  // Legacy method - maintains backward compatibility
+  const updateUploadQueue = (readyFiles, duplicateFiles) => {
+    updateFromWorkerResults(readyFiles, duplicateFiles)
   }
 
   // Queue management
@@ -109,6 +145,7 @@ export function useFileQueue() {
     singleFileNotification,
     fileInput,
     folderInput,
+    processingProgress,
 
     // Methods
     getFilePath,
@@ -116,7 +153,10 @@ export function useFileQueue() {
     triggerFolderSelect,
     processSingleFile,
     addFilesToQueue,
-    updateUploadQueue,
+    updateUploadQueue, // Legacy compatibility
+    updateFromWorkerResults, // New worker-optimized method
+    updateProgress,
+    resetProgress,
     removeFromQueue,
     clearQueue,
     startUpload,
