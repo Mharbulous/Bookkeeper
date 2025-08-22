@@ -46,15 +46,6 @@ const signIn = async (email, password) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password)
     const firebaseUser = userCredential.user
 
-    // Create or update user app-specific data in Firestore
-    try {
-      await UserService.createOrUpdateUserDocument(firebaseUser, {
-        role: 'user', // Default role - can be changed later by admin
-      })
-    } catch (userDocError) {
-      console.error('Error creating user app data:', userDocError)
-      // Don't fail the login if user document creation fails
-    }
 
     return firebaseUser
   } catch (error) {

@@ -162,22 +162,21 @@ Components wait for authentication determination before rendering:
 1. **User submits credentials** → `authStore.login(email, password)`
 2. **Store delegates to auth service** → `authService.signIn()`
 3. **Firebase Auth authenticates** → Returns `firebaseUser` object
-4. **Auth service creates/updates user document** → `UserService.createOrUpdateUserDocument()`
-5. **Solo team created if needed** → One-time creation of team document
-6. **onAuthStateChanged fires** → `_handleUserAuthenticated()` called
-7. **Store updates state**:
+4. **onAuthStateChanged fires** → `_handleUserAuthenticated()` called
+5. **Solo team created if needed** → One-time creation including user document
+6. **Store updates state**:
    - Sets `user` from Firebase Auth (identity data)
    - Sets `teamId` (userId for solo users, actual teamId for team members)
    - Sets `userRole` ('admin' for solo users)
    - Transitions to `authenticated` state
-8. **Components react** → UI updates automatically
+7. **Components react** → UI updates automatically
 
 ### New User Registration Process
 
 1. **User registers** → Creates Firebase Auth account
-2. **First login detected** → No user document exists
-3. **User document created** → Preferences and settings initialized
-4. **Solo team created** → Team document with `teamId === userId`
+2. **First login detected** → No team document exists
+3. **Solo team created** → Team document with `teamId === userId`
+4. **User document created** → Preferences and settings initialized during team creation
 5. **Default matters created** → System matters like 'matter-general'
 6. **Auth state updated** → User fully authenticated with team context
 
@@ -362,20 +361,40 @@ service cloud.firestore {
                            request.auth.uid == userId;
     }
     
-    // Team members can access their team
+    // Team access - works for both solo and multi-user teams
     match /teams/{teamId} {
       allow read: if request.auth != null && 
-                     (request.auth.uid == teamId ||  // Solo team
-                      exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)));
+                     request.auth.uid == teamId;  // Solo team
       allow write: if request.auth != null && 
-                      request.auth.uid == teamId;  // Only solo users can modify their own team
+                      request.auth.uid == teamId;  // Solo team only for now
     }
     
-    // Team subcollections
+    // Files use hash as document ID for automatic deduplication
+    match /teams/{teamId}/files/{hash} {
+      allow read: if request.auth != null && 
+                     (request.auth.uid == teamId || 
+                      request.auth.token.teamId == teamId);
+      
+      // Create only if document doesn't exist (no merge)
+      allow create: if request.auth != null && 
+                       (request.auth.uid == teamId || 
+                        request.auth.token.teamId == teamId);
+      
+      // No updates or deletes for immutability
+      allow update, delete: if false;
+    }
+    
+    // File index for queries
+    match /teams/{teamId}/fileIndex/{hash} {
+      allow read, write: if request.auth != null && 
+                            (request.auth.uid == teamId || 
+                             request.auth.token.teamId == teamId);
+    }
+    
+    // Team subcollections (fallback for other collections)
     match /teams/{teamId}/{collection}/{document} {
       allow read, write: if request.auth != null && 
-                           (request.auth.uid == teamId ||  // Solo team
-                            exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)));
+                           request.auth.uid == teamId;  // Solo team
     }
   }
 }
@@ -388,8 +407,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /teams/{teamId}/matters/{matterId}/{fileName} {
       allow read, write: if request.auth != null && 
-                           (request.auth.uid == teamId ||  // Solo team access
-                            firestore.exists(/databases/(default)/documents/teams/$(teamId)/members/$(request.auth.uid)));
+                           request.auth.uid == teamId;  // Solo team
     }
   }
 }

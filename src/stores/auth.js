@@ -122,10 +122,8 @@ export const useAuthStore = defineStore('auth', {
           this.userRole = 'admin'
         }
         
-        // 3. Initialize team context after authentication
-        await this._initializeTeamContext(firebaseUser.uid)
         
-        // 4. Update state
+        // 3. Update state
         this.authState = 'authenticated'
         this.error = null
         
@@ -147,8 +145,6 @@ export const useAuthStore = defineStore('auth', {
       this.authState = 'unauthenticated'
       this.error = null
       
-      // Clear team store data
-      await this._clearTeamContext()
       
       console.log('Auth state transitioned: -> unauthenticated')
     },
@@ -206,13 +202,7 @@ export const useAuthStore = defineStore('auth', {
             }
           },
           isPersonal: true,
-          apps: ['intranet', 'bookkeeper'],
-          settings: {
-            timezone: 'UTC',
-            maxMembers: 100
-          },
-          createdAt: serverTimestamp(),
-          createdBy: firebaseUser.uid
+          createdAt: serverTimestamp()
         })
         
         // 2. Create default matter
@@ -230,17 +220,15 @@ export const useAuthStore = defineStore('auth', {
           isSystemMatter: true
         })
         
-        // 3. Update user document with preferences
-        const userRef = doc(db, 'users', firebaseUser.uid)
-        batch.set(userRef, {
+        // 3. Create user document with preferences
+        const { UserService } = await import('../services/userService')
+        await UserService.createOrUpdateUserDocument(firebaseUser, {
           preferences: {
             theme: 'light',
             notifications: true,
             language: 'en'
-          },
-          createdAt: serverTimestamp(),
-          lastLogin: serverTimestamp()
-        }, { merge: true })
+          }
+        })
         
         await batch.commit()
         console.log('Solo team created for user:', firebaseUser.email)
@@ -319,68 +307,8 @@ export const useAuthStore = defineStore('auth', {
       })
     },
 
-    // Initialize team context after authentication
-    async _initializeTeamContext(userId) {
-      try {
-        // Import team store dynamically to avoid circular imports
-        const { useTeamStore } = await import('./team')
-        const teamStore = useTeamStore()
-        
-        // Load user's teams
-        await teamStore.loadUserTeams(userId)
-        
-        // If user has a teamId, load that team
-        if (this.teamId) {
-          await teamStore.loadTeam(this.teamId)
-        }
-        
-        console.log('Team context initialized')
-      } catch (error) {
-        console.error('Error initializing team context:', error)
-        // Don't fail auth if team initialization fails
-      }
-    },
 
-    // Clear team context on logout
-    async _clearTeamContext() {
-      try {
-        // Import team store dynamically to avoid circular imports
-        const { useTeamStore } = await import('./team')
-        const teamStore = useTeamStore()
-        
-        teamStore.clearTeamData()
-        console.log('Team context cleared')
-      } catch (error) {
-        console.error('Error clearing team context:', error)
-      }
-    },
 
-    // Switch user's team context
-    async switchTeam(teamId) {
-      try {
-        this.teamId = teamId
-        
-        // Update team store
-        const { useTeamStore } = await import('./team')
-        const teamStore = useTeamStore()
-        await teamStore.switchTeam(teamId)
-        
-        // Update user document with new team
-        if (this.user?.uid) {
-          const { UserService } = await import('../services/userService')
-          await UserService.createOrUpdateUserDocument(this.user, {
-            role: this.userRole,
-            teamId: teamId
-          })
-        }
-        
-        console.log('Switched to team:', teamId)
-      } catch (error) {
-        console.error('Error switching team:', error)
-        this.error = error.message
-        throw error
-      }
-    },
 
 
 

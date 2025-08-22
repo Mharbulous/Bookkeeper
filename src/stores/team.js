@@ -182,23 +182,6 @@ export const useTeamStore = defineStore('team', {
       }
     },
 
-    /**
-     * Switch to a different team (for users with multiple teams)
-     */
-    async switchTeam(teamId) {
-      if (!teamId) {
-        this.currentTeam = null
-        return
-      }
-
-      // Check if user has access to this team
-      const hasAccess = this.userTeams.some(team => team.id === teamId)
-      if (!hasAccess) {
-        throw new Error('You do not have access to this team')
-      }
-
-      await this.loadTeam(teamId)
-    },
 
     /**
      * Clear team data (useful for logout)
