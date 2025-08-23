@@ -31,7 +31,8 @@
       "Bash(py:*)",
       "Bash(powershell:*)",
       "mcp__ide__executeCode",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm run test:*)"
     ],
     "deny": [],
     "ask": []
