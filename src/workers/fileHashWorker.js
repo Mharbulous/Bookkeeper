@@ -3,6 +3,18 @@
  * Handles SHA-256 hash generation for file deduplication without blocking the main thread
  */
 
+// Worker-specific timing utility
+let processingStartTime = null
+
+function logWorkerTime(eventName) {
+  if (processingStartTime === null) {
+    // If no start time set, use current time as baseline
+    processingStartTime = Date.now()
+  }
+  const relativeTime = Date.now() - processingStartTime
+  console.log(`${eventName}: ${relativeTime}`)
+}
+
 // Message types
 const MESSAGE_TYPES = {
   PROCESS_FILES: 'PROCESS_FILES',
@@ -57,8 +69,12 @@ async function processFiles(files, batchId) {
   }
   
   try {
+    // Initialize worker timing from first file processing
+    if (processingStartTime === null) {
+      processingStartTime = Date.now()
+    }
+    
     // Step 1: Group files by size to identify unique-sized files
-    console.log(`🔍 Starting deduplication analysis for ${totalFiles} files`)
     const fileSizeGroups = new Map() // file_size -> [file_references]
     
     files.forEach((fileData) => {
@@ -99,11 +115,7 @@ async function processFiles(files, batchId) {
       }
     }
     
-    // Log the analysis results (estimation now happens in folder options)
-    console.log(`📊 File size analysis complete:`)
-    console.log(`   • ${uniqueFiles.length} files with unique sizes (skip hash calculation)`)
-    console.log(`   • ${duplicateCandidates.length} files need hash verification`)
-    console.log(`   • ${Math.round((uniqueFiles.length / totalFiles) * 100)}% of files can skip expensive hash calculation`)
+    logWorkerTime('SIZE_ANALYSIS_COMPLETE')
     
     // Step 3: Hash potential duplicates and group by hash
     const hashGroups = new Map() // hash_value -> [file_references]
@@ -122,14 +134,13 @@ async function processFiles(files, batchId) {
       sendProgressUpdate()
     }
     
-    const hashingEndTime = Date.now()
-    const actualHashingTime = hashingEndTime - hashingStartTime
-    console.log(`🔢 Hash calculation completed in ${actualHashingTime}ms for ${duplicateCandidates.length} files`)
+    logWorkerTime('HASH_CALCULATION_COMPLETE')
     
     const finalFiles = []
     const duplicateFiles = []
     
     // Step 4: Process hash groups to identify true duplicates vs identical files selected twice
+    logWorkerTime('DEDUP_LOGIC_START')
     for (const [, fileRefs] of hashGroups) {
       if (fileRefs.length === 1) {
         // Unique hash - not a duplicate
@@ -192,6 +203,7 @@ async function processFiles(files, batchId) {
     }
     
     // Step 6: Combine unique and non-duplicate files
+    logWorkerTime('DEDUP_LOGIC_COMPLETE')
     const allFinalFiles = [...uniqueFiles, ...finalFiles]
     
     // Prepare result - remove File objects since they can't be transferred back

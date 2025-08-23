@@ -1,4 +1,5 @@
 import { ref, shallowRef, nextTick } from 'vue'
+import { logProcessingTime } from '../utils/processingTimer.js'
 
 export function useFileQueue() {
   // Reactive data - Use shallowRef for better performance with large file arrays
@@ -55,7 +56,6 @@ export function useFileQueue() {
 
   const addFilesToQueue = async (files, processFiles) => {
     if (files.length === 0) return
-    console.log(`🚀 USER ACTION: Files selected/dropped - Starting end-to-end processing at ${Date.now()}ms`)
     const startTime = Date.now()
     await processFiles(files)
     // Note: Total time will be logged when UI update completes
@@ -114,9 +114,6 @@ export function useFileQueue() {
   
   // Simple 2-chunk UI updates for optimal user feedback
   const updateFromWorkerResults = async (readyFiles, duplicateFiles) => {
-    const uiUpdateStartTime = Date.now()
-    console.log(`⏱️  UI UPDATE START: Beginning UI update process at ${uiUpdateStartTime}ms`)
-    
     const allFiles = [...readyFiles, ...duplicateFiles]
     const totalFiles = allFiles.length
     
@@ -129,16 +126,10 @@ export function useFileQueue() {
       phase: 'loading'
     }
     
-    console.info(`Starting 2-chunk UI update for ${totalFiles} files...`)
-    console.log(`📊 UI UPDATE DATA: ${readyFiles.length} ready files, ${duplicateFiles.length} duplicate files`)
-    const startTime = Date.now()
-    
     if (totalFiles <= 100) {
       // For small file sets, just load everything at once
-      const chunk1Start = Date.now()
-      console.log(`⏱️  SINGLE CHUNK START: Processing all ${totalFiles} files at once`)
+      logProcessingTime('CHUNK1_START')
       uploadQueue.value = processFileChunk(allFiles)
-      const chunk1Duration = Date.now() - chunk1Start
       
       uiUpdateProgress.value = {
         current: totalFiles,
@@ -147,16 +138,23 @@ export function useFileQueue() {
         phase: 'complete'
       }
       
-      console.info(`⏱️  SINGLE CHUNK COMPLETE: Loaded ${totalFiles} files in ${chunk1Duration}ms`)
-      console.log(`📊 SINGLE CHUNK PERFORMANCE: ${(totalFiles / chunk1Duration * 1000).toFixed(1)} files/second`)
+      
+      // Wait for Vue to complete DOM rendering for single chunk
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      logProcessingTime('CHUNK1_COMPLETE')
+      
+      // Log placeholder events for consistency when no chunk2 is needed
+      console.log('CHUNK2_START: n/a')
+      console.log('DOM_RENDER_COMPLETE: n/a') 
+      console.log('CHUNK2_COMPLETE: n/a')
     } else {
       // Simple 2-chunk strategy for large file sets
       
       // CHUNK 1: Initial batch (first 100 files) - immediate user feedback
-      const chunk1Start = Date.now()
       const chunk1Size = 100
       const chunk1Files = allFiles.slice(0, chunk1Size)
-      console.log(`⏱️  CHUNK 1 START: Processing first ${chunk1Size} files for immediate feedback`)
+      logProcessingTime('CHUNK1_START')
       uploadQueue.value = processFileChunk(chunk1Files)
       
       uiUpdateProgress.value = {
@@ -166,20 +164,13 @@ export function useFileQueue() {
         phase: 'loading'
       }
       
-      const chunk1Duration = Date.now() - chunk1Start
-      console.info(`⏱️  CHUNK 1 COMPLETE: Displayed first ${chunk1Size} files in ${chunk1Duration}ms`)
-      console.log(`📊 CHUNK 1 PERFORMANCE: ${(chunk1Size / chunk1Duration * 1000).toFixed(1)} files/second`)
+      logProcessingTime('CHUNK1_COMPLETE')
       
       // Delay to let user see the first chunk
-      const delayStart = Date.now()
       await new Promise(resolve => setTimeout(resolve, 200))
-      const delayDuration = Date.now() - delayStart
-      console.log(`⏱️  USER FEEDBACK DELAY: ${delayDuration}ms delay for user perception`)
       
       // CHUNK 2: Complete the rest - all remaining files
-      const chunk2Start = Date.now()
-      const remainingFiles = totalFiles - chunk1Size
-      console.log(`⏱️  CHUNK 2 START: Processing remaining ${remainingFiles} files`)
+      logProcessingTime('CHUNK2_START')
       
       uploadQueue.value = processFileChunk(allFiles) // All files
       
@@ -191,52 +182,21 @@ export function useFileQueue() {
       }
       
       // Wait for Vue to complete DOM rendering
-      const renderStart = Date.now()
       await nextTick()
       await new Promise(resolve => setTimeout(resolve, 0)) // Additional frame wait
-      const renderDuration = Date.now() - renderStart
+      logProcessingTime('DOM_RENDER_COMPLETE')
       
-      const chunk2Duration = Date.now() - chunk2Start
-      console.info(`⏱️  CHUNK 2 COMPLETE: Displayed final ${remainingFiles} files in ${chunk2Duration}ms`)
-      console.log(`📊 CHUNK 2 PERFORMANCE: ${(remainingFiles / chunk2Duration * 1000).toFixed(1)} files/second`)
-      console.log(`⏱️  DOM RENDERING: Vue render completion took ${renderDuration}ms`)
+      logProcessingTime('CHUNK2_COMPLETE')
     }
     
-    const uiUpdateTotalDuration = Date.now() - uiUpdateStartTime
-    const chunkingDuration = Date.now() - startTime
+    logProcessingTime('ALL_FILES_DISPLAYED')
     
-    console.info(`⏱️  UI UPDATE COMPLETE: 2-chunk UI update completed in ${chunkingDuration}ms`)
-    console.log(`⏱️  UI UPDATE TOTAL: Complete UI update process took ${uiUpdateTotalDuration}ms`)
-    
-    // Performance metrics
-    if (totalFiles > 0) {
-      console.log(`📊 UI UPDATE PERFORMANCE:`)
-      console.log(`   • Total files processed: ${totalFiles}`)
-      console.log(`   • Processing rate: ${(totalFiles / uiUpdateTotalDuration * 1000).toFixed(1)} files/second`)
-      console.log(`   • Average time per file: ${(uiUpdateTotalDuration / totalFiles).toFixed(2)}ms`)
-    }
-    
-    // Log end-to-end timing from user action to UI completion
+    // Clean up legacy timing variables
     if (window.endToEndStartTime) {
-      const endToEndDuration = Date.now() - window.endToEndStartTime
-      console.info(`🎯 END-TO-END COMPLETE: From file selection to UI display in ${endToEndDuration}ms (${(endToEndDuration/1000).toFixed(1)}s)`)
-      
-      window.endToEndStartTime = null // Clean up
+      window.endToEndStartTime = null
     }
-    
-    // Log folder processing timing (from Continue button to queue display)
     if (window.folderProcessingStartTime) {
-      const folderProcessingDuration = Date.now() - window.folderProcessingStartTime
-      console.log(`📊 FOLDER_PROCESSING_COMPLETE:`, {
-        timestamp: Date.now(),
-        processingTimeMs: folderProcessingDuration,
-        processingTimeSeconds: Math.round(folderProcessingDuration / 1000 * 10) / 10,
-        filesProcessed: totalFiles,
-        avgTimePerFileMs: Math.round((folderProcessingDuration / Math.max(totalFiles, 1)) * 100) / 100,
-        filesPerSecond: Math.round((totalFiles / Math.max(folderProcessingDuration, 1) * 1000) * 10) / 10
-      })
-      
-      window.folderProcessingStartTime = null // Clean up
+      window.folderProcessingStartTime = null
     }
     
     // Complete the UI update process

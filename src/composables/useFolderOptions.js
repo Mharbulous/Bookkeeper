@@ -1,5 +1,6 @@
 import { ref, watch } from 'vue'
 import { analyzeFiles } from '../utils/fileAnalysis.js'
+import { startProcessingTimer } from '../utils/processingTimer.js'
 
 export function useFolderOptions() {
   // Reactive data
@@ -204,14 +205,8 @@ export function useFolderOptions() {
       filesToAdd = filesToAdd.filter(f => f.path.split('/').length <= 2)
     }
     
-    // Log actual processing start with key metrics
-    console.log(`🚀 PROCESSING_START:`, {
-      timestamp: processingStartTime,
-      selectedOption: includeSubfolders.value ? 'allFiles' : 'mainFolder',
-      actualFilesToProcess: filesToAdd.length,
-      totalFilesAvailable: pendingFolderFiles.value.length,
-      filteredOut: pendingFolderFiles.value.length - filesToAdd.length
-    })
+    // Start the processing timer and log T=0
+    startProcessingTimer()
     
     // Preserve path information when adding files to queue
     const filesWithPath = filesToAdd.map(f => {
@@ -219,7 +214,7 @@ export function useFolderOptions() {
       return f.file
     })
     
-    // Store processing start time for end-to-end measurement
+    // Store processing start time for legacy timing (can be removed later)
     window.folderProcessingStartTime = processingStartTime
     
     addFilesToQueue(filesWithPath)
