@@ -28,7 +28,8 @@
       "Bash(where python)",
       "Bash(\"C:\\Users\\Brahm\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe\" generate_performance_graph.py)",
       "Bash(py -m pip install:*)",
-      "Bash(py:*)"
+      "Bash(py:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []
