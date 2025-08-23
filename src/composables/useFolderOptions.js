@@ -146,12 +146,13 @@ export function useFolderOptions() {
       
       // Analyze both sets concurrently (these will log TIME_ESTIMATION_FORMULA for each)
       const [allFilesResult, mainFolderResult] = await Promise.all([
-        Promise.resolve(analyzeFiles(allFiles, allFilesDirectoryStats.totalDirectoryCount)),
-        Promise.resolve(analyzeFiles(mainFolderFiles, mainFolderDirectoryStats.totalDirectoryCount))
+        Promise.resolve(analyzeFiles(allFiles, allFilesDirectoryStats.totalDirectoryCount, allFilesDirectoryStats.avgDirectoryDepth, allFilesDirectoryStats.avgFileDepth)),
+        Promise.resolve(analyzeFiles(mainFolderFiles, mainFolderDirectoryStats.totalDirectoryCount, mainFolderDirectoryStats.avgDirectoryDepth, mainFolderDirectoryStats.avgFileDepth))
       ])
       
-      // Log prediction-ready data (matches Folder Upload Options modal display)  
-      console.log(`🔬 FOLDER_ANALYSIS_DATA (Modal Predictors):`, {
+      // Log prediction-ready data (matches Folder Upload Options modal display)
+      // Using JSON.stringify to prevent browser console truncation
+      const analysisData = {
         timestamp: Date.now(),
         
         // Core predictors for 3-phase estimation (from Modal Display)
@@ -163,6 +164,7 @@ export function useFolderOptions() {
         totalSizeMB: allFilesResult.totalSizeMB,
         totalDirectoryCount: allFilesResult.totalDirectoryCount,
         avgDirectoryDepth: allFilesDirectoryStats.avgDirectoryDepth,
+        maxDirectoryDepth: allFilesDirectoryStats.maxDirectoryDepth,
         
         // Additional predictors
         uniqueFilesTotal: allFilesResult.uniqueFiles,
@@ -171,7 +173,9 @@ export function useFolderOptions() {
         avgFilenameLength: filenameStats.avgFilenameLength,
         zeroByteFiles: allFilesMetrics.zeroByteFiles,
         largestFileSizesMB: allFilesMetrics.largestFileSizesMB
-      })
+      }
+      
+      console.log(`🔬 FOLDER_ANALYSIS_DATA: ${JSON.stringify(analysisData)}`)
       
       allFilesAnalysis.value = allFilesResult
       mainFolderAnalysis.value = mainFolderResult
@@ -180,8 +184,8 @@ export function useFolderOptions() {
     } catch (error) {
       console.error('Error analyzing files for folder options:', error)
       // Set fallback analysis
-      allFilesAnalysis.value = analyzeFiles([])
-      mainFolderAnalysis.value = analyzeFiles([])
+      allFilesAnalysis.value = analyzeFiles([], 0, 0, 0)
+      mainFolderAnalysis.value = analyzeFiles([], 0, 0, 0)
     } finally {
       isAnalyzing.value = false
     }

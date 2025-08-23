@@ -573,8 +573,11 @@ const getRelativePath = (file) => {
     return '\\'
   }
   
+  // Normalize path separators to forward slashes for consistent processing
+  const normalizedPath = file.path.replace(/\\/g, '/')
+  
   // Extract the folder path by removing the filename
-  const pathParts = file.path.split('/')
+  const pathParts = normalizedPath.split('/').filter(part => part !== '')
   pathParts.pop() // Remove the filename
   
   if (pathParts.length === 0) {

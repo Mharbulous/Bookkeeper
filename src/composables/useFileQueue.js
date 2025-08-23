@@ -211,8 +211,8 @@ export function useFileQueue() {
   }
 
   // Legacy method - maintains backward compatibility
-  const updateUploadQueue = (readyFiles, duplicateFiles) => {
-    updateFromWorkerResults(readyFiles, duplicateFiles)
+  const updateUploadQueue = async (readyFiles, duplicateFiles) => {
+    await updateFromWorkerResults(readyFiles, duplicateFiles)
   }
 
   // Queue management

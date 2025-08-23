@@ -189,7 +189,7 @@ export function useQueueDeduplication() {
 
         // Update UI using existing API
         logProcessingTime('UI_UPDATE_START')
-        updateUploadQueue(readyFiles, duplicateFiles)
+        await updateUploadQueue(readyFiles, duplicateFiles)
 
         // Return in exact same format as current API
         return { readyFiles, duplicateFiles }
@@ -405,7 +405,7 @@ export function useQueueDeduplication() {
     
     // Update UI using existing API
     logProcessingTime('UI_UPDATE_START')
-    updateUploadQueue(readyFiles, duplicatesForQueue)
+    await updateUploadQueue(readyFiles, duplicatesForQueue)
     
     // Fallback processing complete - UI update timing will be handled by useFileQueue
     
