@@ -142,13 +142,25 @@
               :class="{ 'bg-purple-lighten-5': file.isDuplicate }"
             >
               <template #prepend>
-                <v-tooltip location="bottom">
+                <v-tooltip 
+                  location="bottom" 
+                  transition="fade-transition"
+                  :open-delay="0"
+                  :close-delay="0"
+                >
                   <template #activator="{ props: tooltipProps }">
-                    <v-avatar v-bind="tooltipProps" color="grey-lighten-3" size="48" class="cursor-help">
+                    <v-avatar 
+                      v-bind="tooltipProps" 
+                      @mouseenter="onTooltipHover(file.id || file.name, file.file || file)"
+                      @mouseleave="onTooltipLeave(file.id || file.name)"
+                      color="grey-lighten-3" 
+                      size="48" 
+                      class="cursor-help"
+                    >
                       <v-icon :icon="getFileIcon(file.type)" size="24" />
                     </v-avatar>
                   </template>
-                  {{ hashDisplayInfo.get(file.id || file.name)?.displayHash || 'Processing...' }}
+                  {{ getHashDisplay(file.id || file.name) }}
                 </v-tooltip>
               </template>
 
@@ -270,7 +282,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { useLazyHashTooltip } from '../../../composables/useLazyHashTooltip.js'
 
 // Component configuration
 defineOptions({
@@ -301,6 +314,32 @@ const props = defineProps({
 
 // Emits
 defineEmits(['remove-file', 'start-upload', 'clear-queue'])
+
+// Lazy hash tooltip functionality
+const { 
+  onTooltipHover, 
+  onTooltipLeave, 
+  getHashDisplay, 
+  populateExistingHash,
+  clearCache 
+} = useLazyHashTooltip()
+
+// Populate existing hashes when component mounts or props change
+const populateExistingHashes = () => {
+  props.files.forEach(file => {
+    if (file.hash) {
+      populateExistingHash(file.id || file.name, file.hash)
+    }
+  })
+}
+
+// Populate hashes on mount and when files change
+onMounted(populateExistingHashes)
+
+// Clean up on unmount
+onUnmounted(() => {
+  clearCache()
+})
 
 // Computed properties
 const uploadableFiles = computed(() => {
@@ -347,57 +386,8 @@ const groupedFiles = computed(() => {
   return Array.from(groups.values())
 })
 
-// Hash display helper for tooltips
-const hashDisplayInfo = computed(() => {
-  const hashMap = new Map() // clean_hash -> [files_with_that_hash]
-  
-  props.files.forEach(file => {
-    if (file.hash) {
-      // Extract clean hash (remove _size suffix)
-      const cleanHash = file.hash.split('_')[0]
-      
-      if (!hashMap.has(cleanHash)) {
-        hashMap.set(cleanHash, [])
-      }
-      hashMap.get(cleanHash).push(file)
-    }
-  })
-  
-  const result = new Map()
-  
-  props.files.forEach(file => {
-    if (file.hash) {
-      const cleanHash = file.hash.split('_')[0]
-      const filesWithSameHash = hashMap.get(cleanHash) || []
-      const truncatedHash = cleanHash.substring(0, 8) + '...'
-      
-      if (filesWithSameHash.length > 1) {
-        result.set(file.id || file.name, {
-          displayHash: truncatedHash,
-          fullHash: cleanHash,
-          sharedCount: filesWithSameHash.length,
-          isShared: true
-        })
-      } else {
-        result.set(file.id || file.name, {
-          displayHash: truncatedHash,
-          fullHash: cleanHash,
-          sharedCount: 1,
-          isShared: false
-        })
-      }
-    } else {
-      result.set(file.id || file.name, {
-        displayHash: 'Processing...',
-        fullHash: null,
-        sharedCount: 0,
-        isShared: false
-      })
-    }
-  })
-  
-  return result
-})
+// Watch for file changes and populate existing hashes
+watch(() => props.files, populateExistingHashes, { deep: true })
 
 const totalSize = computed(() => {
   return uploadableFiles.value.reduce((total, file) => total + file.size, 0)
@@ -604,5 +594,21 @@ const getRelativePath = (file) => {
 
 .cursor-help {
   cursor: help;
+}
+
+/* Custom fade transition for tooltip popup */
+:deep(.fade-transition-enter-active),
+:deep(.fade-transition-leave-active) {
+  transition: opacity 0.5s ease-in-out !important;
+}
+
+:deep(.fade-transition-enter-from),
+:deep(.fade-transition-leave-to) {
+  opacity: 0 !important;
+}
+
+:deep(.fade-transition-enter-to),
+:deep(.fade-transition-leave-from) {
+  opacity: 1 !important;
 }
 </style>

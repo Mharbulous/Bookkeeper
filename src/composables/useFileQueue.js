@@ -97,19 +97,27 @@ export function useFileQueue() {
 
   // Helper function to process a chunk of files into queue format
   const processFileChunk = (files) => {
-    return files.map(fileRef => ({
-      id: crypto.randomUUID(),
-      file: fileRef.file,
-      metadata: fileRef.metadata,
-      hash: fileRef.hash,
-      status: fileRef.status,
-      name: fileRef.file.name,
-      size: fileRef.file.size,
-      type: fileRef.file.type,
-      lastModified: fileRef.file.lastModified,
-      path: getFilePath(fileRef),
-      isDuplicate: fileRef.status === 'duplicate'
-    }))
+    return files.map(fileRef => {
+      const queueItem = {
+        id: crypto.randomUUID(),
+        file: fileRef.file,
+        metadata: fileRef.metadata,
+        status: fileRef.status,
+        name: fileRef.file.name,
+        size: fileRef.file.size,
+        type: fileRef.file.type,
+        lastModified: fileRef.file.lastModified,
+        path: getFilePath(fileRef),
+        isDuplicate: fileRef.status === 'duplicate'
+      }
+      
+      // Only include hash if it was calculated during deduplication process
+      if (fileRef.hash) {
+        queueItem.hash = fileRef.hash
+      }
+      
+      return queueItem
+    })
   }
   
   // Simple 2-chunk UI updates for optimal user feedback
