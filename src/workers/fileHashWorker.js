@@ -99,31 +99,11 @@ async function processFiles(files, batchId) {
       }
     }
     
-    // Log the early analysis results
+    // Log the analysis results (estimation now happens in folder options)
     console.log(`📊 File size analysis complete:`)
     console.log(`   • ${uniqueFiles.length} files with unique sizes (skip hash calculation)`)
     console.log(`   • ${duplicateCandidates.length} files need hash verification`)
     console.log(`   • ${Math.round((uniqueFiles.length / totalFiles) * 100)}% of files can skip expensive hash calculation`)
-    
-    // Calculate time estimation
-    const totalSizeForHashing = duplicateCandidates.reduce((sum, fileRef) => sum + fileRef.file.size, 0)
-    const totalSizeMB = totalSizeForHashing / (1024 * 1024)
-    
-    // Estimation factors (based on empirical data):
-    // - Unique files: ~0.1ms per file (minimal processing)
-    // - Hash candidates: ~0.5ms per MB + 2ms base per file
-    // - UI update: ~4ms per final file
-    const uniqueFileTime = uniqueFiles.length * 0.1
-    const hashingTime = (totalSizeMB * 0.5) + (duplicateCandidates.length * 2)
-    const estimatedWorkerTime = uniqueFileTime + hashingTime
-    const estimatedUITime = totalFiles * 4  // Rough estimate, actual depends on dedup results
-    const totalEstimatedTime = estimatedWorkerTime + estimatedUITime
-    
-    console.log(`⏱️  End-to-end time estimate:`)
-    console.log(`   • Hash candidates total size: ${totalSizeMB.toFixed(1)} MB`)
-    console.log(`   • Estimated worker time: ${Math.round(estimatedWorkerTime)}ms`)
-    console.log(`   • Estimated UI update time: ${Math.round(estimatedUITime)}ms`)
-    console.log(`   • TOTAL END-TO-END ESTIMATE: ${Math.round(totalEstimatedTime)}ms (${(totalEstimatedTime/1000).toFixed(1)}s)`)
     
     // Step 3: Hash potential duplicates and group by hash
     const hashGroups = new Map() // hash_value -> [file_references]

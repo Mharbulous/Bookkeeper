@@ -83,6 +83,26 @@ export function useFolderOptions() {
       allFilesAnalysis.value = allFilesResult
       mainFolderAnalysis.value = mainFolderResult
       
+      // Log estimates at the same time they're calculated for the modal
+      console.log(`⏱️  End-to-end time estimates:`)
+      console.log(`📁 Main folder only:`)
+      console.log(`   • ${mainFolderResult.uniqueFiles} files with unique sizes (skip hash calculation)`)
+      console.log(`   • ${mainFolderResult.duplicateCandidates} files need hash verification`)
+      console.log(`   • ${Math.round((mainFolderResult.uniqueFiles / Math.max(mainFolderResult.totalFiles, 1)) * 100)}% of files can skip expensive hash calculation`)
+      console.log(`   • Hash candidates total size: ${mainFolderResult.duplicateCandidatesSizeMB} MB`)
+      console.log(`   • Estimated worker time: ${mainFolderResult.breakdown.workerTimeMs}ms`)
+      console.log(`   • Estimated UI update time: ${mainFolderResult.breakdown.uiTimeMs}ms`)
+      console.log(`   • TOTAL END-TO-END ESTIMATE: ${mainFolderResult.estimatedTimeMs}ms (${mainFolderResult.estimatedTimeSeconds}s)`)
+      
+      console.log(`📂 Include subfolders:`)
+      console.log(`   • ${allFilesResult.uniqueFiles} files with unique sizes (skip hash calculation)`)
+      console.log(`   • ${allFilesResult.duplicateCandidates} files need hash verification`)
+      console.log(`   • ${Math.round((allFilesResult.uniqueFiles / Math.max(allFilesResult.totalFiles, 1)) * 100)}% of files can skip expensive hash calculation`)
+      console.log(`   • Hash candidates total size: ${allFilesResult.duplicateCandidatesSizeMB} MB`)
+      console.log(`   • Estimated worker time: ${allFilesResult.breakdown.workerTimeMs}ms`)
+      console.log(`   • Estimated UI update time: ${allFilesResult.breakdown.uiTimeMs}ms`)
+      console.log(`   • TOTAL END-TO-END ESTIMATE: ${allFilesResult.estimatedTimeMs}ms (${allFilesResult.estimatedTimeSeconds}s)`)
+      
     } catch (error) {
       console.error('Error analyzing files for folder options:', error)
       // Set fallback analysis

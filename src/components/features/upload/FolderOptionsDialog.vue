@@ -27,9 +27,10 @@
                     Analyzing files...
                   </template>
                   <template v-else>
-                    Contains <strong>{{ formatNumber(mainFolderAnalysis.totalFiles) }}</strong> files totalling 
-                    <strong>{{ mainFolderAnalysis.totalSizeMB }}</strong> MB and less than 
-                    <strong>{{ mainFolderAnalysis.estimatedDuplicationPercent }}%</strong> duplication.
+                    <strong>{{ formatNumber(mainFolderAnalysis.totalFiles) }}</strong> files with less than 
+                    <strong>{{ mainFolderAnalysis.estimatedDuplicationPercent }}%</strong> duplication 
+                    (<strong>{{ mainFolderAnalysis.uniqueFilesSizeMB }}</strong>MB of 
+                    <strong>{{ mainFolderAnalysis.totalSizeMB }}</strong>MB are unique).
                   </template>
                 </div>
               </div>
@@ -54,9 +55,10 @@
                     Analyzing files...
                   </template>
                   <template v-else>
-                    Contains <strong>{{ formatNumber(allFilesAnalysis.totalFiles) }}</strong> files totalling 
-                    <strong>{{ allFilesAnalysis.totalSizeMB }}</strong> MB and less than 
-                    <strong>{{ allFilesAnalysis.estimatedDuplicationPercent }}%</strong> duplication.
+                    <strong>{{ formatNumber(allFilesAnalysis.totalFiles) }}</strong> files with less than 
+                    <strong>{{ allFilesAnalysis.estimatedDuplicationPercent }}%</strong> duplication 
+                    (<strong>{{ allFilesAnalysis.uniqueFilesSizeMB }}</strong>MB of 
+                    <strong>{{ allFilesAnalysis.totalSizeMB }}</strong>MB are unique).
                   </template>
                 </div>
               </div>
@@ -67,8 +69,8 @@
       
       <v-card-actions class="px-6 py-4">
         <!-- Time Estimate Display -->
-        <div v-if="!isAnalyzing && getSelectedAnalysis()" class="text-h6 font-weight-medium text-primary">
-          Time estimate: {{ formatTime(getSelectedAnalysis().estimatedTimeSeconds) }}
+        <div v-if="!isAnalyzing && getSelectedAnalysis" class="text-h6 font-weight-medium text-primary">
+          Time estimate: {{ getSelectedAnalysis.estimatedTimeSeconds }} seconds
         </div>
         <div v-else-if="isAnalyzing" class="d-flex align-center">
           <v-progress-circular
@@ -104,9 +106,10 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { formatDuration } from '../../../utils/fileAnalysis.js'
 
-defineProps({
+const props = defineProps({
   show: {
     type: Boolean,
     required: true
@@ -148,11 +151,11 @@ const formatTime = (seconds) => {
 }
 
 // Get analysis data for currently selected option
-const getSelectedAnalysis = () => {
+const getSelectedAnalysis = computed(() => {
   if (props.includeSubfolders) {
     return props.allFilesAnalysis
   } else {
     return props.mainFolderAnalysis
   }
-}
+})
 </script>

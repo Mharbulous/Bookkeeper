@@ -71,10 +71,14 @@ export function analyzeFiles(files) {
   const estimatedUITime = files.length * UI_UPDATE_TIME_MS
   const totalEstimatedTime = estimatedWorkerTime + estimatedUITime
   
+  // Calculate unique file size (files that can skip hash calculation)
+  const uniqueFilesSizeMB = uniqueFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)
+  
   return {
     totalFiles: files.length,
     totalSizeMB: Math.round(totalFilesSizeMB * 10) / 10, // Round to 1 decimal
     uniqueFiles: uniqueFiles.length,
+    uniqueFilesSizeMB: Math.round(uniqueFilesSizeMB * 10) / 10,
     duplicateCandidates: duplicateCandidates.length,
     duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
     estimatedDuplicationPercent,
