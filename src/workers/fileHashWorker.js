@@ -78,13 +78,13 @@ async function processFiles(files, batchId) {
     const fileSizeGroups = new Map() // file_size -> [file_references]
     
     files.forEach((fileData) => {
-      const { id, file, originalIndex } = fileData
+      const { id, file, originalIndex, customPath } = fileData
       const fileSize = file.size
       const fileRef = {
         id,
         file,
         originalIndex,
-        path: getFilePath(file),
+        path: customPath || getFilePath(file), // Use customPath first, fallback to getFilePath
         metadata: {
           fileName: file.name,
           fileSize: file.size,

@@ -30,7 +30,8 @@
       "Bash(py -m pip install:*)",
       "Bash(py:*)",
       "Bash(powershell:*)",
-      "mcp__ide__executeCode"
+      "mcp__ide__executeCode",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

@@ -107,7 +107,7 @@ export function useFileQueue() {
         size: fileRef.file.size,
         type: fileRef.file.type,
         lastModified: fileRef.file.lastModified,
-        path: getFilePath(fileRef),
+        path: fileRef.path || getFilePath(fileRef),
         isDuplicate: fileRef.status === 'duplicate'
       }
       

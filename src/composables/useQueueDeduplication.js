@@ -147,10 +147,12 @@ export function useQueueDeduplication() {
         fileMapping.set(fileId, file)
         
         // Send file data to worker (File objects are cloned via structured clone)
+        // Include path separately since File.path custom property doesn't survive structured cloning
         return {
           id: fileId,
           file: file,  // File objects cloned to worker, converted to ArrayBuffer internally
-          originalIndex: index
+          originalIndex: index,
+          customPath: file.path // Pass path separately to survive worker transfer
         }
       })
 
@@ -178,12 +180,14 @@ export function useQueueDeduplication() {
         const readyFiles = workerResult.readyFiles.map(fileRef => ({
           ...fileRef,
           file: fileMapping.get(fileRef.id),  // Restore original File object
+          path: fileRef.path,  // Preserve path from worker result
           status: 'ready'
         }))
 
         const duplicateFiles = workerResult.duplicateFiles.map(fileRef => ({
           ...fileRef,
           file: fileMapping.get(fileRef.id),  // Restore original File object
+          path: fileRef.path,  // Preserve path from worker result
           status: 'duplicate'
         }))
 
