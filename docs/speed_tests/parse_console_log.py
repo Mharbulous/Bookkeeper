@@ -19,7 +19,8 @@ def extract_filename_prefix(input_path):
 
 def parse_folder_analysis_data(content):
     """Parse FOLDER_ANALYSIS_DATA entries from console log"""
-    pattern = r'🔬 FOLDER_ANALYSIS_DATA: \{([^}]+)(?:, …)?\}'
+    # Updated pattern to be more flexible with the ending
+    pattern = r'🔬 FOLDER_ANALYSIS_DATA: \{([^}]+)\}'
     matches = re.findall(pattern, content)
     
     folder_data = []
@@ -95,11 +96,11 @@ def parse_timing_data(content):
     
     # Group timing data by test runs (each PROCESSING_START begins a new test)
     test_run_data = defaultdict(dict)
-    current_test_run = 1
+    current_test_run = 0  # Start at 0 so first test run becomes 1
     
     for event_type, timing in matches:
         if event_type == 'PROCESSING_START':
-            current_test_run += 1
+            current_test_run += 1  # Increment first, then assign
         
         test_run_data[current_test_run][event_type] = int(timing)
     
@@ -118,7 +119,8 @@ def parse_timing_data(content):
         row = {'Test Run #': test_run}
         
         for column in expected_columns:
-            row[column] = data.get(column, '')
+            # Use None for missing values instead of empty string for better CSV handling
+            row[column] = data.get(column, None)
         
         timing_data.append(row)
     
