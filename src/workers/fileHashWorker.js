@@ -115,7 +115,6 @@ async function processFiles(files, batchId) {
       }
     }
     
-    logWorkerTime('SIZE_ANALYSIS_COMPLETE')
     
     // Step 3: Hash potential duplicates and group by hash
     const hashGroups = new Map() // hash_value -> [file_references]
@@ -134,13 +133,11 @@ async function processFiles(files, batchId) {
       sendProgressUpdate()
     }
     
-    logWorkerTime('HASH_CALCULATION_COMPLETE')
     
     const finalFiles = []
     const duplicateFiles = []
     
     // Step 4: Process hash groups to identify true duplicates vs identical files selected twice
-    logWorkerTime('DEDUP_LOGIC_START')
     for (const [, fileRefs] of hashGroups) {
       if (fileRefs.length === 1) {
         // Unique hash - not a duplicate
@@ -203,7 +200,6 @@ async function processFiles(files, batchId) {
     }
     
     // Step 6: Combine unique and non-duplicate files
-    logWorkerTime('DEDUP_LOGIC_COMPLETE')
     const allFinalFiles = [...uniqueFiles, ...finalFiles]
     
     // Prepare result - remove File objects since they can't be transferred back

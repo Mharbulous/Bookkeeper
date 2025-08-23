@@ -165,6 +165,36 @@ Hash-based deduplication eliminates redundant storage and processing of identica
 - Secure logout clears all client-side data
 - Route guards prevent unauthorized access
 
+## Performance Testing & Analysis
+
+### Speed Test Data Collection
+The `docs/speed_tests/` directory contains tools for analyzing file processing performance:
+
+**Data Collection Process:**
+1. Run file processing operations in the browser
+2. Copy console log output from browser DevTools console
+3. Save console output as `.md` file (e.g., `3_Raw_ConsoleData.md`)
+
+**Analysis Scripts:**
+- **`parse_console_log.py`**: Parses browser console logs into structured CSV data
+  ```bash
+  python parse_console_log.py 3_Raw_ConsoleData.md
+  ```
+  - Generates `3_FolderAnalysisData.csv` (file metrics)
+  - Generates `3_TestSpeedData.csv` (3-stage timing data)
+
+- **`analyze_3stage_data.py`**: Analyzes performance data and provides prediction coefficients
+  ```bash
+  python analyze_3stage_data.py
+  ```
+
+**3-Stage Performance Model:**
+- **Phase 1**: File Analysis (size filtering) - correlates with `totalFiles`
+- **Phase 2**: Hash Processing - correlates with `uniqueFilesTotal`  
+- **Phase 3**: UI Rendering - correlates with `uniqueFilesTotal` (strongest predictor)
+
+The parsing script automatically detects Web Worker vs Main Thread execution mode and handles timing inconsistencies between the two execution paths.
+
 ## Important Notes
 
 - **File Processing**: Large operations run in Web Workers to maintain UI responsiveness

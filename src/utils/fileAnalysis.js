@@ -6,9 +6,10 @@
 /**
  * Analyze files to provide count, size, duplication estimates, and time predictions
  * @param {File[]} files - Array of File objects to analyze
+ * @param {number} totalDirectoryCount - Total number of unique directories (optional)
  * @returns {Object} Analysis results
  */
-export function analyzeFiles(files) {
+export function analyzeFiles(files, totalDirectoryCount = 0) {
   if (!files || !Array.isArray(files) || files.length === 0) {
     return {
       totalFiles: 0,
@@ -17,7 +18,8 @@ export function analyzeFiles(files) {
       duplicateCandidates: 0,
       estimatedDuplicationPercent: 0,
       estimatedTimeMs: 0,
-      estimatedTimeSeconds: 0
+      estimatedTimeSeconds: 0,
+      totalDirectoryCount: totalDirectoryCount
     }
   }
 
@@ -109,6 +111,7 @@ export function analyzeFiles(files) {
     estimatedDuplicationPercent,
     estimatedTimeMs: Math.round(totalEstimatedTime),
     estimatedTimeSeconds: Math.round(totalEstimatedTime / 1000 * 10) / 10,
+    totalDirectoryCount: totalDirectoryCount,
     breakdown: {
       uniqueFileTimeMs: Math.round(uniqueFileTime),
       hashingTimeMs: Math.round(hashingTime), 

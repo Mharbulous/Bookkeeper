@@ -163,8 +163,6 @@ export function useQueueDeduplication() {
       }
 
       try {
-        logProcessingTime('WORKER_SEND')
-        
         // Send to worker with timeout based on file count and size
         const totalSize = files.reduce((sum, file) => sum + file.size, 0)
         const estimatedTime = Math.max(30000, Math.min(300000, totalSize / 1000)) // 30s min, 5min max
@@ -175,8 +173,6 @@ export function useQueueDeduplication() {
         }, {
           timeout: estimatedTime
         })
-        
-        logProcessingTime('WORKER_COMPLETE')
 
         // Map worker results back to original File objects
         const readyFiles = workerResult.readyFiles.map(fileRef => ({
@@ -190,8 +186,6 @@ export function useQueueDeduplication() {
           file: fileMapping.get(fileRef.id),  // Restore original File object
           status: 'duplicate'
         }))
-        
-        logProcessingTime('RESULT_MAPPING_COMPLETE')
 
         // Update UI using existing API
         logProcessingTime('UI_UPDATE_START')
@@ -292,7 +286,6 @@ export function useQueueDeduplication() {
       }
     }
     
-    logProcessingTime('SIZE_ANALYSIS_COMPLETE')
     
     // Step 3: Hash potential duplicates and group by hash
     const hashGroups = new Map() // hash_value -> [file_references]
@@ -327,7 +320,6 @@ export function useQueueDeduplication() {
       }
     }
     
-    logProcessingTime('HASH_CALCULATION_COMPLETE')
     
     const finalFiles = []
     const duplicateFiles = []
@@ -395,7 +387,6 @@ export function useQueueDeduplication() {
       }
     }
     
-    logProcessingTime('DEDUP_LOGIC_COMPLETE')
     
     // Step 6: Combine unique and non-duplicate files
     const combineStartTime = Date.now()
@@ -411,8 +402,6 @@ export function useQueueDeduplication() {
       ...fileRef,
       status: 'duplicate'
     }))
-    
-    logProcessingTime('RESULT_MAPPING_COMPLETE')
     
     // Update UI using existing API
     logProcessingTime('UI_UPDATE_START')

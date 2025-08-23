@@ -29,7 +29,8 @@
       "Bash(\"C:\\Users\\Brahm\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe\" generate_performance_graph.py)",
       "Bash(py -m pip install:*)",
       "Bash(py:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "mcp__ide__executeCode"
     ],
     "deny": [],
     "ask": []

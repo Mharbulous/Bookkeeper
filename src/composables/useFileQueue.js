@@ -136,7 +136,6 @@ export function useFileQueue() {
     
     if (totalFiles <= 100) {
       // For small file sets, just load everything at once
-      logProcessingTime('CHUNK1_START')
       uploadQueue.value = processFileChunk(allFiles)
       
       uiUpdateProgress.value = {
@@ -150,12 +149,6 @@ export function useFileQueue() {
       // Wait for Vue to complete DOM rendering for single chunk
       await nextTick()
       await new Promise(resolve => setTimeout(resolve, 0))
-      logProcessingTime('CHUNK1_COMPLETE')
-      
-      // Log placeholder events for consistency when no chunk2 is needed
-      console.log('CHUNK2_START: n/a')
-      console.log('DOM_RENDER_COMPLETE: n/a') 
-      console.log('CHUNK2_COMPLETE: n/a')
     } else {
       // Optimized 2-chunk strategy for large file sets (>100 files)
       // 
@@ -170,7 +163,6 @@ export function useFileQueue() {
       // CHUNK 1: Initial batch (first 100 files) - immediate user feedback
       const chunk1Size = 100
       const chunk1Files = allFiles.slice(0, chunk1Size)
-      logProcessingTime('CHUNK1_START')
       uploadQueue.value = processFileChunk(chunk1Files)
       
       uiUpdateProgress.value = {
@@ -180,15 +172,12 @@ export function useFileQueue() {
         phase: 'loading'
       }
       
-      logProcessingTime('CHUNK1_COMPLETE')
-      
       // Brief delay to let user see the initial files and get visual feedback
       await new Promise(resolve => setTimeout(resolve, 200))
       
       // CHUNK 2: Full render of ALL files (including the first 100)
       // This replaces the first 100 files rather than appending to them
       // because full DOM replacement is more efficient than large incremental updates
-      logProcessingTime('CHUNK2_START')
       
       uploadQueue.value = processFileChunk(allFiles) // Render ALL files efficiently
       
@@ -202,9 +191,6 @@ export function useFileQueue() {
       // Wait for Vue to complete DOM rendering
       await nextTick()
       await new Promise(resolve => setTimeout(resolve, 0)) // Additional frame wait
-      logProcessingTime('DOM_RENDER_COMPLETE')
-      
-      logProcessingTime('CHUNK2_COMPLETE')
     }
     
     logProcessingTime('ALL_FILES_DISPLAYED')

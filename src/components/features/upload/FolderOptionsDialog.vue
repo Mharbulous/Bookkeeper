@@ -15,7 +15,7 @@
           >
             <template #label>
               <div class="w-100">
-                <div class="font-weight-medium mb-2">Folder only</div>
+                <div class="font-weight-medium mb-2">This folder only</div>
                 <div class="text-body-2 text-grey-darken-1">
                   <template v-if="isAnalyzing || !mainFolderAnalysis">
                     <v-progress-circular
@@ -27,10 +27,9 @@
                     Analyzing files...
                   </template>
                   <template v-else>
-                    <strong>{{ formatNumber(mainFolderAnalysis.totalFiles) }}</strong> files with less than 
-                    <strong>{{ mainFolderAnalysis.estimatedDuplicationPercent }}%</strong> duplication 
-                    (<strong>{{ mainFolderAnalysis.uniqueFilesSizeMB }}</strong>MB of 
-                    <strong>{{ mainFolderAnalysis.totalSizeMB }}</strong>MB are unique).
+                    <strong>{{ formatNumber(mainFolderAnalysis.totalFiles) }}</strong> files in this folder totalling 
+                    <strong>{{ mainFolderAnalysis.totalSizeMB }}</strong>MB 
+                    (<strong>{{ mainFolderAnalysis.duplicateCandidatesSizeMB }}</strong>MB possible duplicates).
                   </template>
                 </div>
               </div>
@@ -55,10 +54,10 @@
                     Analyzing files...
                   </template>
                   <template v-else>
-                    <strong>{{ formatNumber(allFilesAnalysis.totalFiles) }}</strong> files with less than 
-                    <strong>{{ allFilesAnalysis.estimatedDuplicationPercent }}%</strong> duplication 
-                    (<strong>{{ allFilesAnalysis.uniqueFilesSizeMB }}</strong>MB of 
-                    <strong>{{ allFilesAnalysis.totalSizeMB }}</strong>MB are unique).
+                    <strong>{{ formatNumber(allFilesAnalysis.totalFiles) }}</strong> files in 
+                    <strong>{{ formatNumber(allFilesAnalysis.totalDirectoryCount) }}</strong> folders totalling 
+                    <strong>{{ allFilesAnalysis.totalSizeMB }}</strong>MB 
+                    (<strong>{{ allFilesAnalysis.duplicateCandidatesSizeMB }}</strong>MB possible duplicates).
                   </template>
                 </div>
               </div>
@@ -71,10 +70,6 @@
         <!-- Time Estimate Display -->
         <div v-if="!isAnalyzing && getSelectedAnalysis" class="text-h6 font-weight-medium text-primary">
           Time estimate: {{ formatTime(getSelectedAnalysis.estimatedTimeSeconds) }}
-          <div v-if="getSelectedAnalysis.breakdown" class="text-caption text-grey-darken-1 mt-1">
-            Using {{ getSelectedAnalysis.breakdown.isLargeDataset ? 'large dataset' : 'standard' }} processing rate
-            ({{ getSelectedAnalysis.breakdown.hashRateUsed }}ms/MB)
-          </div>
         </div>
         <div v-else-if="isAnalyzing" class="d-flex align-center">
           <v-progress-circular

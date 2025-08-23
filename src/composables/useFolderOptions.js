@@ -15,16 +15,32 @@ export function useFolderOptions() {
   const allFilesAnalysis = ref(null)
 
   // Helper functions for predictive metrics
-  const calculateDirectoryDepthStats = (files) => {
-    const depths = files.map(f => {
+  const calculateDirectoryStats = (files) => {
+    // Single pass through files to calculate all directory metrics efficiently
+    const directories = new Set()
+    const depths = []
+    
+    files.forEach(f => {
       const pathParts = f.path.split('/').filter(part => part !== '')
-      return pathParts.length - 1 // Subtract 1 because last part is filename
+      const depth = pathParts.length - 1 // Subtract 1 because last part is filename
+      
+      // Collect depth for stats
+      depths.push(depth)
+      
+      // Add unique directory paths (all levels)
+      const dirParts = pathParts.slice(0, -1) // Remove filename
+      for (let i = 1; i <= dirParts.length; i++) {
+        const dirPath = dirParts.slice(0, i).join('/')
+        directories.add(dirPath)
+      }
     })
     
+    // Calculate depth statistics
     const maxDepth = depths.length > 0 ? Math.max(...depths) : 0
     const avgDepth = depths.length > 0 ? depths.reduce((sum, d) => sum + d, 0) / depths.length : 0
     
     return {
+      totalDirectoryCount: directories.size,
       maxDirectoryDepth: maxDepth,
       avgDirectoryDepth: Math.round(avgDepth * 10) / 10
     }
@@ -73,59 +89,57 @@ export function useFolderOptions() {
     isAnalyzing.value = true
     
     try {
-      // Separate files into main folder vs all files
-      const allFiles = pendingFolderFiles.value.map(f => f.file)
+      // Single preprocessing pass - parse all paths once and separate files
+      const allFiles = []
+      const mainFolderFiles = []
+      const mainFolderFileData = []
       
-      
-      const mainFolderFiles = pendingFolderFiles.value
-        .filter(f => {
-          const pathParts = f.path.split('/').filter(part => part !== '') // Remove empty parts
-          const isMainFolder = pathParts.length === 2  // Exactly 2 parts: folder/file (no subfolders)
-          return isMainFolder
-        })
-        .map(f => f.file)
+      pendingFolderFiles.value.forEach(fileData => {
+        allFiles.push(fileData.file)
         
+        const pathParts = fileData.path.split('/').filter(part => part !== '')
+        const isMainFolder = pathParts.length === 2  // Exactly 2 parts: folder/file (no subfolders)
+        
+        if (isMainFolder) {
+          mainFolderFiles.push(fileData.file)
+          mainFolderFileData.push(fileData)
+        }
+      })
       
-      
-      // Calculate predictive metrics for all files and main folder files
+      // Calculate predictive metrics using pre-separated file arrays
       const allFilesMetrics = calculateFileSizeMetrics(pendingFolderFiles.value)
-      const mainFolderMetrics = calculateFileSizeMetrics(pendingFolderFiles.value.filter(f => {
-        const pathParts = f.path.split('/').filter(part => part !== '')
-        return pathParts.length === 2 // main folder files only
-      }))
-      const depthStats = calculateDirectoryDepthStats(pendingFolderFiles.value)
+      const mainFolderMetrics = calculateFileSizeMetrics(mainFolderFileData)
+      const allFilesDirectoryStats = calculateDirectoryStats(pendingFolderFiles.value)
+      const mainFolderDirectoryStats = calculateDirectoryStats(mainFolderFileData)
       const filenameStats = calculateFilenameStats(pendingFolderFiles.value)
       
-      // Log streamlined data focused on time prediction
-      console.log(`🔬 FOLDER_ANALYSIS_DATA:`, {
-        timestamp: Date.now(),
-        
-        // File counts
-        totalFiles: allFiles.length,
-        mainFolderFiles: mainFolderFiles.length,
-        subfolderFiles: allFiles.length - mainFolderFiles.length,
-        
-        // File sizes
-        totalSizeMB: allFilesMetrics.totalSizeMB,
-        mainFolderSizeMB: mainFolderMetrics.totalSizeMB,
-        
-        // Duplication indicators
-        uniqueFilesMainFolder: mainFolderMetrics.uniqueFiles,
-        uniqueFilesTotal: allFilesMetrics.uniqueFiles,
-        identicalSizeFiles: allFilesMetrics.identicalSizeFiles,
-        
-        // Processing hints
-        zeroByteFiles: allFilesMetrics.zeroByteFiles,
-        avgFilenameLength: filenameStats.avgFilenameLength,
-        maxDirectoryDepth: depthStats.maxDirectoryDepth,
-        avgDirectoryDepth: depthStats.avgDirectoryDepth,
-        largestFileSizesMB: allFilesMetrics.largestFileSizesMB
-      })
       // Analyze both sets concurrently (these will log TIME_ESTIMATION_FORMULA for each)
       const [allFilesResult, mainFolderResult] = await Promise.all([
-        Promise.resolve(analyzeFiles(allFiles)),
-        Promise.resolve(analyzeFiles(mainFolderFiles))
+        Promise.resolve(analyzeFiles(allFiles, allFilesDirectoryStats.totalDirectoryCount)),
+        Promise.resolve(analyzeFiles(mainFolderFiles, mainFolderDirectoryStats.totalDirectoryCount))
       ])
+      
+      // Log prediction-ready data (matches Folder Upload Options modal display)  
+      console.log(`🔬 FOLDER_ANALYSIS_DATA (Modal Predictors):`, {
+        timestamp: Date.now(),
+        
+        // Core predictors for 3-phase estimation (from Modal Display)
+        totalFiles: allFilesResult.totalFiles,
+        duplicateCandidateCount: allFilesResult.duplicateCandidates,
+        duplicateCandidatePercent: allFilesResult.estimatedDuplicationPercent,
+        uniqueFilesSizeMB: allFilesResult.uniqueFilesSizeMB,
+        duplicateCandidatesSizeMB: allFilesResult.duplicateCandidatesSizeMB,
+        totalSizeMB: allFilesResult.totalSizeMB,
+        totalDirectoryCount: allFilesResult.totalDirectoryCount,
+        avgDirectoryDepth: allFilesDirectoryStats.avgDirectoryDepth,
+        
+        // Additional predictors
+        uniqueFilesTotal: allFilesResult.uniqueFiles,
+        maxDirectoryDepth: allFilesDirectoryStats.maxDirectoryDepth,
+        avgFilenameLength: filenameStats.avgFilenameLength,
+        zeroByteFiles: allFilesMetrics.zeroByteFiles,
+        largestFileSizesMB: allFilesMetrics.largestFileSizesMB
+      })
       
       allFilesAnalysis.value = allFilesResult
       mainFolderAnalysis.value = mainFolderResult
@@ -180,11 +194,23 @@ export function useFolderOptions() {
 
   const processFolderEntry = async (dirEntry, addFilesToQueue) => {
     const files = await readDirectoryRecursive(dirEntry)
-    const hasSubfolders = files.some(file => file.path.includes('/'))
+    
+    // Single pass to check for subfolders and count root folders
+    const rootFolders = new Set()
+    let hasSubfolders = false
+    
+    files.forEach(f => {
+      const pathParts = f.path.split('/')
+      rootFolders.add(pathParts[0])
+      
+      if (pathParts.length > 2) { // More than folder/file means subfolders exist
+        hasSubfolders = true
+      }
+    })
     
     if (hasSubfolders) {
       pendingFolderFiles.value = files
-      subfolderCount.value = new Set(files.map(f => f.path.split('/')[0])).size
+      subfolderCount.value = rootFolders.size
       showFolderOptions.value = true
     } else {
       // Preserve path information when adding files to queue
