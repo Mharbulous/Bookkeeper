@@ -14,35 +14,66 @@ export function useFolderOptions() {
   const mainFolderAnalysis = ref(null)
   const allFilesAnalysis = ref(null)
 
-  // Helper functions for predictive metrics
-  const calculateDirectoryStats = (files) => {
-    // Single pass through files to calculate all directory metrics efficiently
-    const directories = new Set()
-    const depths = []
+  // Single preprocessing function to parse all paths once and extract all needed information
+  const preprocessFileData = (files) => {
+    const directories = new Map() // directory path -> depth
+    const fileDepths = []
+    const rootFolders = new Set()
+    const preprocessedFiles = []
+    let hasSubfolders = false
     
-    files.forEach(f => {
-      const pathParts = f.path.split('/').filter(part => part !== '')
-      const depth = pathParts.length - 1 // Subtract 1 because last part is filename
+    files.forEach(fileData => {
+      // Parse path once and extract all information
+      const pathParts = fileData.path.split('/').filter(part => part !== '')
+      const fileDepth = pathParts.length - 1 // Subtract 1 because last part is filename
+      const isMainFolder = pathParts.length === 2 // Exactly 2 parts: folder/file (no subfolders)
       
-      // Collect depth for stats
-      depths.push(depth)
+      // Track root folders and subfolder detection
+      rootFolders.add(pathParts[0])
+      if (pathParts.length > 2) {
+        hasSubfolders = true
+      }
       
-      // Add unique directory paths (all levels)
+      // Collect file depth for file depth stats
+      fileDepths.push(fileDepth)
+      
+      // Add unique directory paths (all levels) with their depths
       const dirParts = pathParts.slice(0, -1) // Remove filename
       for (let i = 1; i <= dirParts.length; i++) {
         const dirPath = dirParts.slice(0, i).join('/')
-        directories.add(dirPath)
+        const dirDepth = i // Directory depth is its level in the hierarchy
+        directories.set(dirPath, dirDepth)
       }
+      
+      // Store preprocessed file data
+      preprocessedFiles.push({
+        ...fileData,
+        pathParts,
+        fileDepth,
+        isMainFolder,
+        dirParts
+      })
     })
     
-    // Calculate depth statistics
-    const maxDepth = depths.length > 0 ? Math.max(...depths) : 0
-    const avgDepth = depths.length > 0 ? depths.reduce((sum, d) => sum + d, 0) / depths.length : 0
+    // Calculate directory and file depth statistics
+    const maxFileDepth = fileDepths.length > 0 ? Math.max(...fileDepths) : 0
+    const avgFileDepth = fileDepths.length > 0 ? fileDepths.reduce((sum, d) => sum + d, 0) / fileDepths.length : 0
+    
+    const directoryDepths = Array.from(directories.values())
+    const avgDirectoryDepth = directoryDepths.length > 0 ? directoryDepths.reduce((sum, d) => sum + d, 0) / directoryDepths.length : 0
     
     return {
-      totalDirectoryCount: directories.size,
-      maxDirectoryDepth: maxDepth,
-      avgDirectoryDepth: Math.round(avgDepth * 10) / 10
+      preprocessedFiles,
+      directoryStats: {
+        totalDirectoryCount: directories.size,
+        maxFileDepth: maxFileDepth,
+        avgFileDepth: Math.round(avgFileDepth * 10) / 10,
+        avgDirectoryDepth: Math.round(avgDirectoryDepth * 10) / 10
+      },
+      folderStats: {
+        rootFolderCount: rootFolders.size,
+        hasSubfolders
+      }
     }
   }
 
@@ -89,28 +120,28 @@ export function useFolderOptions() {
     isAnalyzing.value = true
     
     try {
-      // Single preprocessing pass - parse all paths once and separate files
+      // Single preprocessing pass - parse all paths once and extract everything
+      const { preprocessedFiles, directoryStats: allFilesDirectoryStats } = preprocessFileData(pendingFolderFiles.value)
+      
+      // Separate files based on preprocessed data (no more path parsing!)
       const allFiles = []
       const mainFolderFiles = []
       const mainFolderFileData = []
       
-      pendingFolderFiles.value.forEach(fileData => {
+      preprocessedFiles.forEach(fileData => {
         allFiles.push(fileData.file)
         
-        const pathParts = fileData.path.split('/').filter(part => part !== '')
-        const isMainFolder = pathParts.length === 2  // Exactly 2 parts: folder/file (no subfolders)
-        
-        if (isMainFolder) {
+        if (fileData.isMainFolder) {
           mainFolderFiles.push(fileData.file)
           mainFolderFileData.push(fileData)
         }
       })
       
-      // Calculate predictive metrics using pre-separated file arrays
+      // Calculate directory stats for main folder subset using preprocessed data
+      const mainFolderDirectoryStats = preprocessFileData(mainFolderFileData).directoryStats
+      
+      // Calculate other metrics using the separated file arrays
       const allFilesMetrics = calculateFileSizeMetrics(pendingFolderFiles.value)
-      const mainFolderMetrics = calculateFileSizeMetrics(mainFolderFileData)
-      const allFilesDirectoryStats = calculateDirectoryStats(pendingFolderFiles.value)
-      const mainFolderDirectoryStats = calculateDirectoryStats(mainFolderFileData)
       const filenameStats = calculateFilenameStats(pendingFolderFiles.value)
       
       // Analyze both sets concurrently (these will log TIME_ESTIMATION_FORMULA for each)
@@ -135,7 +166,8 @@ export function useFolderOptions() {
         
         // Additional predictors
         uniqueFilesTotal: allFilesResult.uniqueFiles,
-        maxDirectoryDepth: allFilesDirectoryStats.maxDirectoryDepth,
+        maxFileDepth: allFilesDirectoryStats.maxFileDepth,
+        avgFileDepth: allFilesDirectoryStats.avgFileDepth,
         avgFilenameLength: filenameStats.avgFilenameLength,
         zeroByteFiles: allFilesMetrics.zeroByteFiles,
         largestFileSizesMB: allFilesMetrics.largestFileSizesMB
@@ -195,22 +227,12 @@ export function useFolderOptions() {
   const processFolderEntry = async (dirEntry, addFilesToQueue) => {
     const files = await readDirectoryRecursive(dirEntry)
     
-    // Single pass to check for subfolders and count root folders
-    const rootFolders = new Set()
-    let hasSubfolders = false
+    // Use preprocessing to check for subfolders and count root folders (no duplicate parsing!)
+    const { folderStats } = preprocessFileData(files)
     
-    files.forEach(f => {
-      const pathParts = f.path.split('/')
-      rootFolders.add(pathParts[0])
-      
-      if (pathParts.length > 2) { // More than folder/file means subfolders exist
-        hasSubfolders = true
-      }
-    })
-    
-    if (hasSubfolders) {
+    if (folderStats.hasSubfolders) {
       pendingFolderFiles.value = files
-      subfolderCount.value = rootFolders.size
+      subfolderCount.value = folderStats.rootFolderCount
       showFolderOptions.value = true
     } else {
       // Preserve path information when adding files to queue
@@ -223,16 +245,18 @@ export function useFolderOptions() {
   }
 
   const processFolderFiles = (files) => {
-    const hasSubfolders = files.some(file => file.webkitRelativePath.split('/').length > 2)
+    // Convert to our standard format
+    const fileDataArray = files.map(file => ({
+      file,
+      path: file.webkitRelativePath
+    }))
     
-    if (hasSubfolders) {
-      pendingFolderFiles.value = files.map(file => ({
-        file,
-        path: file.webkitRelativePath
-      }))
-      // Count unique subfolder names
-      const subfolderPaths = files.map(f => f.webkitRelativePath.split('/')[1]).filter(Boolean)
-      subfolderCount.value = new Set(subfolderPaths).size
+    // Use preprocessing to check for subfolders (no duplicate parsing!)
+    const { folderStats } = preprocessFileData(fileDataArray)
+    
+    if (folderStats.hasSubfolders) {
+      pendingFolderFiles.value = fileDataArray
+      subfolderCount.value = folderStats.rootFolderCount
       showFolderOptions.value = true
     } else {
       return files
@@ -245,8 +269,9 @@ export function useFolderOptions() {
     let filesToAdd = pendingFolderFiles.value
     
     if (!includeSubfolders.value) {
-      // Filter to only main folder files (max 2 path segments: folder/file)
-      filesToAdd = filesToAdd.filter(f => f.path.split('/').length <= 2)
+      // Use preprocessed data to filter main folder files (no more path parsing!)
+      const { preprocessedFiles } = preprocessFileData(pendingFolderFiles.value)
+      filesToAdd = preprocessedFiles.filter(f => f.isMainFolder)
     }
     
     // Start the processing timer and log T=0
