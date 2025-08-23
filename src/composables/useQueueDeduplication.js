@@ -125,8 +125,10 @@ export function useQueueDeduplication() {
     }
 
     try {
+      const deduplicationStartTime = Date.now()
       console.info(`Processing ${files.length} files using Web Worker...`)
       console.log(`📊 Total files to process: ${files.length}`)
+      console.log(`⏱️  DEDUPLICATION START: Beginning file processing at ${deduplicationStartTime}ms`)
       
       // Create mapping structure that preserves original File objects
       const fileMapping = new Map()
@@ -163,11 +165,13 @@ export function useQueueDeduplication() {
       }
 
       try {
-        const startTime = Date.now()
+        const workerStartTime = Date.now()
+        console.log(`⏱️  WORKER SEND: Sending ${files.length} files to worker at ${workerStartTime}ms`)
         
         // Send to worker with timeout based on file count and size
         const totalSize = files.reduce((sum, file) => sum + file.size, 0)
         const estimatedTime = Math.max(30000, Math.min(300000, totalSize / 1000)) // 30s min, 5min max
+        console.log(`⏱️  WORKER TIMEOUT: Set to ${estimatedTime}ms for ${(totalSize / (1024 * 1024)).toFixed(1)}MB total`)
         
         const workerResult = await workerInstance.sendMessage({
           type: 'PROCESS_FILES',
@@ -176,10 +180,13 @@ export function useQueueDeduplication() {
           timeout: estimatedTime
         })
         
-        const duration = Date.now() - startTime
-        console.info(`Web Worker processing completed in ${duration}ms`)
+        const workerDuration = Date.now() - workerStartTime
+        const deduplicationDuration = Date.now() - deduplicationStartTime
+        console.info(`⏱️  WORKER COMPLETE: Web Worker processing completed in ${workerDuration}ms`)
+        console.info(`⏱️  DEDUPLICATION COMPLETE: Total deduplication time ${deduplicationDuration}ms`)
 
         // Map worker results back to original File objects
+        const mappingStartTime = Date.now()
         const readyFiles = workerResult.readyFiles.map(fileRef => ({
           ...fileRef,
           file: fileMapping.get(fileRef.id),  // Restore original File object
@@ -191,8 +198,13 @@ export function useQueueDeduplication() {
           file: fileMapping.get(fileRef.id),  // Restore original File object
           status: 'duplicate'
         }))
+        
+        const mappingDuration = Date.now() - mappingStartTime
+        console.log(`⏱️  RESULT MAPPING: Mapped ${readyFiles.length + duplicateFiles.length} results in ${mappingDuration}ms`)
+        console.log(`📊 DEDUPLICATION RESULTS: ${readyFiles.length} unique files, ${duplicateFiles.length} duplicates`)
 
         // Update UI using existing API
+        console.log(`⏱️  QUEUE UPDATE START: Beginning UI queue update at ${Date.now()}ms`)
         updateUploadQueue(readyFiles, duplicateFiles)
 
         // Return in exact same format as current API
@@ -233,8 +245,10 @@ export function useQueueDeduplication() {
 
   // Legacy main thread processing (fallback implementation)
   const processFilesMainThread = async (files, updateUploadQueue, onProgress = null) => {
+    const fallbackStartTime = Date.now()
     console.info(`Processing ${files.length} files on main thread (fallback mode)...`)
     console.log(`📊 Total files to process: ${files.length}`)
+    console.log(`⏱️  FALLBACK START: Beginning main thread processing at ${fallbackStartTime}ms`)
     const startTime = Date.now()
     
     // Track progress for main thread processing
@@ -255,6 +269,7 @@ export function useQueueDeduplication() {
     // Send initial progress
     sendProgress()
     // Step 1: Group files by size to identify unique-sized files
+    const sizeGroupingStartTime = Date.now()
     const fileSizeGroups = new Map() // file_size -> [file_references]
     
     files.forEach((file, index) => {
@@ -290,6 +305,9 @@ export function useQueueDeduplication() {
         duplicateCandidates.push(...fileRefs)
       }
     }
+    
+    const sizeGroupingDuration = Date.now() - sizeGroupingStartTime
+    console.log(`⏱️  SIZE GROUPING: Completed file size analysis in ${sizeGroupingDuration}ms`)
     
     // Log the analysis results (estimation now happens in folder options)
     console.log(`📊 File size analysis complete:`)
@@ -332,12 +350,13 @@ export function useQueueDeduplication() {
     
     const hashingEndTime = Date.now()
     const actualHashingTime = hashingEndTime - hashingStartTime
-    console.log(`🔢 Hash calculation completed in ${actualHashingTime}ms for ${duplicateCandidates.length} files (main thread)`)
+    console.log(`⏱️  HASHING COMPLETE: Hash calculation completed in ${actualHashingTime}ms for ${duplicateCandidates.length} files (main thread)`)
     
     const finalFiles = []
     const duplicateFiles = []
     
     // Step 4: Process hash groups to identify true duplicates vs identical files selected twice
+    const deduplicationLogicStartTime = Date.now()
     for (const [, fileRefs] of hashGroups) {
       if (fileRefs.length === 1) {
         // Unique hash - not a duplicate
@@ -399,7 +418,11 @@ export function useQueueDeduplication() {
       }
     }
     
+    const deduplicationLogicDuration = Date.now() - deduplicationLogicStartTime
+    console.log(`⏱️  DEDUP LOGIC: Duplicate detection logic completed in ${deduplicationLogicDuration}ms`)
+    
     // Step 6: Combine unique and non-duplicate files
+    const combineStartTime = Date.now()
     const allFinalFiles = [...uniqueFiles, ...finalFiles]
     
     // Prepare for queue
@@ -413,11 +436,23 @@ export function useQueueDeduplication() {
       status: 'duplicate'
     }))
     
+    const combineDuration = Date.now() - combineStartTime
+    console.log(`⏱️  COMBINE RESULTS: Combined final results in ${combineDuration}ms`)
+    
     // Update UI using existing API
+    console.log(`⏱️  FALLBACK QUEUE UPDATE START: Beginning UI queue update at ${Date.now()}ms`)
     updateUploadQueue(readyFiles, duplicatesForQueue)
     
-    const duration = Date.now() - startTime
-    console.info(`Main thread processing completed in ${duration}ms`)
+    const totalDuration = Date.now() - fallbackStartTime
+    console.info(`⏱️  FALLBACK COMPLETE: Main thread processing completed in ${totalDuration}ms`)
+    
+    // Break down the timing
+    console.log(`📊 FALLBACK TIMING BREAKDOWN:`)
+    console.log(`   • Size grouping: ${sizeGroupingDuration}ms`)
+    console.log(`   • Hash calculation: ${actualHashingTime}ms`)
+    console.log(`   • Deduplication logic: ${deduplicationLogicDuration}ms`)
+    console.log(`   • Result combination: ${combineDuration}ms`)
+    console.log(`   • Total processing: ${totalDuration}ms`)
     
     // Return in exact same format as current API
     return { readyFiles, duplicatesForQueue }

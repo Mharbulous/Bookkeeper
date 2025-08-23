@@ -24,7 +24,6 @@ export function useFolderOptions() {
       const allFiles = pendingFolderFiles.value.map(f => f.file)
       
       // Debug: Log path structures to understand filtering
-      console.log('📁 Analyzing folder structure:')
       
       // Show path segment distribution
       const pathAnalysis = pendingFolderFiles.value.map(f => {
@@ -37,7 +36,6 @@ export function useFolderOptions() {
         segmentCounts[p.segments] = (segmentCounts[p.segments] || 0) + 1
       })
       
-      console.log('📊 Path segments distribution:', segmentCounts)
       
       // Show examples of each segment type
       const examplesBySegments = {}
@@ -48,7 +46,6 @@ export function useFolderOptions() {
         }
       })
       
-      console.log('📄 Example paths by segment count:', examplesBySegments)
       
       const mainFolderFiles = pendingFolderFiles.value
         .filter(f => {
@@ -58,7 +55,6 @@ export function useFolderOptions() {
         })
         .map(f => f.file)
         
-      console.log(`📊 Filtering results: ${mainFolderFiles.length} main folder files, ${allFiles.length} total files`)
       
       // Debug: Show path analysis
       if (pendingFolderFiles.value.length > 0) {
@@ -71,7 +67,6 @@ export function useFolderOptions() {
             isMainFolder: pathParts.length === 2
           }
         })
-        console.log('📄 Path analysis examples:', exampleAnalysis)
       }
       
       // Analyze both sets concurrently
@@ -83,25 +78,32 @@ export function useFolderOptions() {
       allFilesAnalysis.value = allFilesResult
       mainFolderAnalysis.value = mainFolderResult
       
-      // Log estimates at the same time they're calculated for the modal
-      console.log(`⏱️  End-to-end time estimates:`)
-      console.log(`📁 Main folder only:`)
-      console.log(`   • ${mainFolderResult.uniqueFiles} files with unique sizes (skip hash calculation)`)
-      console.log(`   • ${mainFolderResult.duplicateCandidates} files need hash verification`)
-      console.log(`   • ${Math.round((mainFolderResult.uniqueFiles / Math.max(mainFolderResult.totalFiles, 1)) * 100)}% of files can skip expensive hash calculation`)
-      console.log(`   • Hash candidates total size: ${mainFolderResult.duplicateCandidatesSizeMB} MB`)
-      console.log(`   • Estimated worker time: ${mainFolderResult.breakdown.workerTimeMs}ms`)
-      console.log(`   • Estimated UI update time: ${mainFolderResult.breakdown.uiTimeMs}ms`)
-      console.log(`   • TOTAL END-TO-END ESTIMATE: ${mainFolderResult.estimatedTimeMs}ms (${mainFolderResult.estimatedTimeSeconds}s)`)
+      // Additional readily available data points for time estimation
       
-      console.log(`📂 Include subfolders:`)
-      console.log(`   • ${allFilesResult.uniqueFiles} files with unique sizes (skip hash calculation)`)
-      console.log(`   • ${allFilesResult.duplicateCandidates} files need hash verification`)
-      console.log(`   • ${Math.round((allFilesResult.uniqueFiles / Math.max(allFilesResult.totalFiles, 1)) * 100)}% of files can skip expensive hash calculation`)
-      console.log(`   • Hash candidates total size: ${allFilesResult.duplicateCandidatesSizeMB} MB`)
-      console.log(`   • Estimated worker time: ${allFilesResult.breakdown.workerTimeMs}ms`)
-      console.log(`   • Estimated UI update time: ${allFilesResult.breakdown.uiTimeMs}ms`)
-      console.log(`   • TOTAL END-TO-END ESTIMATE: ${allFilesResult.estimatedTimeMs}ms (${allFilesResult.estimatedTimeSeconds}s)`)
+      // File size distribution analysis
+      const allFileSizes = allFiles.map(f => f.size)
+      const totalSizeMB = allFileSizes.reduce((sum, size) => sum + size, 0) / (1024 * 1024)
+      const avgFileSizeMB = totalSizeMB / allFiles.length
+      const maxFileSizeMB = Math.max(...allFileSizes) / (1024 * 1024)
+      const minFileSizeMB = Math.min(...allFileSizes) / (1024 * 1024)
+      
+      
+      // File type analysis
+      const fileExtensions = allFiles.map(f => {
+        const parts = f.name.split('.')
+        return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'no-extension'
+      })
+      const extensionCounts = {}
+      fileExtensions.forEach(ext => {
+        extensionCounts[ext] = (extensionCounts[ext] || 0) + 1
+      })
+      const uniqueExtensions = Object.keys(extensionCounts).length
+      const topExtensions = Object.entries(extensionCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+      
+      
+      
       
     } catch (error) {
       console.error('Error analyzing files for folder options:', error)

@@ -79,8 +79,6 @@ export function analyzeFiles(files) {
   const estimatedUITime = files.length * UI_UPDATE_TIME_MS
   const totalEstimatedTime = estimatedWorkerTime + estimatedUITime
   
-  // Log the formula being used for debugging
-  console.log(`Time Estimation Formula Used: T_total = (${uniqueFiles.length} × 0.1) + (${totalSizeMB.toFixed(1)} × ${hashTimePerMB}) + (${duplicateCandidates.length} × 2) + (${files.length} × 4.5) = ${Math.round(totalEstimatedTime)}ms`)
   
   // Calculate unique file size (files that can skip hash calculation)
   const uniqueFilesSizeMB = uniqueFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)

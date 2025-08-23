@@ -114,6 +114,9 @@ export function useFileQueue() {
   
   // Simple 2-chunk UI updates for optimal user feedback
   const updateFromWorkerResults = async (readyFiles, duplicateFiles) => {
+    const uiUpdateStartTime = Date.now()
+    console.log(`⏱️  UI UPDATE START: Beginning UI update process at ${uiUpdateStartTime}ms`)
+    
     const allFiles = [...readyFiles, ...duplicateFiles]
     const totalFiles = allFiles.length
     
@@ -127,11 +130,13 @@ export function useFileQueue() {
     }
     
     console.info(`Starting 2-chunk UI update for ${totalFiles} files...`)
+    console.log(`📊 UI UPDATE DATA: ${readyFiles.length} ready files, ${duplicateFiles.length} duplicate files`)
     const startTime = Date.now()
     
     if (totalFiles <= 100) {
       // For small file sets, just load everything at once
       const chunk1Start = Date.now()
+      console.log(`⏱️  SINGLE CHUNK START: Processing all ${totalFiles} files at once`)
       uploadQueue.value = processFileChunk(allFiles)
       const chunk1Duration = Date.now() - chunk1Start
       
@@ -142,7 +147,8 @@ export function useFileQueue() {
         phase: 'complete'
       }
       
-      console.info(`Single chunk: Loaded ${totalFiles} files in ${chunk1Duration}ms`)
+      console.info(`⏱️  SINGLE CHUNK COMPLETE: Loaded ${totalFiles} files in ${chunk1Duration}ms`)
+      console.log(`📊 SINGLE CHUNK PERFORMANCE: ${(totalFiles / chunk1Duration * 1000).toFixed(1)} files/second`)
     } else {
       // Simple 2-chunk strategy for large file sets
       
@@ -150,6 +156,7 @@ export function useFileQueue() {
       const chunk1Start = Date.now()
       const chunk1Size = 100
       const chunk1Files = allFiles.slice(0, chunk1Size)
+      console.log(`⏱️  CHUNK 1 START: Processing first ${chunk1Size} files for immediate feedback`)
       uploadQueue.value = processFileChunk(chunk1Files)
       
       uiUpdateProgress.value = {
@@ -160,14 +167,19 @@ export function useFileQueue() {
       }
       
       const chunk1Duration = Date.now() - chunk1Start
-      console.info(`✅ Chunk 1 COMPLETE: Displayed first ${chunk1Size} files in ${chunk1Duration}ms`)
+      console.info(`⏱️  CHUNK 1 COMPLETE: Displayed first ${chunk1Size} files in ${chunk1Duration}ms`)
+      console.log(`📊 CHUNK 1 PERFORMANCE: ${(chunk1Size / chunk1Duration * 1000).toFixed(1)} files/second`)
       
       // Delay to let user see the first chunk
+      const delayStart = Date.now()
       await new Promise(resolve => setTimeout(resolve, 200))
+      const delayDuration = Date.now() - delayStart
+      console.log(`⏱️  USER FEEDBACK DELAY: ${delayDuration}ms delay for user perception`)
       
       // CHUNK 2: Complete the rest - all remaining files
       const chunk2Start = Date.now()
       const remainingFiles = totalFiles - chunk1Size
+      console.log(`⏱️  CHUNK 2 START: Processing remaining ${remainingFiles} files`)
       
       uploadQueue.value = processFileChunk(allFiles) // All files
       
@@ -179,20 +191,42 @@ export function useFileQueue() {
       }
       
       // Wait for Vue to complete DOM rendering
+      const renderStart = Date.now()
       await nextTick()
       await new Promise(resolve => setTimeout(resolve, 0)) // Additional frame wait
+      const renderDuration = Date.now() - renderStart
       
       const chunk2Duration = Date.now() - chunk2Start
-      console.info(`✅ Chunk 2 COMPLETE: Displayed final ${remainingFiles} files in ${chunk2Duration}ms`)
+      console.info(`⏱️  CHUNK 2 COMPLETE: Displayed final ${remainingFiles} files in ${chunk2Duration}ms`)
+      console.log(`📊 CHUNK 2 PERFORMANCE: ${(remainingFiles / chunk2Duration * 1000).toFixed(1)} files/second`)
+      console.log(`⏱️  DOM RENDERING: Vue render completion took ${renderDuration}ms`)
     }
     
-    const duration = Date.now() - startTime
-    console.info(`2-chunk UI update completed in ${duration}ms`)
+    const uiUpdateTotalDuration = Date.now() - uiUpdateStartTime
+    const chunkingDuration = Date.now() - startTime
+    
+    console.info(`⏱️  UI UPDATE COMPLETE: 2-chunk UI update completed in ${chunkingDuration}ms`)
+    console.log(`⏱️  UI UPDATE TOTAL: Complete UI update process took ${uiUpdateTotalDuration}ms`)
+    
+    // Performance metrics
+    if (totalFiles > 0) {
+      console.log(`📊 UI UPDATE PERFORMANCE:`)
+      console.log(`   • Total files processed: ${totalFiles}`)
+      console.log(`   • Processing rate: ${(totalFiles / uiUpdateTotalDuration * 1000).toFixed(1)} files/second`)
+      console.log(`   • Average time per file: ${(uiUpdateTotalDuration / totalFiles).toFixed(2)}ms`)
+    }
     
     // Log end-to-end timing from user action to UI completion
     if (window.endToEndStartTime) {
       const endToEndDuration = Date.now() - window.endToEndStartTime
       console.info(`🎯 END-TO-END COMPLETE: From file selection to UI display in ${endToEndDuration}ms (${(endToEndDuration/1000).toFixed(1)}s)`)
+      
+      // Detailed end-to-end breakdown
+      console.log(`📊 END-TO-END PERFORMANCE:`)
+      console.log(`   • Total files: ${totalFiles}`)
+      console.log(`   • End-to-end rate: ${(totalFiles / endToEndDuration * 1000).toFixed(1)} files/second`) 
+      console.log(`   • Average time per file (full process): ${(endToEndDuration / totalFiles).toFixed(2)}ms`)
+      
       window.endToEndStartTime = null // Clean up
     }
     
