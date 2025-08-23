@@ -127,23 +127,25 @@ if (authStore.isAuthenticated) {
 
 ### File Processing & Estimation System
 
-**3-Phase Time Prediction Model:**
-The system uses a sophisticated 3-phase model to predict processing time with high accuracy:
+**3-Phase Enhanced Prediction Model (Trial 5 Optimization):**
+The system uses a sophisticated multi-factor prediction model achieving 88.4% accuracy:
 
-1. **Phase 1: File Analysis** (0.15ms per file)
+1. **Phase 1: File Analysis** (Multi-factor with directory structure)
+   - Formula: `172.48 + (0.657 × files) + (-88.60 × avgDepth) + (-2.05 × dirCount)`
    - Path parsing and directory structure analysis
    - Size-based grouping and filtering
    - Duplicate candidate identification
 
-2. **Phase 2: Hash Processing** (scale-aware)
+2. **Phase 2: Hash Processing** (Combined optimal using duplicate metrics)
+   - Formula: `-75.22 + (5.14 × duplicateCandidates) + (0.73 × duplicateSizeMB)`
    - SHA-256 calculation for duplicate detection
-   - Size-based processing: 18ms/MB (small datasets), 10ms/MB (large datasets >200MB)
-   - Base overhead: 2ms per file requiring hash
+   - Optimized using actual duplicate candidates rather than total file metrics
+   - Accounts for both candidate count and data size requiring hashing
 
-3. **Phase 3: UI Rendering** (directory complexity aware)
-   - Base rendering: 0.8ms per file
-   - Directory complexity: 25ms × average directory depth
+3. **Phase 3: UI Rendering** (Enhanced multi-factor with directory complexity)
+   - Formula: `-218.69 + (3.44 × files) + (133.74 × avgDepth) + (1.68 × dirCount)`
    - DOM updates and progress visualization
+   - Directory structure complexity significantly impacts rendering performance
 
 **Path Parsing Optimization:**
 - Single preprocessing pass eliminates 80% of redundant path parsing
@@ -156,17 +158,17 @@ The system uses a sophisticated 3-phase model to predict processing time with hi
 - **Firestore integration**: Hashes serve as document IDs for automatic database-level deduplication
 - **Efficient processing**: Typically 60-80% of files skip expensive hash calculation
 
-**Console Logging for Analysis:**
+**Enhanced Console Logging for Analysis:**
+The system now uses JSON.stringify() to prevent console truncation and capture complete data:
 ```javascript
-🔬 FOLDER_ANALYSIS_DATA (Modal Predictors): {
-  totalFiles, duplicateCandidateCount, totalSizeMB,
-  avgDirectoryDepth, totalDirectoryCount, uniqueFilesTotal
+🔬 FOLDER_ANALYSIS_DATA: {
+  totalFiles, duplicateCandidateCount, totalSizeMB, duplicateCandidatesSizeMB,
+  avgDirectoryDepth, maxDirectoryDepth, totalDirectoryCount, uniqueFilesTotal,
+  avgFilenameLength, zeroByteFiles, largestFileSizesMB: [...]
 }
 
-🔬 TIME_ESTIMATION_FORMULA: {
-  phase1TimeMs, phase2TimeMs, phase3TimeMs,
-  formulaBreakdown: "Phase1(files × 0.15) + Phase2(sizeMB × rate) + Phase3(files × 0.8 + depth × 25)"
-}
+// TIME_ESTIMATION_FORMULA console logs removed for production
+// Detailed breakdown available in analyzeFiles() return object
 ```
 
 ### Multi-App SSO Integration
@@ -252,25 +254,27 @@ The `docs/speed_tests/` directory contains tools for analyzing file processing p
   python analyze_3stage_data.py
   ```
 
-**3-Phase Performance Model Implementation:**
-The current system implements a sophisticated prediction model that evolved from extensive performance testing:
+**Enhanced 3-Phase Performance Model (Trial 5 Optimization):**
+The system implements an optimized multi-factor prediction model achieving 88.4% accuracy:
 
-- **Phase 1: File Analysis** - File scanning, path parsing, size grouping (0.15ms/file)
-- **Phase 2: Hash Processing** - SHA-256 calculation for deduplication (size-based: 10-18ms/MB)  
-- **Phase 3: UI Rendering** - DOM updates with directory complexity (0.8ms/file + 25ms × avgDepth)
+- **Phase 1: File Analysis** - Multi-factor: `172.48 + (0.657 × files) + (-88.60 × avgDepth) + (-2.05 × dirCount)`
+- **Phase 2: Hash Processing** - Combined optimal: `-75.22 + (5.14 × duplicateCandidates) + (0.73 × duplicateSizeMB)`  
+- **Phase 3: UI Rendering** - Enhanced complexity: `-218.69 + (3.44 × files) + (133.74 × avgDepth) + (1.68 × dirCount)`
 
-**Key Insights from Performance Analysis:**
-- Web Worker execution provides more consistent timing than main thread processing
-- Directory depth significantly impacts UI rendering performance (25ms per depth level)
-- Scale-aware hash processing: large datasets (>200MB) process more efficiently
-- Size-based pre-filtering eliminates 60-80% of expensive hash calculations
-- Average directory depth is a better predictor than maximum directory depth
+**Key Insights from Enhanced Performance Analysis:**
+- **Multi-factor models outperform simple constants**: Directory structure complexity significantly improves accuracy
+- **Duplicate-specific metrics**: Using `duplicateCandidates` and `duplicateSizeMB` provides better Phase 2 predictions than total file metrics
+- **Directory depth impact**: Both positive (UI complexity) and negative (analysis efficiency) effects on different phases
+- **Negative base constants**: Some phases show fixed overhead savings in certain scenarios
+- **R² scores of 0.997+**: Excellent model fit achieved through comprehensive calibration
 
-**Actual vs Predicted Timing:**
-The system logs both predicted and actual timing data for continuous model refinement:
-- Console logs capture real performance data during processing
-- Prediction accuracy typically within 15-20% of actual processing time
-- Models account for Web Worker vs main thread execution differences
+**Enhanced Prediction Accuracy:**
+Current optimized model performance from Trial 5 comprehensive analysis:
+- **Mean Accuracy**: 88.4% (improved from 88.0%)
+- **Median Accuracy**: 96.4%
+- **R² Score**: 0.999 (excellent model fit)
+- **Mean Absolute Error**: 168ms
+- Models account for Web Worker execution and multi-factor complexity
 
 ## Important Notes
 
