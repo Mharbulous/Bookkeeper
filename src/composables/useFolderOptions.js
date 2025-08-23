@@ -14,6 +14,58 @@ export function useFolderOptions() {
   const mainFolderAnalysis = ref(null)
   const allFilesAnalysis = ref(null)
 
+  // Helper functions for predictive metrics
+  const calculateDirectoryDepthStats = (files) => {
+    const depths = files.map(f => {
+      const pathParts = f.path.split('/').filter(part => part !== '')
+      return pathParts.length - 1 // Subtract 1 because last part is filename
+    })
+    
+    const maxDepth = depths.length > 0 ? Math.max(...depths) : 0
+    const avgDepth = depths.length > 0 ? depths.reduce((sum, d) => sum + d, 0) / depths.length : 0
+    
+    return {
+      maxDirectoryDepth: maxDepth,
+      avgDirectoryDepth: Math.round(avgDepth * 10) / 10
+    }
+  }
+
+  const calculateFileSizeMetrics = (files) => {
+    const fileSizes = files.map(f => f.file.size)
+    const totalSizeMB = fileSizes.reduce((sum, size) => sum + size, 0) / (1024 * 1024)
+    
+    // Group files by size to find identical sizes
+    const sizeGroups = new Map()
+    fileSizes.forEach(size => {
+      sizeGroups.set(size, (sizeGroups.get(size) || 0) + 1)
+    })
+    
+    const uniqueFiles = Array.from(sizeGroups.values()).filter(count => count === 1).length
+    const identicalSizeFiles = fileSizes.length - uniqueFiles
+    const zeroByteFiles = fileSizes.filter(size => size === 0).length
+    
+    // Get top 5 largest files
+    const sortedSizes = [...fileSizes].sort((a, b) => b - a)
+    const largestFileSizesMB = sortedSizes.slice(0, 5).map(size => Math.round((size / (1024 * 1024)) * 10) / 10)
+    
+    return {
+      totalSizeMB: Math.round(totalSizeMB * 10) / 10,
+      uniqueFiles,
+      identicalSizeFiles,
+      zeroByteFiles,
+      largestFileSizesMB
+    }
+  }
+
+  const calculateFilenameStats = (files) => {
+    const filenameLengths = files.map(f => f.path.length)
+    const avgFilenameLength = filenameLengths.length > 0 
+      ? Math.round((filenameLengths.reduce((sum, len) => sum + len, 0) / filenameLengths.length) * 10) / 10 
+      : 0
+    
+    return { avgFilenameLength }
+  }
+
   // Analysis function
   const analyzeFilesForOptions = async () => {
     if (pendingFolderFiles.value.length === 0) return
@@ -23,29 +75,6 @@ export function useFolderOptions() {
     try {
       // Separate files into main folder vs all files
       const allFiles = pendingFolderFiles.value.map(f => f.file)
-      
-      // Debug: Log path structures to understand filtering
-      
-      // Show path segment distribution
-      const pathAnalysis = pendingFolderFiles.value.map(f => {
-        const pathParts = f.path.split('/').filter(part => part !== '')
-        return { path: f.path, segments: pathParts.length }
-      })
-      
-      const segmentCounts = {}
-      pathAnalysis.forEach(p => {
-        segmentCounts[p.segments] = (segmentCounts[p.segments] || 0) + 1
-      })
-      
-      
-      // Show examples of each segment type
-      const examplesBySegments = {}
-      pathAnalysis.forEach(p => {
-        if (!examplesBySegments[p.segments]) examplesBySegments[p.segments] = []
-        if (examplesBySegments[p.segments].length < 2) {
-          examplesBySegments[p.segments].push(p.path)
-        }
-      })
       
       
       const mainFolderFiles = pendingFolderFiles.value
@@ -58,51 +87,40 @@ export function useFolderOptions() {
         
       
       
-      // File size distribution analysis (needed for logging)
-      const allFileSizes = allFiles.map(f => f.size)
-      const totalFilesSizeMB = allFileSizes.reduce((sum, size) => sum + size, 0) / (1024 * 1024)
-      const avgFileSizeMB = totalFilesSizeMB / allFiles.length
-      const maxFileSizeMB = Math.max(...allFileSizes) / (1024 * 1024)
-      const minFileSizeMB = Math.min(...allFileSizes) / (1024 * 1024)
+      // Calculate predictive metrics for all files and main folder files
+      const allFilesMetrics = calculateFileSizeMetrics(pendingFolderFiles.value)
+      const mainFolderMetrics = calculateFileSizeMetrics(pendingFolderFiles.value.filter(f => {
+        const pathParts = f.path.split('/').filter(part => part !== '')
+        return pathParts.length === 2 // main folder files only
+      }))
+      const depthStats = calculateDirectoryDepthStats(pendingFolderFiles.value)
+      const filenameStats = calculateFilenameStats(pendingFolderFiles.value)
       
-      // File type analysis (needed for logging)
-      const fileExtensions = allFiles.map(f => {
-        const parts = f.name.split('.')
-        return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'no-extension'
-      })
-      const extensionCounts = {}
-      fileExtensions.forEach(ext => {
-        extensionCounts[ext] = (extensionCounts[ext] || 0) + 1
-      })
-      const uniqueExtensions = Object.keys(extensionCounts).length
-      const topExtensions = Object.entries(extensionCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-      
-      // Log basic file properties BEFORE running time estimation formulas
+      // Log streamlined data focused on time prediction
       console.log(`🔬 FOLDER_ANALYSIS_DATA:`, {
         timestamp: Date.now(),
+        
+        // File counts
         totalFiles: allFiles.length,
         mainFolderFiles: mainFolderFiles.length,
         subfolderFiles: allFiles.length - mainFolderFiles.length,
-        folderStructure: {
-          subfolderCount: subfolderCount.value,
-          avgFilesPerFolder: Math.round(allFiles.length / Math.max(subfolderCount.value, 1) * 10) / 10
-        },
-        fileSizeMetrics: {
-          totalMB: Math.round(totalFilesSizeMB * 10) / 10,
-          avgFileSizeMB: Math.round(avgFileSizeMB * 1000) / 1000, // 3 decimal precision
-          maxFileSizeMB: Math.round(maxFileSizeMB * 10) / 10,
-          minFileSizeMB: Math.round(minFileSizeMB * 1000) / 1000,
-          maxToAvgSizeRatio: Math.round((maxFileSizeMB / Math.max(avgFileSizeMB, 0.001)) * 10) / 10 // size variance indicator
-        },
-        fileTypeMetrics: {
-          distinctExtensionTypes: uniqueExtensions,
-          extensionVarietyPercent: Math.round((uniqueExtensions / Math.max(allFiles.length, 1)) * 100), // % variety of extensions
-          topExtensions: topExtensions.slice(0, 3).map(([ext, count]) => ({ ext, count, percentage: Math.round((count / allFiles.length) * 100) }))
-        }
+        
+        // File sizes
+        totalSizeMB: allFilesMetrics.totalSizeMB,
+        mainFolderSizeMB: mainFolderMetrics.totalSizeMB,
+        
+        // Duplication indicators
+        uniqueFilesMainFolder: mainFolderMetrics.uniqueFiles,
+        uniqueFilesTotal: allFilesMetrics.uniqueFiles,
+        identicalSizeFiles: allFilesMetrics.identicalSizeFiles,
+        
+        // Processing hints
+        zeroByteFiles: allFilesMetrics.zeroByteFiles,
+        avgFilenameLength: filenameStats.avgFilenameLength,
+        maxDirectoryDepth: depthStats.maxDirectoryDepth,
+        avgDirectoryDepth: depthStats.avgDirectoryDepth,
+        largestFileSizesMB: allFilesMetrics.largestFileSizesMB
       })
-      
       // Analyze both sets concurrently (these will log TIME_ESTIMATION_FORMULA for each)
       const [allFilesResult, mainFolderResult] = await Promise.all([
         Promise.resolve(analyzeFiles(allFiles)),
