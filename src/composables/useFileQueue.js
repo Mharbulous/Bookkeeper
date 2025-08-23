@@ -221,13 +221,22 @@ export function useFileQueue() {
       const endToEndDuration = Date.now() - window.endToEndStartTime
       console.info(`🎯 END-TO-END COMPLETE: From file selection to UI display in ${endToEndDuration}ms (${(endToEndDuration/1000).toFixed(1)}s)`)
       
-      // Detailed end-to-end breakdown
-      console.log(`📊 END-TO-END PERFORMANCE:`)
-      console.log(`   • Total files: ${totalFiles}`)
-      console.log(`   • End-to-end rate: ${(totalFiles / endToEndDuration * 1000).toFixed(1)} files/second`) 
-      console.log(`   • Average time per file (full process): ${(endToEndDuration / totalFiles).toFixed(2)}ms`)
-      
       window.endToEndStartTime = null // Clean up
+    }
+    
+    // Log folder processing timing (from Continue button to queue display)
+    if (window.folderProcessingStartTime) {
+      const folderProcessingDuration = Date.now() - window.folderProcessingStartTime
+      console.log(`📊 FOLDER_PROCESSING_COMPLETE:`, {
+        timestamp: Date.now(),
+        processingTimeMs: folderProcessingDuration,
+        processingTimeSeconds: Math.round(folderProcessingDuration / 1000 * 10) / 10,
+        filesProcessed: totalFiles,
+        avgTimePerFileMs: Math.round((folderProcessingDuration / Math.max(totalFiles, 1)) * 100) / 100,
+        filesPerSecond: Math.round((totalFiles / Math.max(folderProcessingDuration, 1) * 1000) * 10) / 10
+      })
+      
+      window.folderProcessingStartTime = null // Clean up
     }
     
     // Complete the UI update process

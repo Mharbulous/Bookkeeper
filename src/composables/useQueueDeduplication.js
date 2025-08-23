@@ -249,7 +249,6 @@ export function useQueueDeduplication() {
     console.info(`Processing ${files.length} files on main thread (fallback mode)...`)
     console.log(`📊 Total files to process: ${files.length}`)
     console.log(`⏱️  FALLBACK START: Beginning main thread processing at ${fallbackStartTime}ms`)
-    const startTime = Date.now()
     
     // Track progress for main thread processing
     let processedCount = 0

@@ -56,39 +56,15 @@ export function useFolderOptions() {
         .map(f => f.file)
         
       
-      // Debug: Show path analysis
-      if (pendingFolderFiles.value.length > 0) {
-        const exampleAnalysis = pendingFolderFiles.value.slice(0, 3).map(f => {
-          const pathParts = f.path.split('/').filter(part => part !== '')
-          return {
-            path: f.path,
-            parts: pathParts,
-            segments: pathParts.length,
-            isMainFolder: pathParts.length === 2
-          }
-        })
-      }
       
-      // Analyze both sets concurrently
-      const [allFilesResult, mainFolderResult] = await Promise.all([
-        Promise.resolve(analyzeFiles(allFiles)),
-        Promise.resolve(analyzeFiles(mainFolderFiles))
-      ])
-      
-      allFilesAnalysis.value = allFilesResult
-      mainFolderAnalysis.value = mainFolderResult
-      
-      // Additional readily available data points for time estimation
-      
-      // File size distribution analysis
+      // File size distribution analysis (needed for logging)
       const allFileSizes = allFiles.map(f => f.size)
-      const totalSizeMB = allFileSizes.reduce((sum, size) => sum + size, 0) / (1024 * 1024)
-      const avgFileSizeMB = totalSizeMB / allFiles.length
+      const totalFilesSizeMB = allFileSizes.reduce((sum, size) => sum + size, 0) / (1024 * 1024)
+      const avgFileSizeMB = totalFilesSizeMB / allFiles.length
       const maxFileSizeMB = Math.max(...allFileSizes) / (1024 * 1024)
       const minFileSizeMB = Math.min(...allFileSizes) / (1024 * 1024)
       
-      
-      // File type analysis
+      // File type analysis (needed for logging)
       const fileExtensions = allFiles.map(f => {
         const parts = f.name.split('.')
         return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'no-extension'
@@ -102,7 +78,38 @@ export function useFolderOptions() {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
       
+      // Log basic file properties BEFORE running time estimation formulas
+      console.log(`🔬 FOLDER_ANALYSIS_DATA:`, {
+        timestamp: Date.now(),
+        totalFiles: allFiles.length,
+        mainFolderFiles: mainFolderFiles.length,
+        subfolderFiles: allFiles.length - mainFolderFiles.length,
+        folderStructure: {
+          subfolderCount: subfolderCount.value,
+          avgFilesPerFolder: Math.round(allFiles.length / Math.max(subfolderCount.value, 1) * 10) / 10
+        },
+        fileSizeMetrics: {
+          totalMB: Math.round(totalFilesSizeMB * 10) / 10,
+          avgFileSizeMB: Math.round(avgFileSizeMB * 1000) / 1000, // 3 decimal precision
+          maxFileSizeMB: Math.round(maxFileSizeMB * 10) / 10,
+          minFileSizeMB: Math.round(minFileSizeMB * 1000) / 1000,
+          maxToAvgSizeRatio: Math.round((maxFileSizeMB / Math.max(avgFileSizeMB, 0.001)) * 10) / 10 // size variance indicator
+        },
+        fileTypeMetrics: {
+          distinctExtensionTypes: uniqueExtensions,
+          extensionVarietyPercent: Math.round((uniqueExtensions / Math.max(allFiles.length, 1)) * 100), // % variety of extensions
+          topExtensions: topExtensions.slice(0, 3).map(([ext, count]) => ({ ext, count, percentage: Math.round((count / allFiles.length) * 100) }))
+        }
+      })
       
+      // Analyze both sets concurrently (these will log TIME_ESTIMATION_FORMULA for each)
+      const [allFilesResult, mainFolderResult] = await Promise.all([
+        Promise.resolve(analyzeFiles(allFiles)),
+        Promise.resolve(analyzeFiles(mainFolderFiles))
+      ])
+      
+      allFilesAnalysis.value = allFilesResult
+      mainFolderAnalysis.value = mainFolderResult
       
       
     } catch (error) {
@@ -189,6 +196,7 @@ export function useFolderOptions() {
 
   // Folder options handlers
   const confirmFolderOptions = (addFilesToQueue) => {
+    const processingStartTime = Date.now()
     let filesToAdd = pendingFolderFiles.value
     
     if (!includeSubfolders.value) {
@@ -196,11 +204,24 @@ export function useFolderOptions() {
       filesToAdd = filesToAdd.filter(f => f.path.split('/').length <= 2)
     }
     
+    // Log actual processing start with key metrics
+    console.log(`🚀 PROCESSING_START:`, {
+      timestamp: processingStartTime,
+      selectedOption: includeSubfolders.value ? 'allFiles' : 'mainFolder',
+      actualFilesToProcess: filesToAdd.length,
+      totalFilesAvailable: pendingFolderFiles.value.length,
+      filteredOut: pendingFolderFiles.value.length - filesToAdd.length
+    })
+    
     // Preserve path information when adding files to queue
     const filesWithPath = filesToAdd.map(f => {
       f.file.path = f.path
       return f.file
     })
+    
+    // Store processing start time for end-to-end measurement
+    window.folderProcessingStartTime = processingStartTime
+    
     addFilesToQueue(filesWithPath)
     
     showFolderOptions.value = false

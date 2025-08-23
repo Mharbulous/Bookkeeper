@@ -79,6 +79,22 @@ export function analyzeFiles(files) {
   const estimatedUITime = files.length * UI_UPDATE_TIME_MS
   const totalEstimatedTime = estimatedWorkerTime + estimatedUITime
   
+  // Log formula components for validation against actual times
+  console.log(`🔬 TIME_ESTIMATION_FORMULA:`, {
+    timestamp: Date.now(),
+    totalFiles: files.length,
+    uniqueSizeFiles: uniqueFiles.length,
+    duplicateCandidates: duplicateCandidates.length,
+    totalSizeMB: Math.round(totalSizeMB * 10) / 10,
+    hashTimeRateUsed: hashTimePerMB,
+    formulaComponents: {
+      uniqueSizeFileTimeMs: Math.round(uniqueFileTime),
+      hashingTimeMs: Math.round(hashingTime),
+      uiTimeMs: Math.round(estimatedUITime),
+      totalEstimatedMs: Math.round(totalEstimatedTime)
+    },
+    formulaBreakdown: `T_total = (${uniqueFiles.length} × 0.1) + (${Math.round(totalSizeMB * 10) / 10} × ${hashTimePerMB}) + (${duplicateCandidates.length} × 2) + (${files.length} × 4.5) = ${Math.round(totalEstimatedTime)}ms`
+  })
   
   // Calculate unique file size (files that can skip hash calculation)
   const uniqueFilesSizeMB = uniqueFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)
