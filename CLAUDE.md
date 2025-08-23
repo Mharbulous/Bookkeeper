@@ -2,320 +2,173 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Repository Overview
 
-This is a Vue 3 template with Multi-App SSO (Single Sign-On) capabilities, originally designed for the BDLC (Brahm Dorst Law Corporation) Intranet. The template enables seamless authentication across multiple applications using Firebase Auth with team-based multi-tenant architecture. Users can navigate between different apps without re-authentication, while maintaining data isolation through team contexts.
+**Bookkeeper** - A Vue 3 bookkeeping/accounting application with file upload and processing capabilities, built with Firebase Authentication and Vuetify components. This is part of a multi-app SSO architecture with shared authentication across related applications.
 
-## Development Commands
+## Essential Commands
 
-### Essential Commands
+### Development Commands
 - **Development server**: `npm run dev`
 - **Build production**: `npm run build`
 - **Preview build**: `npm run preview`
 - **Lint code**: `npm run lint`
 - **Format code**: `npm run format`
 
-### Testing Commands
+### Testing Commands  
 - **Run tests**: `npm run test`
 - **Run tests once**: `npm run test:run`
 - **Test UI**: `npm run test:ui`
+- **SSO E2E tests**: `npm run test:sso`
+
+### Multi-App SSO Development Commands
+For testing SSO functionality across multiple apps:
+- **Intranet**: `npm run dev:intranet` (intranet.localhost:3000)
+- **Bookkeeper**: `npm run dev:bookkeeping` (bookkeeping.localhost:3001) 
+- **Files**: `npm run dev:files` (files.localhost:3002)
 
 ### Before Committing
-Always run these commands before committing changes:
+Always run these commands in order:
 1. `npm run lint` - Fix linting issues
-2. `npm run test:run` - Ensure all tests pass
+2. `npm run test:run` - Ensure all tests pass  
 3. `npm run build` - Verify the build works
 
-## Architecture Overview
+## Technology Stack
 
-### Core Technology Stack
 - **Frontend**: Vue 3 with Composition API
-- **Build Tool**: Vite
+- **Build Tool**: Vite 
+- **UI Framework**: Vuetify 3 (beta) with Material Design Icons
 - **State Management**: Pinia stores
 - **Routing**: Vue Router 4 with hash-based routing
 - **Authentication**: Firebase Auth with Firestore
-- **Styling**: Tailwind CSS with custom design system
-- **Testing**: Vitest with jsdom
+- **Styling**: Tailwind CSS + custom CSS
+- **Testing**: Vitest with jsdom environment
 
-### Key Design Patterns
+## High-Level Architecture
 
-#### Authentication State Machine with SSO
-The application implements an explicit auth state machine with five states:
-- `uninitialized` → `initializing` → `authenticated` | `unauthenticated` | `error`
+### Authentication System
+The app uses a sophisticated Firebase Auth system with explicit state machine pattern to handle timing issues common in Firebase Auth integrations:
 
-This pattern solves Firebase Auth timing issues and enables cross-domain persistence for Multi-App SSO.
+**Auth States**: `uninitialized` → `initializing` → `authenticated` | `unauthenticated` | `error`
 
-#### Single Source of Truth Architecture
-- **Firebase Auth**: Identity data (`uid`, `email`, `displayName`, `photoURL`) + Custom Claims (`teamId`, `role`)
-- **Firestore**: Application-specific data (`role`, `department`, `teamId`, `preferences`)
+**Key Components**:
+- `stores/auth.js` - Pinia store with state machine for auth
+- `services/authService.js` - Firebase Auth operations
+- `router/guards/auth.js` - Route protection
+- `components/features/auth/LoginForm.vue` - Login interface
 
-This prevents data duplication and enables efficient team-based access controls.
+**Solo Team Architecture**: Every user automatically gets a "solo team" where `teamId === userId`, providing consistent data patterns and easy upgrade path to multi-user teams.
 
-#### Multi-Tenant Team Architecture
-- Teams provide data isolation between organizations
-- Custom claims enable efficient authorization without database calls
-- Flat team structure optimized for performance and simplicity
+### File Upload & Processing System
+Core feature for uploading and processing files with deduplication:
 
-#### Error Handling
-The application provides clear error handling for Firebase configuration, team access, and SSO issues.
+**Key Components**:
+- `views/FileUpload.vue` - Main upload interface
+- `components/features/upload/` - Upload-related components
+  - `FileUploadQueue.vue` - Queue management
+  - `FolderOptionsDialog.vue` - Upload configuration
+  - `ProcessingProgressModal.vue` - Progress tracking
+  - `UploadDropzone.vue` - Drag/drop interface
+- `composables/` - Reusable logic
+  - `useFileQueue.js` - File queue management
+  - `useQueueDeduplication.js` - Duplicate detection
+  - `useWebWorker.js` & `useWorkerManager.js` - Worker management
+- `workers/fileHashWorker.js` - Background hash calculation
 
-## Project Structure
+### Component Architecture
+- **Layout**: `AppSidebar.vue`, `AppHeader.vue` provide main navigation
+- **Base Components**: Reusable UI components in `components/base/`
+- **Feature Components**: Domain-specific components in `components/features/`
+- **Views**: Page-level components in `views/`
 
-### Core Directories
+### Data Flow Patterns
+1. **Authentication**: Firebase Auth → Auth Store → Route Guards → Components
+2. **File Processing**: File Selection → Queue → Deduplication → Worker Processing → Upload
+3. **State Management**: Pinia stores manage global state, composables handle component-level logic
+
+## Key Implementation Details
+
+### Authentication Timing Solutions
+The auth system solves Firebase Auth's race condition issues where `onAuthStateChanged` fires multiple times during initialization:
+
+```javascript
+// Proper auth state checking
+if (!authStore.isInitialized) {
+  return // Wait for auth determination
+}
+
+if (authStore.isAuthenticated) {
+  // User is definitely logged in
+}
 ```
-src/
-├── components/          # Reusable Vue components
-│   └── AppSwitcher.vue  # Multi-app navigation component
-├── views/              # Page-level components
-├── router/             # Vue Router configuration and guards
-├── stores/             # Pinia state management
-│   ├── auth.js         # Authentication with SSO support
-│   └── team.js         # Team management and context
-├── services/           # External service integrations
-│   ├── firebase.js     # Firebase configuration
-│   ├── authService.js  # Authentication operations
-│   ├── teamService.js  # Team CRUD operations
-│   └── userService.js  # User data management
-├── styles/             # Tailwind CSS and component styles
-└── assets/             # Static assets and images
+
+### File Deduplication Strategy  
+Files are deduplicated using SHA-256 hashes as Firestore document IDs, ensuring automatic deduplication at the database level without additional logic.
+
+### Multi-App SSO Integration
+Part of a larger SSO architecture - when testing multi-app features, use the `dev:*` commands with proper localhost domain mapping. All apps share identical Firebase configuration for seamless authentication.
+
+### Route Structure
+- Hash-based routing for Firebase hosting compatibility
+- Route guards protect authenticated areas
+- Meta flags control authentication requirements
+- Lazy loading for all route components
+
+## Development Workflow
+
+### Local SSO Testing Setup
+Add to hosts file for multi-app development:
+```
+127.0.0.1 intranet.localhost
+127.0.0.1 bookkeeping.localhost  
+127.0.0.1 files.localhost
 ```
 
-### Key Files
-- `src/stores/auth.js` - Authentication with SSO and team context
-- `src/stores/team.js` - Team management and multi-tenant support
-- `src/services/teamService.js` - Team CRUD operations
-- `src/components/AppSwitcher.vue` - Multi-app navigation
-- `firestore.rules` - Team-based security rules
+### Key Files to Understand
 - `docs/authentication.md` - Comprehensive auth system documentation
-- `docs/plans/Multi-App-SSO/simplified-sso-roadmap.md` - SSO implementation guide
-- `.env.example` - Environment configuration with SSO variables
+- `src/main.js` - App initialization and auth store setup
+- `src/App.vue` - Main layout with auth state handling
+- `vite.config.js` - Build configuration with Vuetify integration
+- `package.json` - Dependencies and script commands
 
-## Authentication System
+### Testing Strategy
+- Unit tests with Vitest for composables and utilities
+- E2E tests specifically for SSO functionality across apps
+- Manual testing checklist includes cross-app authentication flows
 
-### State Management
-Always use the auth store getters instead of direct checks:
-```javascript
-// ✅ Correct approach
-if (authStore.isAuthenticated) { /* user is logged in */ }
-if (!authStore.isInitialized) { /* still loading */ }
+### Environment Configuration
+Firebase configuration required in `.env` file (see `.env.example` template). All related apps must use identical Firebase project configuration for SSO to function.
 
-// ❌ Avoid - timing issues
-if (authStore.user) { /* user might be null during initialization */ }
-```
+## Performance Optimizations
 
-### Component Integration
-```vue
-<template>
-  <!-- Wait for auth initialization -->
-  <div v-if="!authStore.isInitialized" class="loading">
-    Loading...
-  </div>
-  <div v-else-if="authStore.isAuthenticated">
-    Welcome, {{ authStore.userDisplayName }}
-  </div>
-  <div v-else>
-    Please log in
-  </div>
-</template>
-```
+### Web Workers
+File hashing and processing operations run in background workers to prevent UI blocking during large file uploads.
 
-### Common Auth Operations
-- **Login**: `await authStore.login(email, password)`
-- **Logout**: `await authStore.logout()`
-- **Check auth state**: Use `authStore.isAuthenticated` getter
-- **Get user info**: Use `authStore.userDisplayName` or `authStore.userInitials`
+### Lazy Loading
+- Route components are dynamically imported
+- Auth service imports are lazy-loaded to prevent circular dependencies
+- Large dependencies loaded on-demand
 
-## Design System
+### Deduplication Efficiency  
+Hash-based deduplication eliminates redundant storage and processing of identical files.
 
-### Colors
-- **Brand Blue**: `#3b82f6` (primary actions, links)
-- **Brand Blue Dark**: `#1d4ed8` (hover states)
-- **Neutrals**: Tailwind slate scale (50-800)
+## Security Implementation
 
-### Component Patterns
-- **Buttons**: Use `py-3 px-4` padding with `rounded-lg`
-- **Form Inputs**: Include focus states with `focus:border-brand-blue`
-- **Cards**: Use `bg-white border border-gray-200 rounded-lg shadow-md p-6`
+### Firestore Security Rules
+- Users can only access their own data (`teamId === userId` for solo users)
+- Files use hash-based document IDs for immutable storage
+- Team-based access control ready for future multi-user features
 
-### Layout Standards
-- **Header height**: `h-20` (80px)
-- **Sidebar**: `w-[60px]` collapsed, `w-[280px]` expanded
-- **Page container**: `max-w-7xl mx-auto px-4`
+### Authentication Security
+- Firebase Auth handles all identity verification
+- Automatic token refresh and session validation
+- Secure logout clears all client-side data
+- Route guards prevent unauthorized access
 
-## Routing Configuration
+## Important Notes
 
-### Route Protection
-Routes use meta fields for access control:
-```javascript
-{
-  path: '/dashboard',
-  component: Dashboard,
-  meta: { 
-    requiresAuth: true,
-    roles: ['user', 'admin'] // Optional role-based access
-  }
-}
-```
-
-### Navigation Patterns
-The application uses breadcrumb highlighting where parent categories remain highlighted when viewing sub-pages. Use `exact="false"` on router-link components for this behavior.
-
-## Firebase Integration
-
-### Environment Variables
-Required configuration for Multi-App SSO (all must be provided):
-- `VITE_FIREBASE_API_KEY` - Firebase API key
-- `VITE_FIREBASE_AUTH_DOMAIN` - Firebase auth domain 
-- `VITE_FIREBASE_PROJECT_ID` - Firebase project ID (must be same across all apps)
-- `VITE_FIREBASE_STORAGE_BUCKET` - Firebase storage bucket
-- `VITE_FIREBASE_MESSAGING_SENDER_ID` - Firebase messaging sender ID
-- `VITE_FIREBASE_APP_ID` - Firebase app ID
-- `VITE_APP_DOMAIN` - Base domain for multi-app navigation (e.g., 'yourdomain.com')
-
-**Critical for SSO**: All apps must use the **same Firebase project** and have identical configuration.
-
-### Firestore Structure
-```javascript
-// /users/{uid} - Application-specific user data
-{
-  role: 'user' | 'admin',
-  department: 'Engineering',
-  teamId: 'team-abc-123',  // Team association for data isolation
-  preferences: { theme: 'light', notifications: true },
-  createdAt: Timestamp,
-  updatedAt: Timestamp,
-  lastLogin: Timestamp
-}
-
-// /teams/{teamId} - Team/organization data
-{
-  name: 'ACME Corp',
-  description: 'Engineering team',
-  members: {
-    userId1: { email: 'user@acme.com', role: 'admin', joinedAt: Timestamp },
-    userId2: { email: 'user2@acme.com', role: 'member', joinedAt: Timestamp }
-  },
-  settings: { /* team-specific settings */ },
-  createdAt: Timestamp,
-  updatedAt: Timestamp
-}
-```
-
-## Testing Guidelines
-
-### Test Structure
-- Tests use Vitest with jsdom environment
-- Mock Firebase services for unit tests
-- Test authentication state transitions
-- Verify component reactivity with state changes
-
-### Critical Test Areas
-1. **Auth state machine transitions**
-2. **Component reactivity to auth changes**
-3. **Route guard behavior**
-4. **Firebase configuration validation**
-
-## Multi-App SSO Usage
-
-### Creating New Apps from Template
-1. Use this repository as a GitHub template
-2. **Critical**: Use the same Firebase project across all apps
-3. Deploy each app to its own subdomain (e.g., `app1.domain.com`, `app2.domain.com`)
-4. Add all domains to Firebase Console authorized domains
-
-### App Navigation
-Use the `AppSwitcher` component for seamless app navigation:
-```vue
-<template>
-  <AppSwitcher />
-</template>
-
-<script setup>
-import AppSwitcher from '@/components/AppSwitcher.vue'
-</script>
-```
-
-### Team Context
-Access team information in any component:
-```vue
-<script setup>
-import { useAuthStore } from '@/stores/auth'
-import { useTeamStore } from '@/stores/team'
-
-const authStore = useAuthStore()
-const teamStore = useTeamStore()
-
-// Current user's team ID
-const teamId = authStore.currentTeam
-
-// Team details
-const teamName = teamStore.teamName
-const isAdmin = teamStore.isTeamAdmin
-</script>
-```
-
-## Common Development Tasks
-
-### Adding New Protected Routes
-1. Add route to `src/router/index.js` with `meta: { requiresAuth: true }`
-2. Create view component in `src/views/`
-3. Update navigation in `src/components/Sidebar.vue` if needed
-
-### Adding New Apps to SSO Network
-1. Create new repository from this template
-2. Use identical Firebase configuration
-3. Update `AppSwitcher.vue` to include new app
-4. Deploy to new subdomain
-
-### Managing Teams
-```javascript
-import { TeamService } from '@/services/teamService'
-
-// Create new team
-await TeamService.createTeam('team-id', {
-  name: 'ACME Corp',
-  description: 'Engineering team'
-})
-
-// Add member to team
-await TeamService.addTeamMember('team-id', 'user-id', {
-  email: 'user@example.com',
-  role: 'member'
-})
-```
-
-### Customizing Design System
-1. Update `tailwind.config.js` for new design tokens
-2. Document changes in `docs/design-guidelines.md`
-3. Update component examples
-
-## Troubleshooting
-
-### Auth Issues
-- **Infinite loading**: Check if `authStore.initialize()` is called in main.js
-- **Components not updating**: Ensure using Pinia store getters, not direct state
-- **Route guard failures**: Verify `waitForInit()` is used in auth guard
-
-### Build Issues
-- **Vite build errors**: Check for dynamic imports in Firebase services
-- **Tailwind not working**: Verify `postcss.config.js` and `tailwind.config.js`
-- **Asset loading**: Check Vite base path configuration
-
-### Firebase Issues
-- **Startup errors**: Missing environment variables will prevent app initialization
-- **Auth state errors**: Check Firebase console for configuration issues
-- **Firestore permissions**: Verify security rules allow user document access
-
-## Performance Considerations
-
-### Code Splitting
-- Views are lazy-loaded using dynamic imports
-- Firebase services use dynamic imports to avoid circular dependencies
-
-### State Management
-- Auth store uses efficient getters for computed values
-- User display names are cached to prevent repeated calculations
-
-### Build Optimization
-- Vite handles tree-shaking automatically
-- Tailwind CSS purges unused styles in production
+- **File Processing**: Large operations run in Web Workers to maintain UI responsiveness
+- **State Machine**: Always check `authStore.isInitialized` before rendering auth-dependent content
+- **Team Context**: All data access is scoped by team ID (currently userId for solo users)
+- **Cross-App Testing**: Use dedicated dev commands for SSO testing across multiple apps
+- **Firebase Consistency**: All apps in SSO architecture must use identical Firebase configuration
