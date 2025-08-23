@@ -58,18 +58,29 @@ export function analyzeFiles(files) {
   const bufferedTotalFiles = files.length + 1
   const estimatedDuplicationPercent = Math.round((bufferedDuplicateCandidates / bufferedTotalFiles) * 100)
   
-  // Time estimation using current model constants
-  // Based on recent test data: hash processing is ~15ms per MB, not 0.5ms
+  // Optimized time estimation formula based on 13-test performance analysis
+  // Formula: T_total = (uniqueFiles × 0.1) + (hashDataSizeMB × α) + (duplicateCandidates × 2) + (totalFiles × 4.5)
+  // Where α = 10 if hashDataSizeMB > 200, else α = 18 (scale-aware processing)
   const UNIQUE_FILE_TIME_MS = 0.1        // ms per unique file
-  const HASH_TIME_PER_MB = 15            // ms per MB (updated from test data)  
   const HASH_BASE_TIME_MS = 2            // base ms per file needing hash
-  const UI_UPDATE_TIME_MS = 4            // ms per final file for UI update
+  const UI_UPDATE_TIME_MS = 4.5          // ms per final file for UI update (optimized from 4.2ms observed)
+  
+  // Scale-aware hash processing rate based on dataset size
+  // Large datasets (>200MB) process more efficiently due to batching/caching effects
+  const HASH_TIME_PER_MB_LARGE = 10      // ms per MB for large datasets (>200MB)
+  const HASH_TIME_PER_MB_SMALL = 18      // ms per MB for smaller datasets (≤200MB)
+  const LARGE_DATASET_THRESHOLD_MB = 200  // MB threshold for scale efficiency
+  
+  const hashTimePerMB = totalSizeMB > LARGE_DATASET_THRESHOLD_MB ? HASH_TIME_PER_MB_LARGE : HASH_TIME_PER_MB_SMALL
   
   const uniqueFileTime = uniqueFiles.length * UNIQUE_FILE_TIME_MS
-  const hashingTime = (totalSizeMB * HASH_TIME_PER_MB) + (duplicateCandidates.length * HASH_BASE_TIME_MS)
+  const hashingTime = (totalSizeMB * hashTimePerMB) + (duplicateCandidates.length * HASH_BASE_TIME_MS)
   const estimatedWorkerTime = uniqueFileTime + hashingTime
   const estimatedUITime = files.length * UI_UPDATE_TIME_MS
   const totalEstimatedTime = estimatedWorkerTime + estimatedUITime
+  
+  // Log the formula being used for debugging
+  console.log(`Time Estimation Formula Used: T_total = (${uniqueFiles.length} × 0.1) + (${totalSizeMB.toFixed(1)} × ${hashTimePerMB}) + (${duplicateCandidates.length} × 2) + (${files.length} × 4.5) = ${Math.round(totalEstimatedTime)}ms`)
   
   // Calculate unique file size (files that can skip hash calculation)
   const uniqueFilesSizeMB = uniqueFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)
@@ -88,7 +99,9 @@ export function analyzeFiles(files) {
       uniqueFileTimeMs: Math.round(uniqueFileTime),
       hashingTimeMs: Math.round(hashingTime), 
       workerTimeMs: Math.round(estimatedWorkerTime),
-      uiTimeMs: Math.round(estimatedUITime)
+      uiTimeMs: Math.round(estimatedUITime),
+      hashRateUsed: hashTimePerMB,
+      isLargeDataset: totalSizeMB > LARGE_DATASET_THRESHOLD_MB
     }
   }
 }

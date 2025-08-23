@@ -70,7 +70,11 @@
       <v-card-actions class="px-6 py-4">
         <!-- Time Estimate Display -->
         <div v-if="!isAnalyzing && getSelectedAnalysis" class="text-h6 font-weight-medium text-primary">
-          Time estimate: {{ getSelectedAnalysis.estimatedTimeSeconds }} seconds
+          Time estimate: {{ formatTime(getSelectedAnalysis.estimatedTimeSeconds) }}
+          <div v-if="getSelectedAnalysis.breakdown" class="text-caption text-grey-darken-1 mt-1">
+            Using {{ getSelectedAnalysis.breakdown.isLargeDataset ? 'large dataset' : 'standard' }} processing rate
+            ({{ getSelectedAnalysis.breakdown.hashRateUsed }}ms/MB)
+          </div>
         </div>
         <div v-else-if="isAnalyzing" class="d-flex align-center">
           <v-progress-circular
