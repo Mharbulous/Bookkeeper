@@ -137,115 +137,16 @@
         <!-- Files in Group -->
         <v-list lines="two" density="comfortable">
           <template v-for="(file, fileIndex) in group.files" :key="file.id || `${groupIndex}-${fileIndex}`">
-            <v-list-item 
-              class="px-0" 
-              :class="{ 'bg-purple-lighten-5': file.isDuplicate }"
-            >
-              <template #prepend>
-                <v-tooltip 
-                  location="bottom" 
-                  transition="fade-transition"
-                  :open-delay="0"
-                  :close-delay="0"
-                >
-                  <template #activator="{ props: tooltipProps }">
-                    <v-avatar 
-                      v-bind="tooltipProps" 
-                      @mouseenter="onTooltipHover(file.id || file.name, file.file || file)"
-                      @mouseleave="onTooltipLeave(file.id || file.name)"
-                      color="grey-lighten-3" 
-                      size="48" 
-                      class="cursor-help"
-                    >
-                      <v-icon :icon="getFileIcon(file.type)" size="24" />
-                    </v-avatar>
-                  </template>
-                  {{ getHashDisplay(file.id || file.name) }}
-                </v-tooltip>
-              </template>
-
-              <v-list-item-title class="d-flex align-center">
-                <span class="text-truncate me-2">{{ file.name }}</span>
-                <!-- Duplicate indicator next to filename (only for files being skipped) -->
-                <v-chip
-                  v-if="group.isDuplicateGroup && file.isDuplicate"
-                  color="purple"
-                  size="x-small"
-                  variant="flat"
-                  class="ms-2"
-                >
-                  duplicate
-                </v-chip>
-              </v-list-item-title>
-
-              <v-list-item-subtitle>
-                <div class="d-flex align-center text-caption text-grey-darken-1">
-                  <span>{{ formatFileSize(file.size) }}</span>
-                  <v-divider vertical class="mx-2" />
-                  <span>{{ formatDate(file.lastModified) }}</span>
-                  <v-divider vertical class="mx-2" />
-                  <span>{{ getRelativePath(file) }}</span>
-                </div>
-                
-                <!-- Duplicate messages -->
-                <div v-if="file.duplicateMessage" class="text-caption mt-1" :class="getDuplicateMessageClass(file)">
-                  <v-icon :icon="getDuplicateIcon(file)" size="12" class="me-1" />
-                  {{ file.duplicateMessage }}
-                </div>
-              </v-list-item-subtitle>
-
-              <template #append>
-                <div class="d-flex align-center">
-                  <!-- Status indicator for existing files and processing only -->
-                  <v-chip
-                    v-if="file.isPreviousUpload || file.status === 'processing'"
-                    :color="getStatusColor(file.status, file)"
-                    size="small"
-                    variant="flat"
-                    class="me-2"
-                  >
-                    {{ getStatusText(file.status, file) }}
-                  </v-chip>
-                  
-                  <!-- Status icon -->
-                  <div class="text-h6">
-                    <v-tooltip 
-                      v-if="file.status === 'processing'"
-                      text="Processing..."
-                      location="bottom"
-                    >
-                      <template #activator="{ props }">
-                        <v-progress-circular
-                          v-bind="props"
-                          size="20"
-                          width="2"
-                          color="purple"
-                          indeterminate
-                        />
-                      </template>
-                    </v-tooltip>
-                    <v-tooltip 
-                      v-else-if="(file.status === 'ready' || file.status === 'pending') && !file.isDuplicate"
-                      text="Ready"
-                      location="bottom"
-                    >
-                      <template #activator="{ props }">
-                        <span v-bind="props">🟢</span>
-                      </template>
-                    </v-tooltip>
-                    <v-tooltip 
-                      v-else-if="file.isDuplicate || file.isPreviousUpload" 
-                      text="Skip"
-                      location="bottom"
-                    >
-                      <template #activator="{ props }">
-                        <span v-bind="props">↩️</span>
-                      </template>
-                    </v-tooltip>
-                  </div>
-                </div>
-              </template>
-            </v-list-item>
+            <!-- Conditional rendering: Placeholder or Loaded Item -->
+            <FileQueuePlaceholder 
+              v-if="!isItemLoaded(groupIndex, fileIndex)"
+              @load="loadItem(groupIndex, fileIndex)"
+            />
+            <LazyFileItem 
+              v-else
+              :file="file" 
+              :group="group"
+            />
             
             <v-divider v-if="fileIndex < group.files.length - 1" />
           </template>
@@ -284,6 +185,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useLazyHashTooltip } from '../../../composables/useLazyHashTooltip.js'
+import { useLazyFileList } from '../../../composables/useLazyFileList.js'
+import FileQueuePlaceholder from './FileQueuePlaceholder.vue'
+import LazyFileItem from './LazyFileItem.vue'
 
 // Component configuration
 defineOptions({
@@ -315,11 +219,8 @@ const props = defineProps({
 // Emits
 defineEmits(['remove-file', 'start-upload', 'clear-queue'])
 
-// Lazy hash tooltip functionality
+// Hash tooltip functionality (only for cache management)
 const { 
-  onTooltipHover, 
-  onTooltipLeave, 
-  getHashDisplay, 
   populateExistingHash,
   clearCache 
 } = useLazyHashTooltip()
@@ -340,6 +241,26 @@ onMounted(populateExistingHashes)
 onUnmounted(() => {
   clearCache()
 })
+
+// Lazy file list functionality
+const {
+  loadItem,
+  isItemLoaded,
+  preloadInitialItems,
+  resetLoadedItems
+} = useLazyFileList(computed(() => groupedFiles.value))
+
+// Preload initial items for better UX
+onMounted(() => {
+  preloadInitialItems(10)
+})
+
+// Reset loaded items when files change
+watch(() => props.files, () => {
+  resetLoadedItems()
+  // Re-preload initial items after files change
+  preloadInitialItems(10)
+}, { deep: true })
 
 // Computed properties
 const uploadableFiles = computed(() => {
@@ -427,41 +348,6 @@ const failedCount = computed(() => {
 })
 
 // Methods
-const getFileIcon = (mimeType) => {
-  if (!mimeType) return 'mdi-file-outline'
-  
-  const iconMap = {
-    'image/': 'mdi-file-image-outline',
-    'video/': 'mdi-file-video-outline',
-    'audio/': 'mdi-file-music-outline',
-    'application/pdf': 'mdi-file-pdf-box',
-    'application/msword': 'mdi-file-word-outline',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'mdi-file-word-outline',
-    'application/vnd.ms-excel': 'mdi-file-excel-outline',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'mdi-file-excel-outline',
-    'application/vnd.ms-powerpoint': 'mdi-file-powerpoint-outline',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'mdi-file-powerpoint-outline',
-    'text/': 'mdi-file-document-outline',
-    'application/zip': 'mdi-folder-zip-outline',
-    'application/x-rar': 'mdi-folder-zip-outline',
-    'application/x-7z-compressed': 'mdi-folder-zip-outline'
-  }
-  
-  // Check for exact match first
-  if (iconMap[mimeType]) {
-    return iconMap[mimeType]
-  }
-  
-  // Check for prefix match
-  for (const [prefix, icon] of Object.entries(iconMap)) {
-    if (mimeType.startsWith(prefix)) {
-      return icon
-    }
-  }
-  
-  return 'mdi-file-outline'
-}
-
 const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 B'
   
@@ -470,16 +356,6 @@ const formatFileSize = (bytes) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
-}
-
-const formatDate = (date) => {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(date)
 }
 
 // 2-chunk loading message generator
@@ -520,74 +396,6 @@ const getPhaseMessage = () => {
   }
 }
 
-const getStatusColor = (status, file) => {
-  const statusColors = {
-    processing: 'purple',
-    pending: 'grey',
-    uploading: 'primary',
-    completed: 'success',
-    error: 'error',
-    duplicate: 'purple',
-    existing: 'blue'
-  }
-  
-  // Handle special cases based on file properties
-  if (file?.isQueueDuplicate) return 'purple'
-  if (file?.isPreviousUpload) return 'blue'
-  
-  return statusColors[status] || 'grey'
-}
-
-const getStatusText = (status, file) => {
-  const statusTexts = {
-    processing: 'Processing',
-    pending: 'Ready',
-    uploading: 'Uploading',
-    completed: 'Completed',
-    error: 'Error',
-    duplicate: 'Duplicate',
-    existing: 'Existing'
-  }
-  
-  // Handle special cases based on file properties
-  if (file?.isQueueDuplicate) return 'Duplicate'
-  if (file?.isPreviousUpload) return 'Existing'
-  
-  return statusTexts[status] || 'Unknown'
-}
-
-const getDuplicateMessageClass = (file) => {
-  if (file.isPreviousUpload) return 'text-blue'
-  if (file.isQueueDuplicate) return 'text-purple'
-  return 'text-info'
-}
-
-const getDuplicateIcon = (file) => {
-  if (file.isPreviousUpload) return 'mdi-cloud-check'
-  if (file.isQueueDuplicate) return 'mdi-content-duplicate'
-  return 'mdi-information'
-}
-
-const getRelativePath = (file) => {
-  if (!file.path || file.path === file.name) {
-    return '\\'
-  }
-  
-  // Normalize path separators to forward slashes for consistent processing
-  const normalizedPath = file.path.replace(/\\/g, '/')
-  
-  // Extract the folder path by removing the filename
-  const pathParts = normalizedPath.split('/').filter(part => part !== '')
-  pathParts.pop() // Remove the filename
-  
-  if (pathParts.length === 0) {
-    return '\\'
-  }
-  
-  // Join path parts and ensure single leading slash
-  const folderPath = pathParts.join('/')
-  return folderPath.startsWith('/') ? folderPath : '/' + folderPath
-}
 </script>
 
 <style scoped>

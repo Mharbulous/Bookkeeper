@@ -9,17 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Commands
 
 ### Development Commands
-- **Development server**: `npm run dev`
-- **Build production**: `npm run build`
-- **Preview build**: `npm run preview`
-- **Lint code**: `npm run lint`
-- **Format code**: `npm run format`
-
-### Testing Commands  
-- **Run tests**: `npm run test`
-- **Run tests once**: `npm run test:run`
-- **Test UI**: `npm run test:ui`
-- **SSO E2E tests**: `npm run test:sso`
+User will run test server:
+- **Development server**: http://localhost:5173/
 
 ### Multi-App SSO Development Commands
 For testing SSO functionality across multiple apps:
@@ -28,7 +19,7 @@ For testing SSO functionality across multiple apps:
 - **Files**: `npm run dev:files` (files.localhost:3002)
 
 ### Before Committing
-Always run these commands in order:
+Do not run these commands unless specifical requested
 1. `npm run lint` - Fix linting issues
 2. `npm run test:run` - Ensure all tests pass  
 3. `npm run build` - Verify the build works
