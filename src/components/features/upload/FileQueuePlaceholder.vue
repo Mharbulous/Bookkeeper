@@ -2,12 +2,20 @@
   <div 
     ref="placeholder"
     class="placeholder-item"
+    :class="{ 'bg-purple-lighten-5': isDuplicate }"
   />
 </template>
 
 <script setup>
 import { ref, nextTick, onUnmounted } from 'vue'
 import { useIntersectionObserver } from '@vueuse/core'
+
+const props = defineProps({
+  isDuplicate: {
+    type: Boolean,
+    default: false
+  }
+})
 
 const emit = defineEmits(['load'])
 
@@ -53,5 +61,8 @@ onUnmounted(() => {
 <style scoped>
 .placeholder-item {
   height: 76px;
+  background-color: white;
+  border-radius: 4px;
+  overflow: hidden;
 }
 </style>

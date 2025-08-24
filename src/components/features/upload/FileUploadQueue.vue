@@ -140,6 +140,7 @@
             <!-- Conditional rendering: Placeholder or Loaded Item -->
             <FileQueuePlaceholder 
               v-if="!isItemLoaded(groupIndex, fileIndex)"
+              :is-duplicate="file.isDuplicate"
               @load="loadItem(groupIndex, fileIndex)"
             />
             <LazyFileItem 
@@ -405,6 +406,15 @@ const getPhaseMessage = () => {
 
 .cursor-help {
   cursor: help;
+}
+
+/* Prevent unwanted scrollbars in file list */
+:deep(.v-list) {
+  overflow: visible;
+}
+
+:deep(.v-list-item) {
+  overflow: hidden;
 }
 
 /* Custom fade transition for tooltip popup */

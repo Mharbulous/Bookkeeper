@@ -37,6 +37,7 @@
             <FileQueuePlaceholder
               v-for="index in placeholderCount"
               :key="index"
+              :is-duplicate="false"
               @load="onPlaceholderLoad(index)"
             />
           </v-list>
@@ -97,28 +98,6 @@
             style="max-width: 200px"
           />
           
-          <!-- Lazy Loading Progress -->
-          <v-card 
-            v-if="showLazyFileList && isLazyLoading" 
-            class="mb-4 bg-green-lighten-5 border-green-lighten-2" 
-            variant="outlined"
-          >
-            <v-card-text class="py-2">
-              <div class="d-flex align-center">
-                <v-progress-circular
-                  indeterminate
-                  color="green"
-                  size="16"
-                  width="2"
-                  class="me-2"
-                />
-                <div class="text-body-2 text-green-darken-2">
-                  {{ loadedItemsCount }} of {{ totalItemsCount }} items displayed
-                </div>
-              </div>
-            </v-card-text>
-          </v-card>
-
           <!-- File List with Lazy Loading -->
           <div v-if="showLazyFileList" class="border rounded" style="max-height: 400px; overflow-y: auto;">
             <div v-for="(group, groupIndex) in groupedTestFiles" :key="groupIndex">
@@ -127,6 +106,7 @@
                   <!-- Conditional rendering: Placeholder or Loaded Item -->
                   <FileQueuePlaceholder 
                     v-if="!isItemLoaded(groupIndex, fileIndex)"
+                    :is-duplicate="file.isDuplicate"
                     @load="loadItem(groupIndex, fileIndex)"
                   />
                   <LazyFileItem 
@@ -184,9 +164,6 @@ const groupedTestFiles = computed(() => {
 const {
   loadItem,
   isItemLoaded,
-  totalItemsCount,
-  loadedItemsCount,
-  isLazyLoading,
   preloadInitialItems,
   resetLoadedItems
 } = useLazyFileList(groupedTestFiles)
@@ -342,7 +319,7 @@ const generateLargeFileList = () => {
   // Preload initial items after Vue updates
   setTimeout(() => {
     preloadInitialItems(20) // Preload more items for testing
-    console.log(`Preloaded initial items. Total: ${totalItemsCount.value}, Loaded: ${loadedItemsCount.value}`)
+    console.log('Preloaded initial items for lazy loading test')
   }, 0)
 }
 
