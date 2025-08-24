@@ -35,62 +35,11 @@
     <!-- File List -->
     <div class="pa-4">
       <!-- Status Tags -->
-      <div v-if="files.length > 0" class="mb-4">
-        <div class="d-flex gap-2 flex-wrap">
-          <v-chip
-            v-if="processingCount > 0"
-            size="large"
-            variant="flat"
-            color="purple"
-            class="text-white"
-          >
-            <v-icon start icon="mdi-cog" />
-            {{ processingCount }} processing
-          </v-chip>
-          
-          <v-chip
-            size="large"
-            variant="flat"
-            color="grey"
-            class="text-white"
-          >
-            {{ pendingCount }} new
-          </v-chip>
-          
-          <v-chip
-            size="large"
-            variant="flat"
-            color="purple"
-            class="text-white"
-          >
-            {{ queueDuplicatesCount }} duplicates
-          </v-chip>
-          
-          <v-chip
-            size="large"
-            variant="flat"
-            color="blue"
-          >
-            {{ previouslyUploadedCount }} previous uploads
-          </v-chip>
-          
-          <v-chip
-            size="large"
-            variant="flat"
-            color="green"
-          >
-            {{ successfulCount }} successful uploads
-          </v-chip>
-          
-          <v-chip
-            size="large"
-            variant="flat"
-            color="red"
-          >
-            {{ failedCount }} failed uploads
-          </v-chip>
-        </div>
-      </div>
+      <FileQueueChips
+        :files="files"
+        :is-processing-ui-update="isProcessingUIUpdate"
+        :ui-update-progress="uiUpdateProgress"
+      />
 
       <!-- UI Update Progress Indicator -->
       <v-card 
@@ -189,6 +138,7 @@ import { useLazyHashTooltip } from '../../../composables/useLazyHashTooltip.js'
 import { useLazyFileList } from '../../../composables/useLazyFileList.js'
 import FileQueuePlaceholder from './FileQueuePlaceholder.vue'
 import LazyFileItem from './LazyFileItem.vue'
+import FileQueueChips from './FileQueueChips.vue'
 
 // Component configuration
 defineOptions({
@@ -311,6 +261,7 @@ const groupedFiles = computed(() => {
 // Watch for file changes and populate existing hashes
 watch(() => props.files, populateExistingHashes, { deep: true })
 
+
 const totalSize = computed(() => {
   return uploadableFiles.value.reduce((total, file) => total + file.size, 0)
 })
@@ -320,33 +271,6 @@ const hasErrors = computed(() => {
 })
 
 
-const pendingCount = computed(() => {
-  return props.files.filter(file => 
-    file.status === 'ready' || 
-    file.status === 'pending' || 
-    (!file.status && !file.isQueueDuplicate && !file.isPreviousUpload)
-  ).length
-})
-
-const processingCount = computed(() => {
-  return props.files.filter(file => file.status === 'processing').length
-})
-
-const queueDuplicatesCount = computed(() => {
-  return props.files.filter(file => file.isDuplicate).length
-})
-
-const previouslyUploadedCount = computed(() => {
-  return props.files.filter(file => file.isPreviousUpload).length
-})
-
-const successfulCount = computed(() => {
-  return props.files.filter(file => file.status === 'completed').length
-})
-
-const failedCount = computed(() => {
-  return props.files.filter(file => file.status === 'error').length
-})
 
 // Methods
 const formatFileSize = (bytes) => {

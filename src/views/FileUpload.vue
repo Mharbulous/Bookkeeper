@@ -111,6 +111,7 @@ const {
   triggerFolderSelect,
   processSingleFile,
   addFilesToQueue,
+  initializeQueueInstantly,
   updateUploadQueue,
   resetProgress,
   removeFromQueue,
@@ -173,7 +174,12 @@ const handleFolderSelect = (event) => {
   updateRefs()
   const files = Array.from(event.target.files)
   // Pass callback to handle no-subfolder case automatically
-  processFolderFiles(files, (files) => addFilesToQueue(files, processFilesWithQueue))
+  processFolderFiles(files, async (files) => {
+    // Show Upload Queue instantly with first 100 files
+    await initializeQueueInstantly(files)
+    // Then process all files for deduplication
+    addFilesToQueue(files, processFilesWithQueue)
+  })
   // Reset input
   event.target.value = ''
 }
@@ -185,12 +191,22 @@ const handleDrop = async (event) => {
       showNotification('File ready for upload', 'success')
     },
     addFilesToQueue: (files) => addFilesToQueue(files, processFilesWithQueue),
-    processFolderEntry: (folder) => processFolderEntry(folder, (files) => addFilesToQueue(files, processFilesWithQueue))
+    processFolderEntry: (folder) => processFolderEntry(folder, async (files) => {
+      // Show Upload Queue instantly with first 100 files
+      await initializeQueueInstantly(files)
+      // Then process all files for deduplication
+      addFilesToQueue(files, processFilesWithQueue)
+    })
   })
 }
 
 const confirmFolderOptions = () => {
-  baseConfirmFolderOptions((files) => addFilesToQueue(files, processFilesWithQueue))
+  baseConfirmFolderOptions(async (files) => {
+    // Show Upload Queue instantly with first 100 files
+    await initializeQueueInstantly(files)
+    // Then process all files for deduplication
+    addFilesToQueue(files, processFilesWithQueue)
+  })
 }
 
 // Update refs to use composable integration

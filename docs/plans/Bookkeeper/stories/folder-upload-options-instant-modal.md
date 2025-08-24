@@ -23,18 +23,12 @@
 - [ ] Predictor data points update in real time as calculations are performed
 - [ ] Progress indicators show calculation status for both options
 
-### "This Folder Only" Flow
-- [ ] When "This folder only" calculations complete:
-  - [ ] Continue button becomes enabled
-  - [ ] Spinner icon is replaced with "Continue" text
-  - [ ] Button remains enabled only while "This folder only" is selected
-
 ### "Include Subfolders" Flow
-- [ ] "Include subfolders" radio button remains disabled during calculations
-- [ ] When "Include subfolders" calculations complete:
-  - [ ] Radio button becomes enabled/active
-  - [ ] Selection automatically switches from "This folder only" to "Include subfolders"
-  - [ ] After ~1 second delay, Continue button becomes enabled (spinner → "Continue" text)
+- [✅] "Include subfolders" radio button remains disabled during calculations
+- [✅] When "Include subfolders" calculations complete:
+  - [✅] Radio button becomes enabled/active
+  - [✅] Selection automatically switches from "This folder only" to "Include subfolders"
+  - [✅] After ~1 second delay, Continue button becomes enabled (spinner → "Continue" text)
 
 ## Technical Context
 
@@ -48,7 +42,7 @@
 Based on recent commits, the modal has been debugged to appear instantly with spinner icons as placeholders for predictors. This story builds on that foundation to refine the user experience.
 
 ## Definition of Done
-- [ ] Modal appears instantly without delay
+- [✅] Modal appears instantly without delay
 - [ ] All acceptance criteria are met
 - [ ] Real-time updates work smoothly
 - [ ] Continue button state management works correctly

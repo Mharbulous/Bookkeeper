@@ -120,18 +120,70 @@ export function useFileQueue() {
     })
   }
   
-  // Simple 2-chunk UI updates for optimal user feedback
-  const updateFromWorkerResults = async (readyFiles, duplicateFiles) => {
-    const allFiles = [...readyFiles, ...duplicateFiles]
-    const totalFiles = allFiles.length
+  // Instant Upload Queue initialization - show immediately with first 100 files
+  const initializeQueueInstantly = async (files) => {
+    const totalFiles = files.length
     
-    // Start UI update process
+    // Show Upload Queue immediately
     isProcessingUIUpdate.value = true
     uiUpdateProgress.value = {
       current: 0,
       total: totalFiles,
       percentage: 0,
       phase: 'loading'
+    }
+    
+    // Force Vue reactivity update
+    await nextTick()
+    
+    // Process first 100 files instantly for immediate display
+    const initialFiles = files.slice(0, 100).map(file => ({
+      id: crypto.randomUUID(),
+      file: file,
+      metadata: {},
+      status: 'ready',
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+      path: file.path,
+      isDuplicate: false
+    }))
+    
+    uploadQueue.value = initialFiles
+    
+    if (totalFiles <= 100) {
+      uiUpdateProgress.value = {
+        current: totalFiles,
+        total: totalFiles,
+        percentage: 100,
+        phase: 'complete'
+      }
+      isProcessingUIUpdate.value = false
+    } else {
+      uiUpdateProgress.value = {
+        current: 100,
+        total: totalFiles,
+        percentage: Math.round((100 / totalFiles) * 100),
+        phase: 'loading'
+      }
+    }
+  }
+
+  // Simple 2-chunk UI updates for optimal user feedback
+  const updateFromWorkerResults = async (readyFiles, duplicateFiles) => {
+    const allFiles = [...readyFiles, ...duplicateFiles]
+    const totalFiles = allFiles.length
+    
+    // Start UI update process (if not already started by initializeQueueInstantly)
+    if (!isProcessingUIUpdate.value) {
+      isProcessingUIUpdate.value = true
+      uiUpdateProgress.value = {
+        current: 0,
+        total: totalFiles,
+        percentage: 0,
+        phase: 'loading'
+      }
     }
     
     if (totalFiles <= 100) {
@@ -145,52 +197,66 @@ export function useFileQueue() {
         phase: 'complete'
       }
       
-      
       // Wait for Vue to complete DOM rendering for single chunk
       await nextTick()
       await new Promise(resolve => setTimeout(resolve, 0))
     } else {
-      // Optimized 2-chunk strategy for large file sets (>100 files)
-      // 
-      // Strategy: Show immediate user feedback, then do one efficient full render
-      // Rationale: Modern DOM engines are heavily optimized for complete re-renders
-      // of large lists. Incremental DOM updates (adding 3200 files to existing 100)
-      // are slower than one full render of all 3300 files due to:
-      // - Layout thrashing from repeated DOM manipulations
-      // - Vue's virtual DOM diffing overhead for large incremental changes
-      // - Memory fragmentation from thousands of individual append operations
-      
-      // CHUNK 1: Initial batch (first 100 files) - immediate user feedback
-      const chunk1Size = 100
-      const chunk1Files = allFiles.slice(0, chunk1Size)
-      uploadQueue.value = processFileChunk(chunk1Files)
-      
-      uiUpdateProgress.value = {
-        current: chunk1Size,
-        total: totalFiles,
-        percentage: Math.round((chunk1Size / totalFiles) * 100),
-        phase: 'loading'
-      }
-      
-      // Brief delay to let user see the initial files and get visual feedback
-      await new Promise(resolve => setTimeout(resolve, 200))
-      
-      // CHUNK 2: Full render of ALL files (including the first 100)
-      // This replaces the first 100 files rather than appending to them
-      // because full DOM replacement is more efficient than large incremental updates
-      
-      uploadQueue.value = processFileChunk(allFiles) // Render ALL files efficiently
-      
-      uiUpdateProgress.value = {
-        current: totalFiles,
-        total: totalFiles,
-        percentage: 100,
-        phase: 'complete'
+      // For large file sets, check if queue was already initialized instantly
+      if (uploadQueue.value.length > 0) {
+        // Queue was already initialized with first 100 files
+        // Ensure minimum loading display time (at least 1.5 seconds for spinner visibility)
+        const minLoadingTime = 1500
+        const elapsedTime = window.instantQueueStartTime ? Date.now() - window.instantQueueStartTime : 0
+        const remainingTime = Math.max(0, minLoadingTime - elapsedTime)
+        
+        
+        if (remainingTime > 0) {
+          await new Promise(resolve => setTimeout(resolve, remainingTime))
+        }
+        
+        // Then replace with full processed results
+        uploadQueue.value = processFileChunk(allFiles)
+        
+        uiUpdateProgress.value = {
+          current: totalFiles,
+          total: totalFiles,
+          percentage: 100,
+          phase: 'complete'
+        }
+        
+        // Clean up timestamp
+        window.instantQueueStartTime = null
+      } else {
+        // Fallback to original 2-chunk strategy if queue wasn't pre-initialized
+        // CHUNK 1: Initial batch (first 100 files) - immediate user feedback
+        const chunk1Size = 100
+        const chunk1Files = allFiles.slice(0, chunk1Size)
+        uploadQueue.value = processFileChunk(chunk1Files)
+        
+        uiUpdateProgress.value = {
+          current: chunk1Size,
+          total: totalFiles,
+          percentage: Math.round((chunk1Size / totalFiles) * 100),
+          phase: 'loading'
+        }
+        
+        // Brief delay to let user see the initial files and get visual feedback
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
+        // CHUNK 2: Full render of ALL files
+        uploadQueue.value = processFileChunk(allFiles)
+        
+        uiUpdateProgress.value = {
+          current: totalFiles,
+          total: totalFiles,
+          percentage: 100,
+          phase: 'complete'
+        }
       }
       
       // Wait for Vue to complete DOM rendering
       await nextTick()
-      await new Promise(resolve => setTimeout(resolve, 0)) // Additional frame wait
+      await new Promise(resolve => setTimeout(resolve, 0))
     }
     
     logProcessingTime('ALL_FILES_DISPLAYED')
@@ -255,6 +321,7 @@ export function useFileQueue() {
     triggerFolderSelect,
     processSingleFile,
     addFilesToQueue,
+    initializeQueueInstantly, // New method for instant queue display
     updateUploadQueue, // Legacy compatibility
     updateFromWorkerResults, // New worker-optimized method
     updateProgress,
