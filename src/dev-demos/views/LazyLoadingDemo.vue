@@ -1,5 +1,12 @@
 <template>
-  <v-container fluid class="pa-6">
+  <DemoContainer
+    title="Lazy Loading Performance Demo"
+    subtitle="FileUploadQueue Optimization: 99%+ Performance Improvement"
+    description="This demonstration shows the massive performance improvement achieved by implementing lazy loading in the FileUploadQueue component. Before: 13+ seconds to render 3,398 files. After: Instant rendering with progressive loading."
+    icon="mdi-speedometer"
+    :tags="['Performance', 'Lazy Loading', 'Vue 3', 'UI Optimization', 'Intersection Observer']"
+    :show-performance-notes="true"
+  >
     <div class="max-w-4xl mx-auto">
       <v-card>
         <v-card-title>FileQueuePlaceholder Performance Test</v-card-title>
@@ -137,14 +144,15 @@
         </v-card-text>
       </v-card>
     </div>
-  </v-container>
+  </DemoContainer>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
-import FileQueuePlaceholder from '../components/features/upload/FileQueuePlaceholder.vue'
-import LazyFileItem from '../components/features/upload/LazyFileItem.vue'
-import { useLazyFileList } from '../composables/useLazyFileList.js'
+import DemoContainer from '../components/DemoContainer.vue'
+import FileQueuePlaceholder from '../../components/features/upload/FileQueuePlaceholder.vue'
+import LazyFileItem from '../../components/features/upload/LazyFileItem.vue'
+import { useLazyFileList } from '../../composables/useLazyFileList.js'
 
 const showPlaceholders = ref(false)
 const placeholderCount = ref(100)

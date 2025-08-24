@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { createAuthGuard } from './guards/auth' // Import the auth guard
+import { registerDemoRoutes } from '../dev-demos/utils/demoRoutes' // Import demo routes
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -41,12 +42,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/placeholder-test',
-      name: 'placeholder-test',
-      component: () => import('../views/PlaceholderTest.vue'),
-      meta: { requiresAuth: false },
-    },
-    {
       path: '/login',
       name: 'login',
       component: () => import('../components/features/auth/LoginForm.vue'),
@@ -71,6 +66,9 @@ const router = createRouter({
     },
   ],
 })
+
+// Register demo routes (development only)
+registerDemoRoutes(router)
 
 // Apply the global beforeEach guard
 router.beforeEach(createAuthGuard())

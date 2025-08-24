@@ -1,0 +1,5 @@
+# This file ensures dev-demos are tracked in git during development
+# but excluded from production builds via vite.config.js
+
+# Include all dev-demo files for development collaboration
+!**/*
