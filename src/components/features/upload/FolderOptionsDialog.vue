@@ -70,7 +70,7 @@
       <v-card-actions class="px-6 py-4">
         <!-- Time Estimate Display -->
         <div v-if="!isAnalyzing && getSelectedAnalysis" class="text-h6 font-weight-medium text-primary">
-          Time estimate: {{ formatTime(getSelectedAnalysis.calibratedTimeSeconds) }}
+          Time estimate: {{ formatTime(getSelectedAnalysis.timeSeconds) }}
         </div>
         <div v-else-if="isAnalyzing" class="d-flex align-center">
           <v-progress-circular

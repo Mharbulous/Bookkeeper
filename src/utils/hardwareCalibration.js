@@ -36,8 +36,27 @@ export function calculateCalibratedProcessingTime(folderData, hardwarePerformanc
   } = folderData;
 
   if (hardwarePerformanceFactor <= 0) {
-    // Fallback to standard prediction if H is invalid
-    return calculateStandardProcessingTime(folderData);
+    // Return minimal default if H is invalid
+    return {
+      totalTimeMs: 1000,
+      totalTimeSeconds: 1.0,
+      phases: {
+        phase1FilteringMs: 60,
+        phase2HashingMs: 500,
+        phase3RenderingMs: 440
+      },
+      calibration: {
+        hardwarePerformanceFactor: 0,
+        baselineH: 1.61,
+        calibrationMultiplier: 1.0,
+        isCalibrated: false
+      },
+      breakdown: {
+        phase1Description: 'Size-based filtering to identify duplicate candidates',
+        phase2Description: `Hash calculation for ${duplicateCandidates} duplicate candidates`,
+        phase3Description: `UI rendering for ${totalFiles} files`
+      }
+    };
   }
 
   // Phase 1: Filtering (size-based duplicate detection)
@@ -99,70 +118,6 @@ export function calculateCalibratedProcessingTime(folderData, hardwarePerformanc
   };
 }
 
-/**
- * Fallback standard processing time calculation (non-calibrated)
- * Uses the existing constants from fileAnalysis.js
- * @param {Object} folderData - Folder analysis data
- * @returns {Object} Standard time predictions
- */
-export function calculateStandardProcessingTime(folderData) {
-  const {
-    totalFiles,
-    duplicateCandidates,
-    duplicateCandidatesSizeMB,
-    avgDirectoryDepth = 2.5,
-    totalDirectoryCount = 0
-  } = folderData;
-
-  // Use existing Trial 5 optimized constants from fileAnalysis.js
-  const PHASE1_BASE_MS = 172.480;
-  const PHASE1_FILE_MS = 0.656570;
-  const PHASE1_DEPTH_MS = -88.604405;
-  const PHASE1_DIR_MS = -2.045097;
-
-  const PHASE2_BASE_MS = -75.215;
-  const PHASE2_CANDIDATE_MS = 5.142402;
-  const PHASE2_DUPSIZE_MS = 0.734205;
-
-  const PHASE3_BASE_MS = -218.692;
-  const PHASE3_FILE_MS = 3.441149;
-  const PHASE3_DEPTH_MS = 133.740506;
-  const PHASE3_DIR_MS = 1.682150;
-
-  const phase1Time = PHASE1_BASE_MS + (totalFiles * PHASE1_FILE_MS) + 
-                    (avgDirectoryDepth * PHASE1_DEPTH_MS) + 
-                    (totalDirectoryCount * PHASE1_DIR_MS);
-
-  const phase2Time = PHASE2_BASE_MS + (duplicateCandidates * PHASE2_CANDIDATE_MS) + 
-                    (duplicateCandidatesSizeMB * PHASE2_DUPSIZE_MS);
-
-  const phase3Time = PHASE3_BASE_MS + (totalFiles * PHASE3_FILE_MS) + 
-                    (avgDirectoryDepth * PHASE3_DEPTH_MS) + 
-                    (totalDirectoryCount * PHASE3_DIR_MS);
-
-  const totalTime = phase1Time + phase2Time + phase3Time;
-
-  return {
-    totalTimeMs: Math.max(1, Math.round(totalTime)),
-    totalTimeSeconds: Math.round(Math.max(1, totalTime) / 100) / 10,
-    phases: {
-      phase1FilteringMs: Math.round(phase1Time),
-      phase2HashingMs: Math.round(phase2Time),
-      phase3RenderingMs: Math.round(phase3Time)
-    },
-    calibration: {
-      hardwarePerformanceFactor: 0,
-      baselineH: 1.61,
-      calibrationMultiplier: 1.0,
-      isCalibrated: false
-    },
-    breakdown: {
-      phase1Description: 'File analysis and preprocessing',
-      phase2Description: `Hash processing for ${duplicateCandidates} candidates`,
-      phase3Description: `UI rendering and updates for ${totalFiles} files`
-    }
-  };
-}
 
 /**
  * Get stored hardware performance factor from localStorage

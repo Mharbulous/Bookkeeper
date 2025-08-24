@@ -7,23 +7,18 @@
 
 import { 
   calculateCalibratedProcessingTime, 
-  getStoredHardwarePerformanceFactor,
-  calculateStandardProcessingTime 
+  getStoredHardwarePerformanceFactor
 } from './hardwareCalibration.js';
 
 /**
- * Analyze files to provide count, size, duplication estimates, and time predictions
+ * Analyze files to provide count, size, duplication estimates, and hardware-calibrated time predictions
  * @param {File[]} files - Array of File objects to analyze
  * @param {number} totalDirectoryCount - Total number of unique directories (optional)
- * @param {number} avgDirectoryDepth - Average directory nesting depth (optional)
+ * @param {number} avgDirectoryDepth - Average directory nesting depth (optional) 
  * @param {number} avgFileDepth - Average file nesting depth (optional)
- * @param {Object} options - Additional options
- * @param {boolean} options.useHardwareCalibration - Use hardware-calibrated predictions if available (default: true)
- * @param {number} options.hardwarePerformanceFactor - Override H factor for predictions
- * @returns {Object} Analysis results with both standard and calibrated predictions
+ * @returns {Object} Analysis results with hardware-calibrated predictions
  */
-export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth = 0, avgFileDepth = 0, options = {}) {
-  const { useHardwareCalibration = true, hardwarePerformanceFactor } = options;
+export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth = 0, avgFileDepth = 0) {
   if (!files || !Array.isArray(files) || files.length === 0) {
     return {
       totalFiles: 0,
@@ -31,8 +26,8 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
       uniqueFiles: 0,
       duplicateCandidates: 0,
       estimatedDuplicationPercent: 0,
-      estimatedTimeMs: 0,
-      estimatedTimeSeconds: 0,
+      timeMs: 0,
+      timeSeconds: 0,
       totalDirectoryCount: totalDirectoryCount
     }
   }
@@ -74,54 +69,23 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
   const bufferedTotalFiles = files.length + 1
   const estimatedDuplicationPercent = Math.round((bufferedDuplicateCandidates / bufferedTotalFiles) * 100)
   
-  // 3-phase prediction model with enhanced optimization (Trial 5)
-  // Achieves 88.4% mean accuracy with optimal model selection
-  
-  // Phase 1: File Analysis - multi-factor with directory structure
-  // Formula: 172.48 + (0.657 * files) + (-88.60 * avgDepth) + (-2.05 * dirCount)
-  const PHASE1_BASE_MS = 172.480
-  const PHASE1_FILE_MS = 0.656570
-  const PHASE1_DEPTH_MS = -88.604405
-  const PHASE1_DIR_MS = -2.045097
-  
-  // Phase 2: Hash Processing - combined optimal using duplicate metrics
-  // Formula: -75.22 + (5.14 * duplicateCandidates) + (0.73 * duplicateSizeMB)
-  const PHASE2_BASE_MS = -75.215
-  const PHASE2_CANDIDATE_MS = 5.142402
-  const PHASE2_DUPSIZE_MS = 0.734205
-  
-  // Phase 3: UI Rendering - multi-factor with directory complexity
-  // Formula: -218.69 + (3.44 * files) + (133.74 * avgDepth) + (1.68 * dirCount)
-  const PHASE3_BASE_MS = -218.692
-  const PHASE3_FILE_MS = 3.441149
-  const PHASE3_DEPTH_MS = 133.740506
-  const PHASE3_DIR_MS = 1.682150
-  
-  // Calculate 3-phase timing using enhanced optimized models
-  const phase1Time = PHASE1_BASE_MS + (files.length * PHASE1_FILE_MS) + (avgDirectoryDepth * PHASE1_DEPTH_MS) + (totalDirectoryCount * PHASE1_DIR_MS)
-  const phase2Time = PHASE2_BASE_MS + (duplicateCandidates.length * PHASE2_CANDIDATE_MS) + (totalSizeMB * PHASE2_DUPSIZE_MS)
-  const phase3Time = PHASE3_BASE_MS + (files.length * PHASE3_FILE_MS) + (avgDirectoryDepth * PHASE3_DEPTH_MS) + (totalDirectoryCount * PHASE3_DIR_MS)
-  
-  const totalEstimatedTime = phase1Time + phase2Time + phase3Time
 
-  // Hardware-calibrated predictions (if available and enabled)
+  // Hardware-calibrated predictions
   let calibratedPrediction = null;
   let usedHardwareCalibration = false;
   
-  if (useHardwareCalibration) {
-    const storedH = hardwarePerformanceFactor || getStoredHardwarePerformanceFactor();
-    if (storedH && storedH > 0) {
-      const folderData = {
-        totalFiles: files.length,
-        duplicateCandidates: duplicateCandidates.length,
-        duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
-        avgDirectoryDepth,
-        totalDirectoryCount
-      };
-      
-      calibratedPrediction = calculateCalibratedProcessingTime(folderData, storedH);
-      usedHardwareCalibration = true;
-    }
+  const storedH = getStoredHardwarePerformanceFactor();
+  if (storedH && storedH > 0) {
+    const folderData = {
+      totalFiles: files.length,
+      duplicateCandidates: duplicateCandidates.length,
+      duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
+      avgDirectoryDepth,
+      totalDirectoryCount
+    };
+    
+    calibratedPrediction = calculateCalibratedProcessingTime(folderData, storedH);
+    usedHardwareCalibration = true;
   }
   
   // Calculate unique file size (files that can skip hash calculation)
@@ -135,40 +99,16 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
     duplicateCandidates: duplicateCandidates.length,
     duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
     estimatedDuplicationPercent,
-    // Standard prediction (always available)
-    estimatedTimeMs: Math.max(1, Math.round(totalEstimatedTime)),
-    estimatedTimeSeconds: Math.round(Math.max(1, totalEstimatedTime) / 1000 * 10) / 10,
     
-    // Hardware-calibrated prediction (if available)
-    calibratedTimeMs: calibratedPrediction ? calibratedPrediction.totalTimeMs : null,
-    calibratedTimeSeconds: calibratedPrediction ? calibratedPrediction.totalTimeSeconds : null,
+    // Hardware-calibrated predictions
+    timeMs: calibratedPrediction ? calibratedPrediction.totalTimeMs : 0,
+    timeSeconds: calibratedPrediction ? calibratedPrediction.totalTimeSeconds : 0,
     isHardwareCalibrated: usedHardwareCalibration,
     totalDirectoryCount: totalDirectoryCount,
-    breakdown: {
-      phase1TimeMs: Math.round(phase1Time),
-      phase2TimeMs: Math.round(phase2Time),
-      phase3TimeMs: Math.round(phase3Time),
-      phase1BaseMs: PHASE1_BASE_MS,
-      phase1FileMs: PHASE1_FILE_MS,
-      phase1DepthMs: PHASE1_DEPTH_MS,
-      phase1DirMs: PHASE1_DIR_MS,
-      phase2BaseMs: PHASE2_BASE_MS,
-      phase2CandidateMs: PHASE2_CANDIDATE_MS,
-      phase2DupsizeMs: PHASE2_DUPSIZE_MS,
-      phase3BaseMs: PHASE3_BASE_MS,
-      phase3FileMs: PHASE3_FILE_MS,
-      phase3DepthMs: PHASE3_DEPTH_MS,
-      phase3DirMs: PHASE3_DIR_MS,
-      avgDirectoryDepth: avgDirectoryDepth,
-      totalDirectoryCount: totalDirectoryCount
-    },
     
-    // Hardware calibration data (if available)
-    hardwareCalibration: calibratedPrediction ? {
-      phases: calibratedPrediction.phases,
-      calibrationInfo: calibratedPrediction.calibration,
-      phaseDescriptions: calibratedPrediction.breakdown
-    } : null
+    // Calibrated phase breakdown
+    phases: calibratedPrediction ? calibratedPrediction.phases : null,
+    calibration: calibratedPrediction ? calibratedPrediction.calibration : null
   }
 }
 
