@@ -185,6 +185,18 @@ Part of a larger SSO architecture - when testing multi-app features, use the `de
 
 ## Development Workflow
 
+### Code Quality & Linting
+**CRITICAL**: You MUST always delegate all linting and code beautification tasks to the specialized `beautifier` agent. When delegating to the beautifier:
+
+1. **Always specify the exact files** that need to be reviewed/formatted
+2. **Use the Task tool** with `subagent_type: "beautifier"`
+3. **Provide clear file paths** - never use vague instructions like "check all files"
+4. **Examples of proper delegation**:
+   - "Review and format these specific files: `src/components/LoginForm.vue`, `src/stores/auth.js`"
+   - "Fix linting errors in `src/utils/fileAnalysis.js` and `src/composables/useFileQueue.js`"
+
+**Never attempt to manually fix linting or formatting issues** - always use the specialized agent.
+
 ### Local SSO Testing Setup
 Add to hosts file for multi-app development:
 ```
