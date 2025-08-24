@@ -11,11 +11,11 @@
         <v-icon start icon="mdi-cog" />
         {{ processingCount }} processing
       </v-chip>
-      
+
       <v-chip
         size="large"
         variant="flat"
-        color="orange"
+        color="blue"
         class="text-white"
       >
         <v-progress-circular
@@ -28,7 +28,7 @@
         <template v-else>{{ pendingCount }}</template>
         new
       </v-chip>
-      
+
       <v-chip
         size="large"
         variant="flat"
@@ -45,11 +45,12 @@
         <template v-else>{{ queueDuplicatesCount }}</template>
         duplicates
       </v-chip>
-      
+
       <v-chip
         size="large"
         variant="flat"
-        color="blue"
+        color="orange"
+        class="text-white"
       >
         <v-progress-circular
           v-if="uiUpdateProgress.phase === 'loading'"
@@ -61,7 +62,7 @@
         <template v-else>{{ previouslyUploadedCount }}</template>
         previous uploads
       </v-chip>
-      
+
       <v-chip
         size="large"
         variant="flat"
@@ -77,7 +78,7 @@
         <template v-else>{{ successfulCount }}</template>
         successful uploads
       </v-chip>
-      
+
       <v-chip
         size="large"
         variant="flat"
@@ -92,6 +93,26 @@
         />
         <template v-else>{{ failedCount }}</template>
         failed uploads
+      </v-chip>
+
+      <!-- Total Files chip (rightmost) -->
+      <v-chip
+        size="large"
+        variant="flat"
+        color="white"
+        class="text-black border-black"
+        style="border-width: 1px;"
+      >
+        <v-progress-circular
+          v-if="uiUpdateProgress.phase === 'loading'"
+          indeterminate
+          size="16"
+          width="2"
+          color="black"
+          class="me-1"
+        />
+        <template v-else>{{ totalCount }}</template>
+        total
       </v-chip>
     </div>
   </div>
@@ -123,14 +144,18 @@ const props = defineProps({
 })
 
 // Computed properties for file counts
+const totalCount = computed(() => {
+  return props.files.length
+})
+
 const uploadableFiles = computed(() => {
   return props.files.filter(file => !file.isDuplicate)
 })
 
 const pendingCount = computed(() => {
-  return props.files.filter(file => 
-    file.status === 'ready' || 
-    file.status === 'pending' || 
+  return props.files.filter(file =>
+    file.status === 'ready' ||
+    file.status === 'pending' ||
     (!file.status && !file.isQueueDuplicate && !file.isPreviousUpload)
   ).length
 })
@@ -154,7 +179,6 @@ const successfulCount = computed(() => {
 const failedCount = computed(() => {
   return props.files.filter(file => file.status === 'error').length
 })
-
 </script>
 
 <style scoped>

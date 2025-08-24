@@ -5,7 +5,7 @@
         <v-icon icon="mdi-file-multiple" class="me-2" />
         Upload Queue
       </div>
-      
+
       <div class="d-flex gap-2">
         <v-btn
           variant="elevated"
@@ -17,7 +17,7 @@
         >
           Clear All
         </v-btn>
-        
+
         <v-btn
           color="primary"
           variant="elevated"
@@ -34,7 +34,7 @@
 
     <!-- File List -->
     <div class="pa-4">
-      <!-- Status Tags -->
+      <!-- Status Chips -->
       <FileQueueChips
         :files="files"
         :is-processing-ui-update="isProcessingUIUpdate"
@@ -261,7 +261,6 @@ const groupedFiles = computed(() => {
 // Watch for file changes and populate existing hashes
 watch(() => props.files, populateExistingHashes, { deep: true })
 
-
 const totalSize = computed(() => {
   return uploadableFiles.value.reduce((total, file) => total + file.size, 0)
 })
@@ -270,29 +269,27 @@ const hasErrors = computed(() => {
   return props.files.some(file => file.status === 'error')
 })
 
-
-
 // Methods
 const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 B'
-  
+
   const k = 1024
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
 }
 
 // 2-chunk loading message generator
 const getLoadingMessage = () => {
   if (!props.isProcessingUIUpdate) return 'Loading files into queue...'
-  
+
   const { total, percentage } = props.uiUpdateProgress
-  
+
   if (total <= 100) {
     return 'Loading files into queue...'
   }
-  
+
   if (percentage <= 15) {
     return 'Showing initial files...'
   } else if (percentage < 100) {
@@ -305,13 +302,13 @@ const getLoadingMessage = () => {
 // Phase message for 2-chunk strategy
 const getPhaseMessage = () => {
   if (!props.isProcessingUIUpdate) return 'Loading...'
-  
+
   const { total, percentage } = props.uiUpdateProgress
-  
+
   if (total <= 100) {
     return 'Loading...'
   }
-  
+
   if (percentage <= 15) {
     return 'Step 1/2'
   } else if (percentage < 100) {
@@ -320,7 +317,6 @@ const getPhaseMessage = () => {
     return 'Complete!'
   }
 }
-
 </script>
 
 <style scoped>
