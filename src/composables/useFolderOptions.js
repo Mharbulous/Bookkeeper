@@ -242,7 +242,7 @@ export function useFolderOptions() {
           largestFileSizesMB: allFilesMetrics.largestFileSizesMB
         }
         
-        console.log(`🔬 FOLDER_ANALYSIS_DATA: ${JSON.stringify(analysisData)}`)
+        // Hardware calibration data stored automatically during analysis
       })
       
       // Wait for both analyses to complete
@@ -451,7 +451,7 @@ export function useFolderOptions() {
       return f.file
     })
     
-    // Store processing start time for legacy timing (can be removed later)
+    // Store processing start time for performance measurement
     window.folderProcessingStartTime = processingStartTime
     
     addFilesToQueue(filesWithPath)

@@ -106,7 +106,7 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
     isHardwareCalibrated: usedHardwareCalibration,
     totalDirectoryCount: totalDirectoryCount,
     
-    // Calibrated phase breakdown
+    // Hardware-calibrated phase breakdown
     phases: calibratedPrediction ? calibratedPrediction.phases : null,
     calibration: calibratedPrediction ? calibratedPrediction.calibration : null
   }

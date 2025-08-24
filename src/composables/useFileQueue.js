@@ -261,7 +261,7 @@ export function useFileQueue() {
     
     logProcessingTime('ALL_FILES_DISPLAYED')
     
-    // Clean up legacy timing variables
+    // Clean up timing variables
     if (window.endToEndStartTime) {
       window.endToEndStartTime = null
     }

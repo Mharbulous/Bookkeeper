@@ -130,25 +130,25 @@ if (authStore.isAuthenticated) {
 
 ### File Processing & Estimation System
 
-**3-Phase Enhanced Prediction Model (Trial 5 Optimization):**
-The system uses a sophisticated multi-factor prediction model achieving 88.4% accuracy:
+**Hardware-Calibrated Prediction System:**
+The system uses hardware-specific calibration to provide accurate time predictions:
 
-1. **Phase 1: File Analysis** (Multi-factor with directory structure)
-   - Formula: `172.48 + (0.657 × files) + (-88.60 × avgDepth) + (-2.05 × dirCount)`
+1. **Phase 1: File Analysis** (Filtering)
+   - Size-based duplicate detection and file categorization
+   - Consistent ~60ms regardless of file count
    - Path parsing and directory structure analysis
-   - Size-based grouping and filtering
    - Duplicate candidate identification
 
-2. **Phase 2: Hash Processing** (Combined optimal using duplicate metrics)
-   - Formula: `-75.22 + (5.14 × duplicateCandidates) + (0.73 × duplicateSizeMB)`
+2. **Phase 2: Hash Processing** (Hardware-Calibrated)
    - SHA-256 calculation for duplicate detection
-   - Optimized using actual duplicate candidates rather than total file metrics
-   - Accounts for both candidate count and data size requiring hashing
+   - Formula: `35 + (6.5 × candidates) + (0.8 × sizeMB)` × hardware calibration factor
+   - Uses stored hardware performance factor (H-factor) from actual measurements
+   - Accounts for both computational and I/O overhead
 
-3. **Phase 3: UI Rendering** (Enhanced multi-factor with directory complexity)
-   - Formula: `-218.69 + (3.44 × files) + (133.74 × avgDepth) + (1.68 × dirCount)`
+3. **Phase 3: UI Rendering** (Hardware & Complexity Calibrated)
    - DOM updates and progress visualization
-   - Directory structure complexity significantly impacts rendering performance
+   - Formula: `50 + (0.52 × files) + (45 × avgDepth)` × hardware calibration factor
+   - Directory structure complexity impacts rendering performance
 
 **Path Parsing Optimization:**
 - Single preprocessing pass eliminates 80% of redundant path parsing
@@ -161,18 +161,12 @@ The system uses a sophisticated multi-factor prediction model achieving 88.4% ac
 - **Firestore integration**: Hashes serve as document IDs for automatic database-level deduplication
 - **Efficient processing**: Typically 60-80% of files skip expensive hash calculation
 
-**Enhanced Console Logging for Analysis:**
-The system now uses JSON.stringify() to prevent console truncation and capture complete data:
-```javascript
-🔬 FOLDER_ANALYSIS_DATA: {
-  totalFiles, duplicateCandidateCount, totalSizeMB, duplicateCandidatesSizeMB,
-  avgDirectoryDepth, maxDirectoryDepth, totalDirectoryCount, uniqueFilesTotal,
-  avgFilenameLength, zeroByteFiles, largestFileSizesMB: [...]
-}
-
-// TIME_ESTIMATION_FORMULA console logs removed for production
-// Detailed breakdown available in analyzeFiles() return object
-```
+**Hardware Performance Calibration:**
+The system automatically calibrates to hardware performance during folder analysis:
+- **H-Factor Calculation**: Files processed per millisecond during folder analysis
+- **Automatic Storage**: Performance measurements stored in localStorage
+- **Continuous Improvement**: Uses recent measurements for better accuracy
+- **Hardware-Specific**: Adapts to different CPU speeds and system performance
 
 ### Multi-App SSO Integration
 Part of a larger SSO architecture - when testing multi-app features, use the `dev:*` commands with proper localhost domain mapping. All apps share identical Firebase configuration for seamless authentication.
@@ -269,27 +263,27 @@ The `docs/speed_tests/` directory contains tools for analyzing file processing p
   python analyze_3stage_data.py
   ```
 
-**Enhanced 3-Phase Performance Model (Trial 5 Optimization):**
-The system implements an optimized multi-factor prediction model achieving 88.4% accuracy:
+**Hardware-Calibrated Performance System:**
+The system uses real-time hardware calibration for accurate predictions:
 
-- **Phase 1: File Analysis** - Multi-factor: `172.48 + (0.657 × files) + (-88.60 × avgDepth) + (-2.05 × dirCount)`
-- **Phase 2: Hash Processing** - Combined optimal: `-75.22 + (5.14 × duplicateCandidates) + (0.73 × duplicateSizeMB)`  
-- **Phase 3: UI Rendering** - Enhanced complexity: `-218.69 + (3.44 × files) + (133.74 × avgDepth) + (1.68 × dirCount)`
+**Hardware Calibration Process:**
+1. **Initial Measurement**: During folder analysis, measure files processed per millisecond (H-factor)
+2. **Baseline Comparison**: Compare against baseline H-factor of 1.61 files/ms
+3. **Calibration Multiplier**: Calculate hardware-specific adjustment factor
+4. **Prediction Scaling**: Apply multiplier to base prediction formulas
 
-**Key Insights from Enhanced Performance Analysis:**
-- **Multi-factor models outperform simple constants**: Directory structure complexity significantly improves accuracy
-- **Duplicate-specific metrics**: Using `duplicateCandidates` and `duplicateSizeMB` provides better Phase 2 predictions than total file metrics
-- **Directory depth impact**: Both positive (UI complexity) and negative (analysis efficiency) effects on different phases
-- **Negative base constants**: Some phases show fixed overhead savings in certain scenarios
-- **R² scores of 0.997+**: Excellent model fit achieved through comprehensive calibration
+**Key Benefits:**
+- **Hardware-Adaptive**: Automatically adjusts to different CPU speeds and system performance
+- **Real-Time Calibration**: Uses actual measurements rather than static formulas
+- **Continuous Learning**: Improves accuracy over time with more measurements
+- **No Negative Constants**: Eliminates mathematical edge cases from legacy system
+- **Simplified Maintenance**: Single prediction system focused on hardware performance
 
-**Enhanced Prediction Accuracy:**
-Current optimized model performance from Trial 5 comprehensive analysis:
-- **Mean Accuracy**: 88.4% (improved from 88.0%)
-- **Median Accuracy**: 96.4%
-- **R² Score**: 0.999 (excellent model fit)
-- **Mean Absolute Error**: 168ms
-- Models account for Web Worker execution and multi-factor complexity
+**Calibration Data Storage:**
+- **localStorage Integration**: Stores up to 50 recent measurements
+- **Rolling Average**: Uses last 10 measurements for current predictions
+- **Performance Tracking**: Monitors H-factor trends and system performance
+- **Automatic Cleanup**: Prevents storage bloat with measurement limits
 
 ## Important Notes
 
