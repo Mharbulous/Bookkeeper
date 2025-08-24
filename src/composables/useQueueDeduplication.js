@@ -98,6 +98,7 @@ export function useQueueDeduplication() {
     }
     
     // Initialize worker if not ready
+    let workerJustInitialized = false
     if (!workerInstance.isWorkerReady.value) {
       console.info('Initializing Web Worker...')
       const initialized = workerInstance.initializeWorker()
@@ -105,10 +106,11 @@ export function useQueueDeduplication() {
         console.warn('Web Worker initialization failed, falling back to main thread processing')
         return processFilesMainThread(files, updateUploadQueue, onProgress)
       }
+      workerJustInitialized = true
     }
     
-    // Check worker health before proceeding
-    if (!workerInstance.isWorkerHealthy.value) {
+    // Check worker health before proceeding (skip for newly initialized workers)
+    if (!workerJustInitialized && !workerInstance.isWorkerHealthy.value) {
       console.warn('Web Worker is unhealthy, attempting restart...')
       
       // Use worker manager for restart if available

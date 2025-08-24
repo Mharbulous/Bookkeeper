@@ -21,8 +21,9 @@ export function useWebWorker(workerPath) {
   let lastHealthCheck = null
   let consecutiveHealthFailures = 0
   const MAX_HEALTH_FAILURES = 3
-  const HEALTH_CHECK_INTERVAL = 10000 // 10 seconds
-  const HEALTH_CHECK_TIMEOUT = 5000 // 5 seconds
+  const HEALTH_CHECK_INTERVAL = 15000 // 15 seconds - less aggressive
+  const HEALTH_CHECK_TIMEOUT = 8000 // 8 seconds - more time for response
+  const HEALTH_CHECK_GRACE_PERIOD = 30000 // 30 seconds before first health check
   
   // Initialize worker
   const initializeWorker = () => {
@@ -62,9 +63,14 @@ export function useWebWorker(workerPath) {
       isWorkerReady.value = true
       isWorkerHealthy.value = true
       workerError.value = null
+      consecutiveHealthFailures = 0
       
-      // Start health monitoring
-      startHealthChecking()
+      // Start health monitoring after grace period
+      setTimeout(() => {
+        if (isWorkerReady.value) {
+          startHealthChecking()
+        }
+      }, HEALTH_CHECK_GRACE_PERIOD)
       
       return true
     } catch (error) {
@@ -139,13 +145,15 @@ export function useWebWorker(workerPath) {
   
   const handleHealthCheckFailure = () => {
     consecutiveHealthFailures++
+    console.warn(`Worker health check failed (${consecutiveHealthFailures}/${MAX_HEALTH_FAILURES})`)
     
+    // Only mark unhealthy after MAX_HEALTH_FAILURES consecutive failures
     if (consecutiveHealthFailures >= MAX_HEALTH_FAILURES) {
       console.error(`Worker failed ${MAX_HEALTH_FAILURES} consecutive health checks, marking as unhealthy`)
       isWorkerHealthy.value = false
-      
-      // Optionally auto-restart worker
-      // restartWorker()
+    } else {
+      // Keep worker healthy until max failures reached
+      console.info(`Worker still healthy despite health check failure (${consecutiveHealthFailures}/${MAX_HEALTH_FAILURES})`)
     }
   }
   
