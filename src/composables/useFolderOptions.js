@@ -247,6 +247,12 @@ export function useFolderOptions() {
       // Wait for both analyses to complete
       await Promise.all([mainFolderPromise, allFilesPromise])
       
+      // Log elapsed time when all calculations are complete
+      if (window.folderOptionsStartTime) {
+        const elapsedTime = Math.round(performance.now() - window.folderOptionsStartTime)
+        console.log(`T = ${elapsedTime}`)
+      }
+      
       // Update subfolder count
       const { folderStats } = preprocessFileData(pendingFolderFiles.value)
       subfolderCount.value = folderStats.rootFolderCount
@@ -303,6 +309,8 @@ export function useFolderOptions() {
   const showFolderOptionsWithAnalysis = (files, addFilesToQueueCallback = null) => {
     // SHOW MODAL FIRST - no conditions, no calculations
     showFolderOptions.value = true
+    console.log("T = 0")
+    window.folderOptionsStartTime = performance.now()
     isAnalyzing.value = true
     
     // Reset all values to show initial state
@@ -372,6 +380,8 @@ export function useFolderOptions() {
   const processFolderEntry = async (dirEntry, addFilesToQueue) => {
     // SHOW MODAL IMMEDIATELY - don't wait for file reading
     showFolderOptions.value = true
+    console.log("T = 0")
+    window.folderOptionsStartTime = performance.now()
     isAnalyzing.value = true
     
     // Reset all values to show initial state

@@ -104,8 +104,8 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
     duplicateCandidates: duplicateCandidates.length,
     duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
     estimatedDuplicationPercent,
-    estimatedTimeMs: Math.round(totalEstimatedTime),
-    estimatedTimeSeconds: Math.round(totalEstimatedTime / 1000 * 10) / 10,
+    estimatedTimeMs: Math.max(1, Math.round(totalEstimatedTime)),
+    estimatedTimeSeconds: Math.round(Math.max(1, totalEstimatedTime) / 1000 * 10) / 10,
     totalDirectoryCount: totalDirectoryCount,
     breakdown: {
       phase1TimeMs: Math.round(phase1Time),
