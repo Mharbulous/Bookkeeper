@@ -30,6 +30,7 @@
 import { useAuthStore } from './stores/auth'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import AppHeader from './components/layout/AppHeader.vue'
+import { useFavicon } from './composables/useFavicon'
 
 export default {
   name: 'App',
@@ -39,6 +40,10 @@ export default {
   },
   setup() {
     const authStore = useAuthStore()
+    
+    // Initialize favicon switching
+    useFavicon()
+    
     return { authStore }
   },
   data() {
