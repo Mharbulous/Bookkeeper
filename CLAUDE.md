@@ -100,6 +100,18 @@ Core feature for uploading and processing files with sophisticated time estimati
    - Progress tracking with phase-based updates
 5. **Upload Coordination**: Processed files uploaded to Firebase Storage
 
+## Demo Organization System
+
+The codebase includes a structured development demonstration system in `src/dev-demos/` for testing and showcasing features:
+
+- **Demo Views**: Full-page demos in `src/dev-demos/views/` (e.g., LazyLoadingDemo.vue)
+- **Demo Routes**: Development-only routes under `/dev/*` (e.g., `/dev/lazy-loading`)
+- **Demo Components**: Reusable demo infrastructure (`DemoContainer.vue`, performance tracking)
+- **Environment-Aware**: Demos only load in development mode
+- **Access**: Navigate to `http://localhost:5174/#/dev` for demo index
+
+Key demos include lazy loading performance testing with <0.01ms placeholder rendering verification and realistic test data generation.
+
 ## Key Implementation Details
 
 ### Authentication Timing Solutions
