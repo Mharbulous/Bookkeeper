@@ -5,7 +5,7 @@ import { startProcessingTimer } from '../utils/processingTimer.js'
 export function useFolderOptions() {
   // Reactive data
   const showFolderOptions = ref(false)
-  const includeSubfolders = ref(true)
+  const includeSubfolders = ref(false)
   const pendingFolderFiles = ref([])
   const subfolderCount = ref(0)
   
@@ -13,6 +13,14 @@ export function useFolderOptions() {
   const isAnalyzing = ref(false)
   const mainFolderAnalysis = ref(null)
   const allFilesAnalysis = ref(null)
+  
+  // Progress tracking for chunked processing
+  const mainFolderProgress = ref({ filesProcessed: 0, totalFiles: 0 })
+  const allFilesProgress = ref({ filesProcessed: 0, totalFiles: 0 })
+  const mainFolderComplete = ref(false)
+  const allFilesComplete = ref(false)
+  const isAnalyzingMainFolder = ref(false)
+  const isAnalyzingAllFiles = ref(false)
 
   // Single preprocessing function to parse all paths once and extract all needed information
   const preprocessFileData = (files) => {
@@ -113,11 +121,55 @@ export function useFolderOptions() {
     return { avgFilenameLength }
   }
 
-  // Analysis function
+  // Chunked analysis function for better UI responsiveness
+  const analyzeFilesChunked = async (files, fileData, directoryStats, chunkSize = 1000, progressRef, isAnalyzingRef, resultRef) => {
+    if (!files || files.length === 0) {
+      resultRef.value = analyzeFiles([], 0, 0, 0)
+      return
+    }
+
+    isAnalyzingRef.value = true
+    progressRef.value = { filesProcessed: 0, totalFiles: files.length }
+    
+    try {
+      // For small sets, process all at once
+      if (files.length <= chunkSize) {
+        resultRef.value = analyzeFiles(files, directoryStats.totalDirectoryCount, directoryStats.avgDirectoryDepth, directoryStats.avgFileDepth)
+        progressRef.value = { filesProcessed: files.length, totalFiles: files.length }
+        return
+      }
+      
+      // For larger sets, process in chunks to allow UI updates
+      let processedFiles = []
+      for (let i = 0; i < files.length; i += chunkSize) {
+        const chunk = files.slice(i, i + chunkSize)
+        processedFiles.push(...chunk)
+        
+        // Update progress
+        progressRef.value = { filesProcessed: processedFiles.length, totalFiles: files.length }
+        
+        // Calculate analysis on processed files so far
+        resultRef.value = analyzeFiles(processedFiles, directoryStats.totalDirectoryCount, directoryStats.avgDirectoryDepth, directoryStats.avgFileDepth)
+        
+        // Allow UI to update between chunks
+        if (i + chunkSize < files.length) {
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error in chunked analysis:', error)
+      resultRef.value = analyzeFiles([], 0, 0, 0)
+    }
+  }
+  
+  // Main analysis function that coordinates both main folder and all files analysis
   const analyzeFilesForOptions = async () => {
     if (pendingFolderFiles.value.length === 0) return
     
     isAnalyzing.value = true
+    mainFolderComplete.value = false
+    allFilesComplete.value = false
     
     try {
       // Single preprocessing pass - parse all paths once and extract everything
@@ -140,69 +192,84 @@ export function useFolderOptions() {
       // Calculate directory stats for main folder subset using preprocessed data
       const mainFolderDirectoryStats = preprocessFileData(mainFolderFileData).directoryStats
       
-      // Calculate other metrics using the separated file arrays
+      // Calculate other metrics for logging
       const allFilesMetrics = calculateFileSizeMetrics(pendingFolderFiles.value)
       const filenameStats = calculateFilenameStats(pendingFolderFiles.value)
       
-      // Analyze both sets concurrently (these will log TIME_ESTIMATION_FORMULA for each)
-      const [allFilesResult, mainFolderResult] = await Promise.all([
-        Promise.resolve(analyzeFiles(allFiles, allFilesDirectoryStats.totalDirectoryCount, allFilesDirectoryStats.avgDirectoryDepth, allFilesDirectoryStats.avgFileDepth)),
-        Promise.resolve(analyzeFiles(mainFolderFiles, mainFolderDirectoryStats.totalDirectoryCount, mainFolderDirectoryStats.avgDirectoryDepth, mainFolderDirectoryStats.avgFileDepth))
-      ])
+      // Start main folder analysis first (faster, enables Continue button sooner)
+      const mainFolderPromise = analyzeFilesChunked(
+        mainFolderFiles, 
+        mainFolderFileData, 
+        mainFolderDirectoryStats, 
+        1000, 
+        mainFolderProgress, 
+        isAnalyzingMainFolder, 
+        mainFolderAnalysis
+      ).then(() => {
+        mainFolderComplete.value = true
+      })
       
-      // Log prediction-ready data (matches Folder Upload Options modal display)
-      // Using JSON.stringify to prevent browser console truncation
-      const analysisData = {
-        timestamp: Date.now(),
+      // Start all files analysis in parallel (slower, but starts immediately)
+      const allFilesPromise = analyzeFilesChunked(
+        allFiles, 
+        preprocessedFiles, 
+        allFilesDirectoryStats, 
+        1000, 
+        allFilesProgress, 
+        isAnalyzingAllFiles, 
+        allFilesAnalysis
+      ).then(() => {
+        allFilesComplete.value = true
         
-        // Core predictors for 3-phase estimation (from Modal Display)
-        totalFiles: allFilesResult.totalFiles,
-        duplicateCandidateCount: allFilesResult.duplicateCandidates,
-        duplicateCandidatePercent: allFilesResult.estimatedDuplicationPercent,
-        uniqueFilesSizeMB: allFilesResult.uniqueFilesSizeMB,
-        duplicateCandidatesSizeMB: allFilesResult.duplicateCandidatesSizeMB,
-        totalSizeMB: allFilesResult.totalSizeMB,
-        totalDirectoryCount: allFilesResult.totalDirectoryCount,
-        avgDirectoryDepth: allFilesDirectoryStats.avgDirectoryDepth,
-        maxDirectoryDepth: allFilesDirectoryStats.maxDirectoryDepth,
+        // Log analysis data when all files analysis is complete
+        const analysisData = {
+          timestamp: Date.now(),
+          totalFiles: allFilesAnalysis.value.totalFiles,
+          duplicateCandidateCount: allFilesAnalysis.value.duplicateCandidates,
+          duplicateCandidatePercent: allFilesAnalysis.value.estimatedDuplicationPercent,
+          uniqueFilesSizeMB: allFilesAnalysis.value.uniqueFilesSizeMB,
+          duplicateCandidatesSizeMB: allFilesAnalysis.value.duplicateCandidatesSizeMB,
+          totalSizeMB: allFilesAnalysis.value.totalSizeMB,
+          totalDirectoryCount: allFilesAnalysis.value.totalDirectoryCount,
+          avgDirectoryDepth: allFilesDirectoryStats.avgDirectoryDepth,
+          maxDirectoryDepth: allFilesDirectoryStats.maxDirectoryDepth,
+          uniqueFilesTotal: allFilesAnalysis.value.uniqueFiles,
+          maxFileDepth: allFilesDirectoryStats.maxFileDepth,
+          avgFileDepth: allFilesDirectoryStats.avgFileDepth,
+          avgFilenameLength: filenameStats.avgFilenameLength,
+          zeroByteFiles: allFilesMetrics.zeroByteFiles,
+          largestFileSizesMB: allFilesMetrics.largestFileSizesMB
+        }
         
-        // Additional predictors
-        uniqueFilesTotal: allFilesResult.uniqueFiles,
-        maxFileDepth: allFilesDirectoryStats.maxFileDepth,
-        avgFileDepth: allFilesDirectoryStats.avgFileDepth,
-        avgFilenameLength: filenameStats.avgFilenameLength,
-        zeroByteFiles: allFilesMetrics.zeroByteFiles,
-        largestFileSizesMB: allFilesMetrics.largestFileSizesMB
-      }
+        console.log(`🔬 FOLDER_ANALYSIS_DATA: ${JSON.stringify(analysisData)}`)
+      })
       
-      console.log(`🔬 FOLDER_ANALYSIS_DATA: ${JSON.stringify(analysisData)}`)
+      // Wait for both analyses to complete
+      await Promise.all([mainFolderPromise, allFilesPromise])
       
-      // Update subfolder count now that we've done full analysis
+      // Update subfolder count
       const { folderStats } = preprocessFileData(pendingFolderFiles.value)
       subfolderCount.value = folderStats.rootFolderCount
-      
-      allFilesAnalysis.value = allFilesResult
-      mainFolderAnalysis.value = mainFolderResult
-      
       
     } catch (error) {
       console.error('Error analyzing files for folder options:', error)
       // Set fallback analysis
       allFilesAnalysis.value = analyzeFiles([], 0, 0, 0)
       mainFolderAnalysis.value = analyzeFiles([], 0, 0, 0)
+      mainFolderComplete.value = true
+      allFilesComplete.value = true
     } finally {
       isAnalyzing.value = false
+      isAnalyzingMainFolder.value = false
+      isAnalyzingAllFiles.value = false
     }
   }
 
   // Background analysis chain - runs after modal is displayed
   const performBackgroundAnalysis = async (files, addFilesToQueueCallback = null) => {
-    console.log('🔍 BACKGROUND: Starting analysis with', files.length, 'files')
-    
     try {
       // Step 1: Quick subfolder detection (can hide modal if no subfolders)
       const subfolderResult = hasSubfoldersQuick(files)
-      console.log('📁 SUBFOLDER CHECK:', subfolderResult ? 'Has subfolders' : 'No subfolders')
       
       if (!subfolderResult) {
         showFolderOptions.value = false
@@ -221,24 +288,8 @@ export function useFolderOptions() {
         return { hasSubfolders: false }
       }
       
-      // Step 2: Ensure spinner shows for at least 500ms before analysis completes
-      console.log('📊 ANALYSIS: Starting full file analysis')
-      const analysisStartTime = Date.now()
-      
-      // Run analysis
+      // Step 2: Run the new chunked analysis
       await analyzeFilesForOptions()
-      
-      // Calculate how long analysis took
-      const analysisTime = Date.now() - analysisStartTime
-      const minSpinnerTime = 500 // Minimum time to show spinner
-      
-      if (analysisTime < minSpinnerTime) {
-        const remainingTime = minSpinnerTime - analysisTime
-        console.log(`⏳ SPINNER: Analysis took ${analysisTime}ms, waiting ${remainingTime}ms more for user feedback`)
-        await new Promise(resolve => setTimeout(resolve, remainingTime))
-      }
-      
-      console.log('✅ ANALYSIS: Complete - showing calculated values')
       
     } catch (error) {
       console.error('Background analysis failed:', error)
@@ -248,30 +299,32 @@ export function useFolderOptions() {
     return { hasSubfolders: true }
   }
 
-  // Show modal immediately, calculate later - KISS solution
+  // Show modal immediately, calculate later - KISS solution  
   const showFolderOptionsWithAnalysis = (files, addFilesToQueueCallback = null) => {
-    console.log('🚀 INSTANT: Showing modal immediately')
-    
     // SHOW MODAL FIRST - no conditions, no calculations
     showFolderOptions.value = true
     isAnalyzing.value = true
     
-    // Reset all values to show spinners
+    // Reset all values to show initial state
     mainFolderAnalysis.value = null
     allFilesAnalysis.value = null
-    
-    console.log('✅ INSTANT: Modal state set, analysis values reset to null')
+    mainFolderProgress.value = { filesProcessed: 0, totalFiles: 0 }
+    allFilesProgress.value = { filesProcessed: 0, totalFiles: 0 }
+    mainFolderComplete.value = false
+    allFilesComplete.value = false
+    isAnalyzingMainFolder.value = false
+    isAnalyzingAllFiles.value = false
+    includeSubfolders.value = false
     
     // Store files for analysis
     if (files) {
       pendingFolderFiles.value = files
     }
     
-    // Use a longer delay to ensure modal actually renders
+    // Use a brief delay to ensure modal renders first
     setTimeout(() => {
-      console.log('⏰ DELAYED: Starting background analysis after 200ms')
       performBackgroundAnalysis(pendingFolderFiles.value, addFilesToQueueCallback)
-    }, 200)
+    }, 100)
   }
 
   const readDirectoryRecursive = (dirEntry) => {
@@ -317,19 +370,23 @@ export function useFolderOptions() {
   }
 
   const processFolderEntry = async (dirEntry, addFilesToQueue) => {
-    console.log('📁 FOLDER DROP: Starting to process folder entry')
-    
     // SHOW MODAL IMMEDIATELY - don't wait for file reading
     showFolderOptions.value = true
     isAnalyzing.value = true
+    
+    // Reset all values to show initial state
     mainFolderAnalysis.value = null
     allFilesAnalysis.value = null
-    
-    console.log('✅ INSTANT: Modal shown immediately, now reading files in background')
+    mainFolderProgress.value = { filesProcessed: 0, totalFiles: 0 }
+    allFilesProgress.value = { filesProcessed: 0, totalFiles: 0 }
+    mainFolderComplete.value = false
+    allFilesComplete.value = false
+    isAnalyzingMainFolder.value = false
+    isAnalyzingAllFiles.value = false
+    includeSubfolders.value = false
     
     // Read files in background
     const files = await readDirectoryRecursive(dirEntry)
-    console.log('📂 FILES READ: Got', files.length, 'files, starting analysis')
     
     // Store files and start analysis
     pendingFolderFiles.value = files
@@ -396,6 +453,14 @@ export function useFolderOptions() {
     isAnalyzing,
     mainFolderAnalysis,
     allFilesAnalysis,
+    
+    // Progress tracking
+    mainFolderProgress,
+    allFilesProgress,
+    mainFolderComplete,
+    allFilesComplete,
+    isAnalyzingMainFolder,
+    isAnalyzingAllFiles,
 
     // Methods
     readDirectoryRecursive,

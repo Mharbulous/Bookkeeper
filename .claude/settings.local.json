@@ -35,6 +35,9 @@
       "Bash(npm run test:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\c\\Users\\Brahm\\Git"
+    ]
   }
 }

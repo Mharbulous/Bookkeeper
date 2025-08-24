@@ -24,6 +24,12 @@
         :is-analyzing="isAnalyzing"
         :main-folder-analysis="mainFolderAnalysis"
         :all-files-analysis="allFilesAnalysis"
+        :main-folder-progress="mainFolderProgress"
+        :all-files-progress="allFilesProgress"
+        :main-folder-complete="mainFolderComplete"
+        :all-files-complete="allFilesComplete"
+        :is-analyzing-main-folder="isAnalyzingMainFolder"
+        :is-analyzing-all-files="isAnalyzingAllFiles"
         @update:show="showFolderOptions = $event"
         @update:include-subfolders="includeSubfolders = $event"
         @confirm="confirmFolderOptions"
@@ -131,6 +137,13 @@ const {
   isAnalyzing,
   mainFolderAnalysis,
   allFilesAnalysis,
+  // Progress tracking
+  mainFolderProgress,
+  allFilesProgress,
+  mainFolderComplete,
+  allFilesComplete,
+  isAnalyzingMainFolder,
+  isAnalyzingAllFiles,
   processFolderEntry,
   processFolderFiles,
   confirmFolderOptions: baseConfirmFolderOptions,

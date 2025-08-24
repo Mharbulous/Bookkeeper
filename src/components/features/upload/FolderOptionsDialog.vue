@@ -39,6 +39,7 @@
           <v-radio
             :value="true"
             color="primary"
+            :disabled="!allFilesComplete"
           >
             <template #label>
               <div class="w-100">
@@ -95,9 +96,16 @@
           color="primary"
           variant="elevated"
           size="large"
+          :disabled="!canContinue"
           @click="$emit('confirm')"
         >
-          Continue
+          <v-progress-circular
+            v-if="!canContinue"
+            indeterminate
+            size="20"
+            width="2"
+          />
+          <span v-if="canContinue">Continue</span>
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -105,7 +113,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch, ref } from 'vue'
 import { formatDuration } from '../../../utils/fileAnalysis.js'
 
 const props = defineProps({
@@ -132,10 +140,21 @@ const props = defineProps({
   allFilesAnalysis: {
     type: Object,
     default: null
+  },
+  mainFolderComplete: {
+    type: Boolean,
+    default: false
+  },
+  allFilesComplete: {
+    type: Boolean,
+    default: false
   }
 })
 
-defineEmits(['confirm', 'cancel', 'update:includeSubfolders', 'update:show'])
+const emit = defineEmits(['confirm', 'cancel', 'update:includeSubfolders', 'update:show'])
+
+// Track post-switch delay period
+const isInPostSwitchDelay = ref(false)
 
 // Formatting helpers
 const formatNumber = (num) => {
@@ -155,6 +174,45 @@ const getSelectedAnalysis = computed(() => {
     return props.allFilesAnalysis
   } else {
     return props.mainFolderAnalysis
+  }
+})
+
+// Determine when Continue button should be enabled
+const canContinue = computed(() => {
+  // If we're in post-switch delay, disable the button
+  if (isInPostSwitchDelay.value) {
+    return false
+  }
+  
+  if (props.includeSubfolders) {
+    return props.allFilesComplete && props.allFilesAnalysis
+  } else {
+    return props.mainFolderComplete && props.mainFolderAnalysis
+  }
+})
+
+// Handle includeSubfolders updates with validation
+const updateIncludeSubfolders = (value) => {
+  // Only allow switching to "Include subfolders" if analysis is complete
+  if (value === true && !props.allFilesComplete) {
+    return // Ignore the change
+  }
+  emit('update:includeSubfolders', value)
+}
+
+// Auto-switch to "Include subfolders" when analysis completes
+watch(() => props.allFilesComplete, async (newValue) => {
+  if (newValue && !props.includeSubfolders) {
+    // Switch radio button immediately
+    emit('update:includeSubfolders', true)
+    
+    // Set post-switch delay for Continue button
+    isInPostSwitchDelay.value = true
+    
+    // Enable Continue button after 1 second delay
+    setTimeout(() => {
+      isInPostSwitchDelay.value = false
+    }, 1000)
   }
 })
 </script>
