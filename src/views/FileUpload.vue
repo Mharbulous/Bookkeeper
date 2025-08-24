@@ -159,10 +159,8 @@ const handleFileSelect = async (event) => {
 const handleFolderSelect = (event) => {
   updateRefs()
   const files = Array.from(event.target.files)
-  const processedFiles = processFolderFiles(files)
-  if (processedFiles) {
-    addFilesToQueue(processedFiles, processFilesWithQueue)
-  }
+  // Pass callback to handle no-subfolder case automatically
+  processFolderFiles(files, (files) => addFilesToQueue(files, processFilesWithQueue))
   // Reset input
   event.target.value = ''
 }

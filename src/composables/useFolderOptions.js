@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { analyzeFiles } from '../utils/fileAnalysis.js'
 import { startProcessingTimer } from '../utils/processingTimer.js'
 
@@ -177,6 +177,10 @@ export function useFolderOptions() {
       
       console.log(`🔬 FOLDER_ANALYSIS_DATA: ${JSON.stringify(analysisData)}`)
       
+      // Update subfolder count now that we've done full analysis
+      const { folderStats } = preprocessFileData(pendingFolderFiles.value)
+      subfolderCount.value = folderStats.rootFolderCount
+      
       allFilesAnalysis.value = allFilesResult
       mainFolderAnalysis.value = mainFolderResult
       
@@ -191,12 +195,84 @@ export function useFolderOptions() {
     }
   }
 
-  // Watch for when folder options dialog opens to trigger analysis
-  watch(showFolderOptions, (newValue) => {
-    if (newValue && pendingFolderFiles.value.length > 0) {
-      analyzeFilesForOptions()
+  // Background analysis chain - runs after modal is displayed
+  const performBackgroundAnalysis = async (files, addFilesToQueueCallback = null) => {
+    console.log('🔍 BACKGROUND: Starting analysis with', files.length, 'files')
+    
+    try {
+      // Step 1: Quick subfolder detection (can hide modal if no subfolders)
+      const subfolderResult = hasSubfoldersQuick(files)
+      console.log('📁 SUBFOLDER CHECK:', subfolderResult ? 'Has subfolders' : 'No subfolders')
+      
+      if (!subfolderResult) {
+        showFolderOptions.value = false
+        isAnalyzing.value = false
+        
+        // Auto-process files if callback provided
+        if (addFilesToQueueCallback) {
+          const filesWithPath = files.map(f => {
+            f.file.path = f.path
+            return f.file
+          })
+          addFilesToQueueCallback(filesWithPath)
+          pendingFolderFiles.value = []
+        }
+        
+        return { hasSubfolders: false }
+      }
+      
+      // Step 2: Ensure spinner shows for at least 500ms before analysis completes
+      console.log('📊 ANALYSIS: Starting full file analysis')
+      const analysisStartTime = Date.now()
+      
+      // Run analysis
+      await analyzeFilesForOptions()
+      
+      // Calculate how long analysis took
+      const analysisTime = Date.now() - analysisStartTime
+      const minSpinnerTime = 500 // Minimum time to show spinner
+      
+      if (analysisTime < minSpinnerTime) {
+        const remainingTime = minSpinnerTime - analysisTime
+        console.log(`⏳ SPINNER: Analysis took ${analysisTime}ms, waiting ${remainingTime}ms more for user feedback`)
+        await new Promise(resolve => setTimeout(resolve, remainingTime))
+      }
+      
+      console.log('✅ ANALYSIS: Complete - showing calculated values')
+      
+    } catch (error) {
+      console.error('Background analysis failed:', error)
+      isAnalyzing.value = false
     }
-  })
+    
+    return { hasSubfolders: true }
+  }
+
+  // Show modal immediately, calculate later - KISS solution
+  const showFolderOptionsWithAnalysis = (files, addFilesToQueueCallback = null) => {
+    console.log('🚀 INSTANT: Showing modal immediately')
+    
+    // SHOW MODAL FIRST - no conditions, no calculations
+    showFolderOptions.value = true
+    isAnalyzing.value = true
+    
+    // Reset all values to show spinners
+    mainFolderAnalysis.value = null
+    allFilesAnalysis.value = null
+    
+    console.log('✅ INSTANT: Modal state set, analysis values reset to null')
+    
+    // Store files for analysis
+    if (files) {
+      pendingFolderFiles.value = files
+    }
+    
+    // Use a longer delay to ensure modal actually renders
+    setTimeout(() => {
+      console.log('⏰ DELAYED: Starting background analysis after 200ms')
+      performBackgroundAnalysis(pendingFolderFiles.value, addFilesToQueueCallback)
+    }, 200)
+  }
 
   const readDirectoryRecursive = (dirEntry) => {
     return new Promise((resolve) => {
@@ -228,43 +304,51 @@ export function useFolderOptions() {
     })
   }
 
-  const processFolderEntry = async (dirEntry, addFilesToQueue) => {
-    const files = await readDirectoryRecursive(dirEntry)
-    
-    // Use preprocessing to check for subfolders and count root folders (no duplicate parsing!)
-    const { folderStats } = preprocessFileData(files)
-    
-    if (folderStats.hasSubfolders) {
-      pendingFolderFiles.value = files
-      subfolderCount.value = folderStats.rootFolderCount
-      showFolderOptions.value = true
-    } else {
-      // Preserve path information when adding files to queue
-      const filesWithPath = files.map(f => {
-        f.file.path = f.path
-        return f.file
-      })
-      await addFilesToQueue(filesWithPath)
+  // Lightweight subfolder detection - check only first few files
+  const hasSubfoldersQuick = (files, maxCheck = 10) => {
+    const checkCount = Math.min(files.length, maxCheck)
+    for (let i = 0; i < checkCount; i++) {
+      const pathParts = files[i].path.split('/').filter(part => part !== '')
+      if (pathParts.length > 2) {
+        return true
+      }
     }
+    return false
   }
 
-  const processFolderFiles = (files) => {
+  const processFolderEntry = async (dirEntry, addFilesToQueue) => {
+    console.log('📁 FOLDER DROP: Starting to process folder entry')
+    
+    // SHOW MODAL IMMEDIATELY - don't wait for file reading
+    showFolderOptions.value = true
+    isAnalyzing.value = true
+    mainFolderAnalysis.value = null
+    allFilesAnalysis.value = null
+    
+    console.log('✅ INSTANT: Modal shown immediately, now reading files in background')
+    
+    // Read files in background
+    const files = await readDirectoryRecursive(dirEntry)
+    console.log('📂 FILES READ: Got', files.length, 'files, starting analysis')
+    
+    // Store files and start analysis
+    pendingFolderFiles.value = files
+    performBackgroundAnalysis(files, addFilesToQueue)
+  }
+
+  const processFolderFiles = (files, addFilesToQueueCallback = null) => {
     // Convert to our standard format
     const fileDataArray = files.map(file => ({
       file,
       path: file.webkitRelativePath
     }))
     
-    // Use preprocessing to check for subfolders (no duplicate parsing!)
-    const { folderStats } = preprocessFileData(fileDataArray)
+    // Show modal immediately - let background analysis determine if subfolders exist
+    showFolderOptionsWithAnalysis(fileDataArray, addFilesToQueueCallback)
     
-    if (folderStats.hasSubfolders) {
-      pendingFolderFiles.value = fileDataArray
-      subfolderCount.value = folderStats.rootFolderCount
-      showFolderOptions.value = true
-    } else {
-      return files
-    }
+    // Return null to indicate modal handling is in progress
+    // Caller should not proceed with direct file processing
+    return null
   }
 
   // Folder options handlers
@@ -319,6 +403,9 @@ export function useFolderOptions() {
     processFolderFiles,
     confirmFolderOptions,
     cancelFolderUpload,
-    analyzeFilesForOptions
+    analyzeFilesForOptions,
+    showFolderOptionsWithAnalysis,
+    performBackgroundAnalysis,
+    hasSubfoldersQuick
   }
 }
