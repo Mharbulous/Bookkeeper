@@ -1,7 +1,15 @@
 /**
  * File analysis utility for estimating processing time and duplication
  * Extracted from worker logic for reuse in UI components
+ * 
+ * Supports both standard predictions and hardware-calibrated predictions
  */
+
+import { 
+  calculateCalibratedProcessingTime, 
+  getStoredHardwarePerformanceFactor,
+  calculateStandardProcessingTime 
+} from './hardwareCalibration.js';
 
 /**
  * Analyze files to provide count, size, duplication estimates, and time predictions
@@ -9,9 +17,13 @@
  * @param {number} totalDirectoryCount - Total number of unique directories (optional)
  * @param {number} avgDirectoryDepth - Average directory nesting depth (optional)
  * @param {number} avgFileDepth - Average file nesting depth (optional)
- * @returns {Object} Analysis results
+ * @param {Object} options - Additional options
+ * @param {boolean} options.useHardwareCalibration - Use hardware-calibrated predictions if available (default: true)
+ * @param {number} options.hardwarePerformanceFactor - Override H factor for predictions
+ * @returns {Object} Analysis results with both standard and calibrated predictions
  */
-export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth = 0, avgFileDepth = 0) {
+export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth = 0, avgFileDepth = 0, options = {}) {
+  const { useHardwareCalibration = true, hardwarePerformanceFactor } = options;
   if (!files || !Array.isArray(files) || files.length === 0) {
     return {
       totalFiles: 0,
@@ -91,7 +103,26 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
   const phase3Time = PHASE3_BASE_MS + (files.length * PHASE3_FILE_MS) + (avgDirectoryDepth * PHASE3_DEPTH_MS) + (totalDirectoryCount * PHASE3_DIR_MS)
   
   const totalEstimatedTime = phase1Time + phase2Time + phase3Time
+
+  // Hardware-calibrated predictions (if available and enabled)
+  let calibratedPrediction = null;
+  let usedHardwareCalibration = false;
   
+  if (useHardwareCalibration) {
+    const storedH = hardwarePerformanceFactor || getStoredHardwarePerformanceFactor();
+    if (storedH && storedH > 0) {
+      const folderData = {
+        totalFiles: files.length,
+        duplicateCandidates: duplicateCandidates.length,
+        duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
+        avgDirectoryDepth,
+        totalDirectoryCount
+      };
+      
+      calibratedPrediction = calculateCalibratedProcessingTime(folderData, storedH);
+      usedHardwareCalibration = true;
+    }
+  }
   
   // Calculate unique file size (files that can skip hash calculation)
   const uniqueFilesSizeMB = uniqueFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)
@@ -104,8 +135,14 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
     duplicateCandidates: duplicateCandidates.length,
     duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
     estimatedDuplicationPercent,
+    // Standard prediction (always available)
     estimatedTimeMs: Math.max(1, Math.round(totalEstimatedTime)),
     estimatedTimeSeconds: Math.round(Math.max(1, totalEstimatedTime) / 1000 * 10) / 10,
+    
+    // Hardware-calibrated prediction (if available)
+    calibratedTimeMs: calibratedPrediction ? calibratedPrediction.totalTimeMs : null,
+    calibratedTimeSeconds: calibratedPrediction ? calibratedPrediction.totalTimeSeconds : null,
+    isHardwareCalibrated: usedHardwareCalibration,
     totalDirectoryCount: totalDirectoryCount,
     breakdown: {
       phase1TimeMs: Math.round(phase1Time),
@@ -124,7 +161,14 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
       phase3DirMs: PHASE3_DIR_MS,
       avgDirectoryDepth: avgDirectoryDepth,
       totalDirectoryCount: totalDirectoryCount
-    }
+    },
+    
+    // Hardware calibration data (if available)
+    hardwareCalibration: calibratedPrediction ? {
+      phases: calibratedPrediction.phases,
+      calibrationInfo: calibratedPrediction.calibration,
+      phaseDescriptions: calibratedPrediction.breakdown
+    } : null
   }
 }
 

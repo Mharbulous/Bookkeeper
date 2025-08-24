@@ -1,6 +1,7 @@
 import { ref, watch, nextTick } from 'vue'
 import { analyzeFiles } from '../utils/fileAnalysis.js'
 import { startProcessingTimer } from '../utils/processingTimer.js'
+import { storeHardwarePerformanceFactor } from '../utils/hardwareCalibration.js'
 
 export function useFolderOptions() {
   // Reactive data
@@ -251,6 +252,18 @@ export function useFolderOptions() {
       if (window.folderOptionsStartTime) {
         const elapsedTime = Math.round(performance.now() - window.folderOptionsStartTime)
         console.log(`T = ${elapsedTime}`)
+        
+        // Store hardware performance factor for calibration
+        const totalFiles = allFilesAnalysis.value?.totalFiles || pendingFolderFiles.value.length
+        if (totalFiles > 0 && elapsedTime > 0) {
+          storeHardwarePerformanceFactor(totalFiles, elapsedTime, {
+            totalSizeMB: allFilesAnalysis.value?.totalSizeMB || 0,
+            duplicateCandidates: allFilesAnalysis.value?.duplicateCandidates || 0,
+            avgDirectoryDepth: allFilesAnalysis.value?.breakdown?.avgDirectoryDepth || 0,
+            timestamp: Date.now(),
+            source: 'folder_analysis'
+          })
+        }
       }
       
       // Update subfolder count
