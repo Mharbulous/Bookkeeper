@@ -47,8 +47,7 @@
     "deny": [],
     "ask": [],
     "additionalDirectories": [
-      "C:\\c\\Users\\Brahm\\Git",
-      "C:\\cygdrive\\c\\Users\\Brahm\\Git"
+      "C:\Users\Brahm\Git"      
     ]
   }
 }
