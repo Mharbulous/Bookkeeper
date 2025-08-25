@@ -5,7 +5,10 @@ import { useFileQueueCore } from './useFileQueueCore'
 export function useFileQueue() {
   // Initialize core queue management
   const queueCore = useFileQueueCore()
-  
+
+  // Time monitoring for cloud file detection
+  let timeWarningInstance = null
+
   // UI-specific reactive data
   const showSingleFileNotification = ref(false)
   const singleFileNotification = ref({ message: '', color: 'info' })
@@ -212,6 +215,11 @@ export function useFileQueue() {
     // Complete the UI update process
     isProcessingUIUpdate.value = false
     
+    // Stop time monitoring when processing completes
+    if (timeWarningInstance) {
+      timeWarningInstance.stopMonitoring()
+    }
+    
     // Reset processing progress when complete
     resetProgress()
   }
@@ -219,6 +227,31 @@ export function useFileQueue() {
   // Legacy method - maintains backward compatibility
   const updateUploadQueue = async (readyFiles, duplicateFiles) => {
     await updateFromWorkerResults(readyFiles, duplicateFiles)
+  }
+
+  // Time monitoring integration
+  const setTimeWarningInstance = (instance) => {
+    timeWarningInstance = instance
+  }
+  
+  const startTimeMonitoring = (estimatedDurationMs) => {
+    if (timeWarningInstance && estimatedDurationMs > 0) {
+      timeWarningInstance.startMonitoring(estimatedDurationMs)
+    }
+  }
+  
+  const stopTimeMonitoring = () => {
+    if (timeWarningInstance) {
+      timeWarningInstance.stopMonitoring()
+    }
+  }
+  
+  const abortProcessing = () => {
+    if (timeWarningInstance) {
+      timeWarningInstance.abortProcessing()
+    }
+    resetProgress()
+    resetUIProgress()
   }
 
   // Utility functions
@@ -256,6 +289,12 @@ export function useFileQueue() {
     updateProgress,
     resetProgress,
     resetUIProgress,
-    showNotification
+    showNotification,
+    
+    // Time monitoring methods
+    setTimeWarningInstance,
+    startTimeMonitoring,
+    stopTimeMonitoring,
+    abortProcessing
   }
 }

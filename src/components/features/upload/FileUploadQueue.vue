@@ -4,6 +4,20 @@
       <div class="d-flex align-center">
         <v-icon icon="mdi-file-multiple" class="me-2" />
         Upload Queue
+        <!-- Time Progress Bar (shown during deduplication) -->
+        <QueueTimeProgress
+          v-if="showTimeProgress"
+          :is-visible="showTimeProgress"
+          :elapsed-time="timeProgress.elapsedTime"
+          :progress-percentage="timeProgress.progressPercentage"
+          :is-overdue="timeProgress.isOverdue"
+          :overdue-seconds="timeProgress.overdueSeconds"
+          :time-remaining="timeProgress.timeRemaining"
+          :formatted-elapsed-time="timeProgress.formattedElapsedTime"
+          :formatted-time-remaining="timeProgress.formattedTimeRemaining"
+          :estimated-duration="timeProgress.estimatedDuration"
+          class="ml-4"
+        />
       </div>
 
       <div class="d-flex gap-2">
@@ -42,9 +56,9 @@
       />
 
       <!-- UI Update Progress Indicator -->
-      <v-card 
-        v-if="isProcessingUIUpdate" 
-        class="mb-4 bg-blue-lighten-5 border-blue-lighten-2" 
+      <v-card
+        v-if="isProcessingUIUpdate"
+        class="mb-4 bg-blue-lighten-5 border-blue-lighten-2"
         variant="outlined"
       >
         <v-card-text class="py-3">
@@ -87,14 +101,14 @@
         <v-list lines="two" density="comfortable">
           <template v-for="(file, fileIndex) in group.files" :key="file.id || `${groupIndex}-${fileIndex}`">
             <!-- Conditional rendering: Placeholder or Loaded Item -->
-            <FileQueuePlaceholder 
+            <FileQueuePlaceholder
               v-if="!isItemLoaded(groupIndex, fileIndex)"
               :is-duplicate="file.isDuplicate"
               @load="loadItem(groupIndex, fileIndex)"
             />
-            <LazyFileItem 
+            <LazyFileItem
               v-else
-              :file="file" 
+              :file="file"
               :group="group"
             />
             
@@ -139,6 +153,7 @@ import { useLazyFileList } from '../../../composables/useLazyFileList.js'
 import FileQueuePlaceholder from './FileQueuePlaceholder.vue'
 import LazyFileItem from './LazyFileItem.vue'
 import FileQueueChips from './FileQueueChips.vue'
+import QueueTimeProgress from './QueueTimeProgress.vue'
 
 // Component configuration
 defineOptions({
@@ -164,6 +179,24 @@ const props = defineProps({
       percentage: 0,
       phase: 'loading'
     })
+  },
+  // Time progress props
+  showTimeProgress: {
+    type: Boolean,
+    default: false
+  },
+  timeProgress: {
+    type: Object,
+    default: () => ({
+      elapsedTime: 0,
+      progressPercentage: 0,
+      isOverdue: false,
+      overdueSeconds: 0,
+      timeRemaining: 0,
+      formattedElapsedTime: '0s',
+      formattedTimeRemaining: '0s',
+      estimatedDuration: 0
+    })
   }
 })
 
@@ -171,9 +204,9 @@ const props = defineProps({
 defineEmits(['remove-file', 'start-upload', 'clear-queue'])
 
 // Hash tooltip functionality (only for cache management)
-const { 
+const {
   populateExistingHash,
-  clearCache 
+  clearCache
 } = useLazyHashTooltip()
 
 // Populate existing hashes when component mounts or props change

@@ -39,12 +39,16 @@
       "Bash(for:*)",
       "Bash(fi)",
       "Bash(done)",
-      "Bash(move:*)"
+      "Bash(move:*)",
+      "Bash(npx eslint:*)",
+      "Bash(dir)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": [
-      "C:\\c\\Users\\Brahm\\Git"
+      "C:\\c\\Users\\Brahm\\Git",
+      "C:\\cygdrive\\c\\Users\\Brahm\\Git"
     ]
   }
 }

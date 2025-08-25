@@ -40,12 +40,24 @@
       />
 
 
+
       <!-- Upload Queue/Preview -->
       <FileUploadQueue
         v-if="uploadQueue.length > 0 || isProcessingUIUpdate"
         :files="uploadQueue"
         :is-processing-ui-update="isProcessingUIUpdate"
         :ui-update-progress="uiUpdateProgress"
+        :show-time-progress="timeWarning.startTime.value !== null && (uploadQueue.length === 0 || isProcessingUIUpdate)"
+        :time-progress="{
+          elapsedTime: timeWarning.elapsedTime.value,
+          progressPercentage: timeWarning.progressPercentage.value,
+          isOverdue: timeWarning.isOverdue.value,
+          overdueSeconds: timeWarning.overdueSeconds.value,
+          timeRemaining: timeWarning.timeRemaining.value,
+          formattedElapsedTime: timeWarning.formattedElapsedTime.value,
+          formattedTimeRemaining: timeWarning.formattedTimeRemaining.value,
+          estimatedDuration: timeWarning.estimatedDuration.value
+        }"
         @remove-file="removeFromQueue"
         @start-upload="startUpload"
         @clear-queue="clearQueue"
@@ -77,6 +89,17 @@
         :can-cancel="true"
         @cancel="handleCancelProcessing"
       />
+
+      <!-- Cloud File Warning Modal -->
+      <CloudFileWarningModal
+        :is-visible="timeWarning.showCloudFileWarning.value"
+        :formatted-elapsed-time="timeWarning.formattedElapsedTime.value"
+        :estimated-duration="timeWarning.estimatedDuration.value"
+        :overdue-seconds="timeWarning.overdueSeconds.value"
+        @stop-upload="handleStopUpload"
+        @continue-waiting="handleContinueWaiting"
+        @close="handleCloseWarning"
+      />
     </div>
   </v-container>
 </template>
@@ -87,10 +110,12 @@ import FileUploadQueue from '../components/features/upload/FileUploadQueue.vue'
 import UploadDropzone from '../components/features/upload/UploadDropzone.vue'
 import FolderOptionsDialog from '../components/features/upload/FolderOptionsDialog.vue'
 import ProcessingProgressModal from '../components/features/upload/ProcessingProgressModal.vue'
+import CloudFileWarningModal from '../components/features/upload/CloudFileWarningModal.vue'
 import { useFileQueue } from '../composables/useFileQueue.js'
 import { useFileDragDrop } from '../composables/useFileDragDrop.js'
 import { useQueueDeduplication } from '../composables/useQueueDeduplication.js'
 import { useFolderOptions } from '../composables/useFolderOptions.js'
+import { useTimeBasedWarning } from '../composables/useTimeBasedWarning.js'
 
 // Component configuration
 defineOptions({
@@ -130,9 +155,8 @@ const {
   handleDrop: baseHandleDrop
 } = useFileDragDrop()
 
-const {
-  processFiles
-} = useQueueDeduplication()
+const queueDeduplication = useQueueDeduplication()
+const { processFiles } = queueDeduplication
 
 const {
   showFolderOptions,
@@ -159,8 +183,53 @@ const {
   cancelFolderUpload
 } = useFolderOptions()
 
+const timeWarning = useTimeBasedWarning()
+
+// Connect time monitoring to deduplication processing
+queueDeduplication.setTimeMonitoringCallback({
+  onProcessingStart: () => {
+    // Time monitoring will be started when we have an estimate from folder analysis
+    console.log('File processing started - waiting for time estimate')
+  },
+  onProcessingComplete: () => {
+    timeWarning.resetMonitoring()
+    console.log('File processing completed - time monitoring reset')
+  },
+  onProcessingError: (error) => {
+    timeWarning.resetMonitoring()
+    console.log('File processing error - time monitoring reset:', error)
+  },
+  onProcessingAborted: () => {
+    console.log('File processing aborted - time monitoring stopped')
+  }
+})
+
 // Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
+  // Start time monitoring if not already started and we have files to process
+  if (files.length > 0 && !timeWarning.startTime.value) {
+    // Use folder analysis estimate if available, otherwise create basic estimate
+    const folderAnalysis = allFilesAnalysis.value || mainFolderAnalysis.value
+    let estimatedTime = 0
+    
+    if (folderAnalysis && folderAnalysis.totalEstimatedTime) {
+      estimatedTime = folderAnalysis.totalEstimatedTime
+      console.log(`Starting time monitoring with folder analysis estimate: ${estimatedTime}ms`)
+    } else {
+      // Basic time estimate for deduplication: 35ms base + 6.5ms per file + size factor
+      const totalSizeMB = files.reduce((sum, file) => sum + (file.size || 0), 0) / (1024 * 1024)
+      estimatedTime = Math.max(1000, 35 + (6.5 * files.length) + (0.8 * totalSizeMB)) // Minimum 1 second for visibility
+      console.log(`Starting time monitoring with basic deduplication estimate: ${estimatedTime}ms for ${files.length} files (${totalSizeMB.toFixed(1)}MB)`)
+    }
+    
+    if (estimatedTime > 0) {
+      timeWarning.startMonitoring(estimatedTime)
+      console.log(`Time monitoring started: estimated=${estimatedTime}ms, files=${files.length}`)
+    } else {
+      console.warn('Time monitoring not started: estimatedTime is 0 or invalid')
+    }
+  }
+  
   // Double-check safety filter: exclude any files from skipped folders
   if (skippedFolders.value && skippedFolders.value.length > 0) {
     const originalCount = files.length
@@ -208,7 +277,6 @@ const handleFolderSelect = (event) => {
   const files = Array.from(event.target.files)
   
   // File Explorer count will be compared automatically in processing
-  
   // Pass callback to handle no-subfolder case automatically
   processFolderFiles(files, async (files) => {
     // Show Upload Queue instantly with first 100 files
@@ -240,7 +308,7 @@ const confirmFolderOptions = () => {
   baseConfirmFolderOptions(async (files) => {
     // Show Upload Queue instantly with first 100 files
     await initializeQueueInstantly(files)
-    // Then process all files for deduplication
+    // Then process all files for deduplication (time monitoring will start automatically)
     addFilesToQueue(files, processFilesWithQueue)
   })
 }
@@ -266,8 +334,29 @@ const triggerFolderSelectWrapper = () => {
 
 // Handle cancel processing for progress modal
 const handleCancelProcessing = () => {
-  // TODO: Implement in Step 8 - Integration
+  // Stop time monitoring when cancelling
+  timeWarning.abortProcessing()
   resetProgress()
+}
+
+// Cloud file warning modal handlers
+const handleStopUpload = () => {
+  // User chose to stop upload due to cloud file warning
+  timeWarning.abortProcessing()
+  resetProgress()
+  clearQueue()
+  showNotification('Upload stopped', 'info')
+}
+
+const handleContinueWaiting = () => {
+  // User chose to wait 1 more minute
+  timeWarning.snoozeWarning()
+  showNotification('Continuing upload - will check again in 1 minute', 'info')
+}
+
+const handleCloseWarning = () => {
+  // User closed warning without choosing action
+  timeWarning.dismissWarning()
 }
 </script>
 

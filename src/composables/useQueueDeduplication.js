@@ -1,18 +1,20 @@
 import { useQueueCore } from './useQueueCore'
-import { useQueueWorkers } from './useQueueWorkers' 
+import { useQueueWorkers } from './useQueueWorkers'
 import { useQueueProgress } from './useQueueProgress'
 
 export function useQueueDeduplication() {
-  
   // Initialize component modules
   const queueCore = useQueueCore()
   const queueWorkers = useQueueWorkers()
   const queueProgress = useQueueProgress()
+
+  // Time monitoring integration
+  let timeMonitoringCallback = null
   
   // Create main thread processing function with core logic
   const processFilesMainThread = async (files, updateUploadQueue, onProgress = null, skippedFolders = []) => {
     return queueProgress.processFilesMainThread(
-      files, 
+      files,
       updateUploadQueue,
       queueCore.processMainThreadDeduplication,
       queueCore.processDuplicateGroups,
@@ -23,13 +25,53 @@ export function useQueueDeduplication() {
   
   // Main processFiles function that coordinates worker vs main thread
   const processFiles = async (files, updateUploadQueue, onProgress = null) => {
-    return queueProgress.processFiles(
-      files,
-      updateUploadQueue,
-      queueWorkers.processFilesWithWorker,
-      processFilesMainThread,
-      onProgress
-    )
+    // Start time monitoring if callback is set
+    if (timeMonitoringCallback) {
+      timeMonitoringCallback.onProcessingStart?.()
+    }
+    
+    try {
+      const result = await queueProgress.processFiles(
+        files,
+        updateUploadQueue,
+        queueWorkers.processFilesWithWorker,
+        processFilesMainThread,
+        onProgress
+      )
+      
+      // Stop time monitoring on successful completion
+      if (timeMonitoringCallback) {
+        timeMonitoringCallback.onProcessingComplete?.()
+      }
+      
+      return result
+    } catch (error) {
+      // Stop time monitoring on error
+      if (timeMonitoringCallback) {
+        timeMonitoringCallback.onProcessingError?.(error)
+      }
+      throw error
+    }
+  }
+
+  // Time monitoring methods
+  const setTimeMonitoringCallback = (callback) => {
+    timeMonitoringCallback = callback
+  }
+  
+  const clearTimeMonitoringCallback = () => {
+    timeMonitoringCallback = null
+  }
+  
+  const abortProcessing = () => {
+    // Terminate any running workers
+    queueWorkers.terminateWorker()
+    
+    // Clear monitoring callback
+    if (timeMonitoringCallback) {
+      timeMonitoringCallback.onProcessingAborted?.()
+      timeMonitoringCallback = null
+    }
   }
 
   return {
@@ -41,10 +83,13 @@ export function useQueueDeduplication() {
     // Main processing methods (coordinated)
     processFiles,
     processFilesMainThread,
-    forceMainThreadProcessing: (files, updateUploadQueue, onProgress = null, skippedFolders = []) => 
-      queueProgress.forceMainThreadProcessing(files, updateUploadQueue, 
-        (files, updateUploadQueue, onProgress) => processFilesMainThread(files, updateUploadQueue, onProgress, skippedFolders), 
-        onProgress),
+    forceMainThreadProcessing: (files, updateUploadQueue, onProgress = null, skippedFolders = []) =>
+      queueProgress.forceMainThreadProcessing(
+        files,
+        updateUploadQueue,
+        (files, updateUploadQueue, onProgress) => processFilesMainThread(files, updateUploadQueue, onProgress, skippedFolders),
+        onProgress
+      ),
     
     // Status and management (from useQueueWorkers)
     getProcessingStatus: queueWorkers.getProcessingStatus,
@@ -56,6 +101,11 @@ export function useQueueDeduplication() {
     
     // Worker access (for backwards compatibility)
     workerInstance: queueWorkers.workerInstance,
-    workerManager: queueWorkers.workerManager
+    workerManager: queueWorkers.workerManager,
+    
+    // Time monitoring integration
+    setTimeMonitoringCallback,
+    clearTimeMonitoringCallback,
+    abortProcessing
   }
 }
