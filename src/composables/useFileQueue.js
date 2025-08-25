@@ -1,14 +1,17 @@
-import { ref, shallowRef, nextTick } from 'vue'
+import { ref, nextTick } from 'vue'
 import { logProcessingTime } from '../utils/processingTimer.js'
+import { useFileQueueCore } from './useFileQueueCore'
 
 export function useFileQueue() {
-  // Reactive data - Use shallowRef for better performance with large file arrays
-  const uploadQueue = shallowRef([])
+  // Initialize core queue management
+  const queueCore = useFileQueueCore()
+  
+  // UI-specific reactive data
   const showSingleFileNotification = ref(false)
   const singleFileNotification = ref({ message: '', color: 'info' })
   
   // Progress state tracking
-  const processingProgress = shallowRef({
+  const processingProgress = ref({
     current: 0,
     total: 0,
     percentage: 0,
@@ -24,43 +27,6 @@ export function useFileQueue() {
     percentage: 0,
     phase: 'loading' // 'loading', 'complete'
   })
-
-  // Template refs
-  const fileInput = ref(null)
-  const folderInput = ref(null)
-
-  // Helper function to get file path consistently
-  const getFilePath = (fileRef) => {
-    // Handle direct file objects
-    if (fileRef instanceof File) {
-      return fileRef.path || fileRef.webkitRelativePath || fileRef.name
-    }
-    // Handle file reference objects
-    return fileRef.path || fileRef.file?.webkitRelativePath || fileRef.file?.path || fileRef.file?.name || fileRef.name
-  }
-
-  // File input handlers
-  const triggerFileSelect = () => {
-    fileInput.value.click()
-  }
-
-  const triggerFolderSelect = () => {
-    folderInput.value.click()
-  }
-
-  // File processing functions
-  const processSingleFile = async (file, processFiles) => {
-    // For single files, add to queue
-    await addFilesToQueue([file], processFiles)
-  }
-
-  const addFilesToQueue = async (files, processFiles) => {
-    if (files.length === 0) return
-    const startTime = Date.now()
-    await processFiles(files)
-    // Note: Total time will be logged when UI update completes
-    window.endToEndStartTime = startTime
-  }
 
   // Worker progress update handler
   const updateProgress = (progressData) => {
@@ -95,31 +61,6 @@ export function useFileQueue() {
     }
   }
 
-  // Helper function to process a chunk of files into queue format
-  const processFileChunk = (files) => {
-    return files.map(fileRef => {
-      const queueItem = {
-        id: crypto.randomUUID(),
-        file: fileRef.file,
-        metadata: fileRef.metadata,
-        status: fileRef.status,
-        name: fileRef.file.name,
-        size: fileRef.file.size,
-        type: fileRef.file.type,
-        lastModified: fileRef.file.lastModified,
-        path: fileRef.path || getFilePath(fileRef),
-        isDuplicate: fileRef.status === 'duplicate'
-      }
-      
-      // Only include hash if it was calculated during deduplication process
-      if (fileRef.hash) {
-        queueItem.hash = fileRef.hash
-      }
-      
-      return queueItem
-    })
-  }
-  
   // Instant Upload Queue initialization - show immediately with first 100 files
   const initializeQueueInstantly = async (files) => {
     const totalFiles = files.length
@@ -150,7 +91,7 @@ export function useFileQueue() {
       isDuplicate: false
     }))
     
-    uploadQueue.value = initialFiles
+    queueCore.uploadQueue.value = initialFiles
     
     if (totalFiles <= 100) {
       uiUpdateProgress.value = {
@@ -188,7 +129,7 @@ export function useFileQueue() {
     
     if (totalFiles <= 100) {
       // For small file sets, just load everything at once
-      uploadQueue.value = processFileChunk(allFiles)
+      queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles)
       
       uiUpdateProgress.value = {
         current: totalFiles,
@@ -202,20 +143,19 @@ export function useFileQueue() {
       await new Promise(resolve => setTimeout(resolve, 0))
     } else {
       // For large file sets, check if queue was already initialized instantly
-      if (uploadQueue.value.length > 0) {
+      if (queueCore.uploadQueue.value.length > 0) {
         // Queue was already initialized with first 100 files
         // Ensure minimum loading display time (at least 1.5 seconds for spinner visibility)
         const minLoadingTime = 1500
         const elapsedTime = window.instantQueueStartTime ? Date.now() - window.instantQueueStartTime : 0
         const remainingTime = Math.max(0, minLoadingTime - elapsedTime)
         
-        
         if (remainingTime > 0) {
           await new Promise(resolve => setTimeout(resolve, remainingTime))
         }
         
         // Then replace with full processed results
-        uploadQueue.value = processFileChunk(allFiles)
+        queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles)
         
         uiUpdateProgress.value = {
           current: totalFiles,
@@ -231,7 +171,7 @@ export function useFileQueue() {
         // CHUNK 1: Initial batch (first 100 files) - immediate user feedback
         const chunk1Size = 100
         const chunk1Files = allFiles.slice(0, chunk1Size)
-        uploadQueue.value = processFileChunk(chunk1Files)
+        queueCore.uploadQueue.value = queueCore.processFileChunk(chunk1Files)
         
         uiUpdateProgress.value = {
           current: chunk1Size,
@@ -244,7 +184,7 @@ export function useFileQueue() {
         await new Promise(resolve => setTimeout(resolve, 200))
         
         // CHUNK 2: Full render of ALL files
-        uploadQueue.value = processFileChunk(allFiles)
+        queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles)
         
         uiUpdateProgress.value = {
           current: totalFiles,
@@ -281,23 +221,6 @@ export function useFileQueue() {
     await updateFromWorkerResults(readyFiles, duplicateFiles)
   }
 
-  // Queue management
-  const removeFromQueue = (fileId) => {
-    const index = uploadQueue.value.findIndex(f => f.id === fileId)
-    if (index > -1) {
-      uploadQueue.value.splice(index, 1)
-    }
-  }
-
-  const clearQueue = () => {
-    uploadQueue.value = []
-  }
-
-  const startUpload = () => {
-    // Placeholder for actual upload implementation
-    // TODO: Implement file upload logic
-  }
-
   // Utility functions
   const showNotification = (message, color = 'info') => {
     singleFileNotification.value = { message, color }
@@ -305,32 +228,34 @@ export function useFileQueue() {
   }
 
   return {
-    // Reactive data
-    uploadQueue,
+    // Reactive data (from core + UI-specific)
+    uploadQueue: queueCore.uploadQueue,
     showSingleFileNotification,
     singleFileNotification,
-    fileInput,
-    folderInput,
+    fileInput: queueCore.fileInput,
+    folderInput: queueCore.folderInput,
     processingProgress,
     isProcessingUIUpdate,
     uiUpdateProgress,
 
-    // Methods
-    getFilePath,
-    triggerFileSelect,
-    triggerFolderSelect,
-    processSingleFile,
-    addFilesToQueue,
+    // Core methods (delegated to core)
+    getFilePath: queueCore.getFilePath,
+    triggerFileSelect: queueCore.triggerFileSelect,
+    triggerFolderSelect: queueCore.triggerFolderSelect,
+    processSingleFile: queueCore.processSingleFile,
+    addFilesToQueue: queueCore.addFilesToQueue,
+    processFileChunk: queueCore.processFileChunk,
+    removeFromQueue: queueCore.removeFromQueue,
+    clearQueue: queueCore.clearQueue,
+    startUpload: queueCore.startUpload,
+
+    // UI coordination methods
     initializeQueueInstantly, // New method for instant queue display
     updateUploadQueue, // Legacy compatibility
     updateFromWorkerResults, // New worker-optimized method
     updateProgress,
     resetProgress,
     resetUIProgress,
-    processFileChunk,
-    removeFromQueue,
-    clearQueue,
-    startUpload,
     showNotification
   }
 }
