@@ -7,17 +7,34 @@
       </v-card-title>
       
       <v-card-text>
-        <v-radio-group :model-value="includeSubfolders" @update:model-value="$emit('update:includeSubfolders', $event)">
+        <!-- Timeout Error Display -->
+        <div v-if="analysisTimedOut" class="mb-4 pa-4 bg-error text-white rounded">
+          <div class="d-flex align-center mb-2">
+            <v-icon icon="mdi-alert-circle" class="me-2" />
+            <span class="font-weight-medium">Analysis Timeout</span>
+          </div>
+          <div class="text-body-2" style="white-space: pre-line;">{{ timeoutError }}</div>
+        </div>
+        
+        <v-radio-group 
+          :model-value="includeSubfolders" 
+          @update:model-value="$emit('update:includeSubfolders', $event)"
+          :disabled="analysisTimedOut"
+        >
           <v-radio
             :value="false"
             color="primary"
             class="mb-4"
+            :disabled="analysisTimedOut"
           >
             <template #label>
               <div class="w-100">
                 <div class="font-weight-medium mb-2">This folder only</div>
                 <div class="text-body-2 text-grey-darken-1">
-                  <template v-if="isAnalyzing || !mainFolderAnalysis">
+                  <template v-if="analysisTimedOut">
+                    Analysis failed - unable to scan folder
+                  </template>
+                  <template v-else-if="isAnalyzing || !mainFolderAnalysis">
                     <v-progress-circular
                       indeterminate
                       size="16"
@@ -39,13 +56,16 @@
           <v-radio
             :value="true"
             color="primary"
-            :disabled="!allFilesComplete"
+            :disabled="!allFilesComplete || analysisTimedOut"
           >
             <template #label>
               <div class="w-100">
                 <div class="font-weight-medium mb-2">Include subfolders</div>
                 <div class="text-body-2 text-grey-darken-1">
-                  <template v-if="isAnalyzing || !allFilesAnalysis">
+                  <template v-if="analysisTimedOut">
+                    Analysis failed - unable to scan folder
+                  </template>
+                  <template v-else-if="isAnalyzing || !allFilesAnalysis">
                     <v-progress-circular
                       indeterminate
                       size="16"
@@ -69,7 +89,10 @@
       
       <v-card-actions class="px-6 py-4">
         <!-- Time Estimate Display -->
-        <div v-if="!isAnalyzing && getSelectedAnalysis" class="text-h6 font-weight-medium text-primary">
+        <div v-if="analysisTimedOut" class="text-h6 font-weight-medium text-error">
+          Analysis failed
+        </div>
+        <div v-else-if="!isAnalyzing && getSelectedAnalysis" class="text-h6 font-weight-medium text-primary">
           Time estimate: {{ formatTime(getSelectedAnalysis.timeSeconds) }}
         </div>
         <div v-else-if="isAnalyzing" class="d-flex align-center">
@@ -96,16 +119,17 @@
           color="primary"
           variant="elevated"
           size="large"
-          :disabled="!canContinue"
+          :disabled="!canContinue || analysisTimedOut"
           @click="$emit('confirm')"
         >
           <v-progress-circular
-            v-if="!canContinue"
+            v-if="!canContinue && !analysisTimedOut"
             indeterminate
             size="20"
             width="2"
           />
-          <span v-if="canContinue">Continue</span>
+          <span v-if="canContinue && !analysisTimedOut">Continue</span>
+          <span v-else-if="analysisTimedOut">Cannot Continue</span>
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -148,6 +172,14 @@ const props = defineProps({
   allFilesComplete: {
     type: Boolean,
     default: false
+  },
+  analysisTimedOut: {
+    type: Boolean,
+    default: false
+  },
+  timeoutError: {
+    type: String,
+    default: null
   }
 })
 

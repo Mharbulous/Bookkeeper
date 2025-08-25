@@ -30,6 +30,8 @@
         :all-files-complete="allFilesComplete"
         :is-analyzing-main-folder="isAnalyzingMainFolder"
         :is-analyzing-all-files="isAnalyzingAllFiles"
+        :analysis-timed-out="analysisTimedOut"
+        :timeout-error="timeoutError"
         @update:show="showFolderOptions = $event"
         @update:include-subfolders="includeSubfolders = $event"
         @confirm="confirmFolderOptions"
@@ -138,6 +140,9 @@ const {
   isAnalyzing,
   mainFolderAnalysis,
   allFilesAnalysis,
+  // Timeout state
+  analysisTimedOut,
+  timeoutError,
   // Progress tracking
   mainFolderProgress,
   allFilesProgress,

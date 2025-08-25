@@ -4,7 +4,7 @@
 
 ### Q: Why does my upload queue show fewer files than Windows File Explorer?
 
-**A:** This is normal behavior due to browser security filtering. You may notice a small discrepancy (typically 1-3 files) between what Windows File Explorer counts and what appears in your upload queue.
+**A:** You may notice a small discrepancy (typically 1-3 files) between what Windows File Explorer counts and what appears in your upload queue.  This is normal behavior due to browser security filtering. 
 
 **What's happening:**
 - **Windows File Explorer** counts ALL files, including hidden system files

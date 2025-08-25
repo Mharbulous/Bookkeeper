@@ -15,6 +15,11 @@ export function useFolderOptions() {
   const mainFolderAnalysis = ref(null)
   const allFilesAnalysis = ref(null)
   
+  // Timeout state
+  const analysisTimedOut = ref(false)
+  const timeoutError = ref(null)
+  let analysisTimeoutId = null
+  
   // Progress tracking for chunked processing
   const mainFolderProgress = ref({ filesProcessed: 0, totalFiles: 0 })
   const allFilesProgress = ref({ filesProcessed: 0, totalFiles: 0 })
@@ -129,6 +134,11 @@ export function useFolderOptions() {
       return
     }
 
+    // Check if timeout occurred before starting
+    if (analysisTimedOut.value) {
+      return
+    }
+
     isAnalyzingRef.value = true
     progressRef.value = { filesProcessed: 0, totalFiles: files.length }
     
@@ -143,6 +153,11 @@ export function useFolderOptions() {
       // For larger sets, process in chunks to allow UI updates
       let processedFiles = []
       for (let i = 0; i < files.length; i += chunkSize) {
+        // Check if timeout occurred during processing
+        if (analysisTimedOut.value) {
+          return
+        }
+        
         const chunk = files.slice(i, i + chunkSize)
         processedFiles.push(...chunk)
         
@@ -168,9 +183,15 @@ export function useFolderOptions() {
   const analyzeFilesForOptions = async () => {
     if (pendingFolderFiles.value.length === 0) return
     
-    isAnalyzing.value = true
+    // Don't set isAnalyzing here since it's already set when modal opens
+    // Don't reset timeout state since it's already set when modal opens
     mainFolderComplete.value = false
     allFilesComplete.value = false
+    
+    // Check if already timed out before proceeding
+    if (analysisTimedOut.value) {
+      return
+    }
     
     try {
       // Single preprocessing pass - parse all paths once and extract everything
@@ -248,6 +269,12 @@ export function useFolderOptions() {
       // Wait for both analyses to complete
       await Promise.all([mainFolderPromise, allFilesPromise])
       
+      // Clear timeout on successful completion
+      if (analysisTimeoutId) {
+        clearTimeout(analysisTimeoutId)
+        analysisTimeoutId = null
+      }
+      
       // Log elapsed time when all calculations are complete
       if (window.folderOptionsStartTime) {
         const elapsedTime = Math.round(performance.now() - window.folderOptionsStartTime)
@@ -272,25 +299,44 @@ export function useFolderOptions() {
       
     } catch (error) {
       console.error('Error analyzing files for folder options:', error)
+      // Clear timeout on error
+      if (analysisTimeoutId) {
+        clearTimeout(analysisTimeoutId)
+        analysisTimeoutId = null
+      }
       // Set fallback analysis
       allFilesAnalysis.value = analyzeFiles([], 0, 0, 0)
       mainFolderAnalysis.value = analyzeFiles([], 0, 0, 0)
       mainFolderComplete.value = true
       allFilesComplete.value = true
     } finally {
-      isAnalyzing.value = false
-      isAnalyzingMainFolder.value = false
-      isAnalyzingAllFiles.value = false
+      // Only clear analyzing state if not timed out (timeout handler clears it)
+      if (!analysisTimedOut.value) {
+        isAnalyzing.value = false
+        isAnalyzingMainFolder.value = false
+        isAnalyzingAllFiles.value = false
+      }
     }
   }
 
   // Background analysis chain - runs after modal is displayed
   const performBackgroundAnalysis = async (files, addFilesToQueueCallback = null) => {
     try {
+      // Check if already timed out before starting analysis
+      if (analysisTimedOut.value) {
+        return { hasSubfolders: true }
+      }
+      
       // Step 1: Quick subfolder detection (can hide modal if no subfolders)
       const subfolderResult = hasSubfoldersQuick(files)
       
       if (!subfolderResult) {
+        // Clear timeout since we're successfully completing
+        if (analysisTimeoutId) {
+          clearTimeout(analysisTimeoutId)
+          analysisTimeoutId = null
+        }
+        
         showFolderOptions.value = false
         isAnalyzing.value = false
         
@@ -312,7 +358,10 @@ export function useFolderOptions() {
       
     } catch (error) {
       console.error('Background analysis failed:', error)
-      isAnalyzing.value = false
+      // Don't clear isAnalyzing here if timed out - let timeout handler manage state
+      if (!analysisTimedOut.value) {
+        isAnalyzing.value = false
+      }
     }
     
     return { hasSubfolders: true }
@@ -323,6 +372,7 @@ export function useFolderOptions() {
     // SHOW MODAL FIRST - no conditions, no calculations
     showFolderOptions.value = true
     console.log("T = 0")
+    console.log("DEBUG: showFolderOptionsWithAnalysis called with", files ? files.length : 'no files', 'files')
     window.folderOptionsStartTime = performance.now()
     isAnalyzing.value = true
     
@@ -336,6 +386,76 @@ export function useFolderOptions() {
     isAnalyzingMainFolder.value = false
     isAnalyzingAllFiles.value = false
     includeSubfolders.value = false
+    analysisTimedOut.value = false
+    timeoutError.value = null
+    
+    // Clear any existing timeout
+    if (analysisTimeoutId) {
+      clearTimeout(analysisTimeoutId)
+      analysisTimeoutId = null
+    }
+    
+    // Set up progress-rate monitoring for behavioral cloud file detection
+    let progressChecks = []
+    let checkCount = 0
+    
+    const checkProgress = () => {
+      checkCount++
+      const elapsed = window.folderOptionsStartTime ? Math.round(performance.now() - window.folderOptionsStartTime) : 0
+      const filesDetected = files ? files.length : (pendingFolderFiles.value ? pendingFolderFiles.value.length : 0)
+      
+      progressChecks.push({ time: elapsed, files: filesDetected, check: checkCount })
+      
+      console.log(`PROGRESS CHECK ${checkCount}: ${filesDetected} files after ${elapsed}ms`)
+      
+      if (checkCount >= 3) {
+        // Analyze progress rate after 3 checks
+        const firstCheck = progressChecks[0]
+        const lastCheck = progressChecks[progressChecks.length - 1]
+        const timeDiff = lastCheck.time - firstCheck.time
+        const filesDiff = lastCheck.files - firstCheck.files
+        const progressRate = timeDiff > 0 ? filesDiff / (timeDiff / 1000) : 0 // files per second
+        
+        console.log('=== PROGRESS RATE ANALYSIS ===')
+        console.log(`Files detected: ${firstCheck.files} → ${lastCheck.files} (${filesDiff} files)`)
+        console.log(`Time elapsed: ${firstCheck.time}ms → ${lastCheck.time}ms (${timeDiff}ms)`)
+        console.log(`Progress rate: ${progressRate.toFixed(2)} files/second`)
+        
+        if (lastCheck.files === 0 && lastCheck.time >= 1000) {
+          // No files detected after 1000+ ms = likely cloud files
+          analysisTimedOut.value = true
+          
+          let errorMessage = "Unable to scan the files in this folder. This is often due to files not being stored locally but being stored on a cloud or files-on-demand service such as OneDrive."
+          
+          const infoLines = []
+          infoLines.push(`No files detected after ${lastCheck.time}ms (likely cloud files - readDirectoryRecursive stuck)`)
+          infoLines.push(`Progress rate: ${progressRate.toFixed(2)} files/second`)
+          
+          errorMessage += "\n\nInformation gathered:\n• " + infoLines.join("\n• ")
+          
+          timeoutError.value = errorMessage
+          isAnalyzing.value = false
+          isAnalyzingMainFolder.value = false
+          isAnalyzingAllFiles.value = false
+          
+          console.log('DIAGNOSIS: Cloud files detected (no progress) - TRIGGERING ERROR')
+        } else if (progressRate > 0) {
+          console.log('DIAGNOSIS: Local files detected (making progress)')
+          // Continue processing - good progress rate
+        } else if (lastCheck.files > 0) {
+          console.log('DIAGNOSIS: Local files detected (readDirectoryRecursive completed)')
+          // Files were detected, readDirectoryRecursive likely completed
+        }
+        return
+      }
+      
+      // Schedule next progress check
+      const nextInterval = checkCount === 1 ? 200 : 200 // 600ms, 800ms, 1000ms intervals
+      setTimeout(checkProgress, nextInterval)
+    }
+    
+    // Start first progress check after 600ms
+    analysisTimeoutId = setTimeout(checkProgress, 600)
     
     // Store files for analysis
     if (files) {
@@ -394,6 +514,7 @@ export function useFolderOptions() {
     // SHOW MODAL IMMEDIATELY - don't wait for file reading
     showFolderOptions.value = true
     console.log("T = 0")
+    console.log("DEBUG: processFolderEntry called with dirEntry:", dirEntry.name)
     window.folderOptionsStartTime = performance.now()
     isAnalyzing.value = true
     
@@ -407,13 +528,97 @@ export function useFolderOptions() {
     isAnalyzingMainFolder.value = false
     isAnalyzingAllFiles.value = false
     includeSubfolders.value = false
+    analysisTimedOut.value = false
+    timeoutError.value = null
     
-    // Read files in background
-    const files = await readDirectoryRecursive(dirEntry)
+    // Clear any existing timeout
+    if (analysisTimeoutId) {
+      clearTimeout(analysisTimeoutId)
+      analysisTimeoutId = null
+    }
     
-    // Store files and start analysis
-    pendingFolderFiles.value = files
-    performBackgroundAnalysis(files, addFilesToQueue)
+    // Set up progress-rate monitoring for behavioral cloud file detection
+    let progressChecks = []
+    let checkCount = 0
+    
+    const checkProgress = () => {
+      checkCount++
+      const elapsed = window.folderOptionsStartTime ? Math.round(performance.now() - window.folderOptionsStartTime) : 0
+      const filesDetected = pendingFolderFiles.value ? pendingFolderFiles.value.length : 0
+      
+      progressChecks.push({ time: elapsed, files: filesDetected, check: checkCount })
+      
+      console.log(`PROGRESS CHECK ${checkCount}: ${filesDetected} files after ${elapsed}ms`)
+      
+      if (checkCount >= 3) {
+        // Analyze progress rate after 3 checks
+        const firstCheck = progressChecks[0]
+        const lastCheck = progressChecks[progressChecks.length - 1]
+        const timeDiff = lastCheck.time - firstCheck.time
+        const filesDiff = lastCheck.files - firstCheck.files
+        const progressRate = timeDiff > 0 ? filesDiff / (timeDiff / 1000) : 0 // files per second
+        
+        console.log('=== PROGRESS RATE ANALYSIS ===')
+        console.log(`Files detected: ${firstCheck.files} → ${lastCheck.files} (${filesDiff} files)`)
+        console.log(`Time elapsed: ${firstCheck.time}ms → ${lastCheck.time}ms (${timeDiff}ms)`)
+        console.log(`Progress rate: ${progressRate.toFixed(2)} files/second`)
+        
+        if (lastCheck.files === 0 && lastCheck.time >= 1000) {
+          // No files detected after 1000+ ms = likely cloud files
+          analysisTimedOut.value = true
+          
+          let errorMessage = "Unable to scan the files in this folder. This is often due to files not being stored locally but being stored on a cloud or files-on-demand service such as OneDrive."
+          
+          const infoLines = []
+          infoLines.push(`No files detected after ${lastCheck.time}ms (likely cloud files - readDirectoryRecursive stuck)`)
+          infoLines.push(`Progress rate: ${progressRate.toFixed(2)} files/second`)
+          
+          errorMessage += "\n\nInformation gathered:\n• " + infoLines.join("\n• ")
+          
+          timeoutError.value = errorMessage
+          isAnalyzing.value = false
+          isAnalyzingMainFolder.value = false
+          isAnalyzingAllFiles.value = false
+          
+          console.log('DIAGNOSIS: Cloud files detected (no progress) - TRIGGERING ERROR')
+        } else if (progressRate > 0) {
+          console.log('DIAGNOSIS: Local files detected (making progress)')
+          // Continue processing - good progress rate
+        } else if (lastCheck.files > 0) {
+          console.log('DIAGNOSIS: Local files detected (readDirectoryRecursive completed)')
+          // Files were detected, readDirectoryRecursive likely completed
+        }
+        return
+      }
+      
+      // Schedule next progress check
+      const nextInterval = checkCount === 1 ? 200 : 200 // 600ms, 800ms, 1000ms intervals
+      setTimeout(checkProgress, nextInterval)
+    }
+    
+    // Start first progress check after 600ms
+    analysisTimeoutId = setTimeout(checkProgress, 600)
+    
+    try {
+      // Read files in background - this is where cloud files often get stuck
+      console.log("DEBUG: Starting readDirectoryRecursive...")
+      const files = await readDirectoryRecursive(dirEntry)
+      console.log("DEBUG: readDirectoryRecursive completed with", files.length, "files")
+      
+      // Check if timeout occurred during file reading
+      if (analysisTimedOut.value) {
+        console.log("DEBUG: Timeout already occurred, not proceeding with analysis")
+        return
+      }
+      
+      // Store files and start analysis
+      console.log("DEBUG: Setting pendingFolderFiles.value to", files.length, "files")
+      pendingFolderFiles.value = files
+      performBackgroundAnalysis(files, addFilesToQueue)
+    } catch (error) {
+      console.error('Error reading directory:', error)
+      // If reading fails, let the timeout handle it
+    }
   }
 
   const processFolderFiles = (files, addFilesToQueueCallback = null) => {
@@ -463,6 +668,16 @@ export function useFolderOptions() {
   const cancelFolderUpload = () => {
     showFolderOptions.value = false
     pendingFolderFiles.value = []
+    
+    // Clear any active timeout
+    if (analysisTimeoutId) {
+      clearTimeout(analysisTimeoutId)
+      analysisTimeoutId = null
+    }
+    
+    // Reset timeout state
+    analysisTimedOut.value = false
+    timeoutError.value = null
   }
 
   return {
@@ -476,6 +691,10 @@ export function useFolderOptions() {
     isAnalyzing,
     mainFolderAnalysis,
     allFilesAnalysis,
+    
+    // Timeout state
+    analysisTimedOut,
+    timeoutError,
     
     // Progress tracking
     mainFolderProgress,
