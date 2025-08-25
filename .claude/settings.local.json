@@ -34,7 +34,8 @@
       "Bash(node:*)",
       "Bash(npm run test:*)",
       "Bash(find:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(echo $EDITOR)"
     ],
     "deny": [],
     "ask": [],

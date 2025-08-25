@@ -6,6 +6,26 @@ Implement sophisticated cloud file detection with graceful partial processing an
 ## Problem Statement
 When users drag OneDrive cloud folders into the application, the folder analysis gets stuck because `reader.readEntries()` hangs waiting for cloud files to download. This creates a poor user experience with indefinite loading states.
 
+## Key Files Involved
+
+### Primary Implementation Files
+- **`src/composables/useFolderOptions.js`** - Core folder analysis logic with timeout system
+- **`src/components/features/upload/FolderOptionsDialog.vue`** - UI dialog showing progress and time estimates
+- **`src/views/FileUpload.vue`** - Main upload view that orchestrates folder processing
+
+### Integration Files  
+- **`src/composables/useQueueDeduplication.js`** - File deduplication logic (needs filtering for skipped folders)
+- **`src/composables/useFileQueue.js`** - File queue management (may need skipped folder awareness)
+- **`src/composables/useFileDragDrop.js`** - Drag/drop handling (calls folder processing)
+
+### Existing Files with Current Progress Logic (to be removed/replaced)
+- **`src/composables/useFolderOptions.js`** - Contains current `checkProgress` functions and progress monitoring
+- **`src/components/features/upload/FolderOptionsDialog.vue`** - Current "Calculating estimate..." display logic
+
+### Documentation
+- **`docs/plans/Bookkeeper/CloudFileDetection.md`** - This implementation plan
+- **`src/utils/fileAnalysis.js`** - File analysis utilities (may need updates for skipped folder handling)
+
 ## Solution: Two-Tier Timeout System
 
 ### Core Architecture
