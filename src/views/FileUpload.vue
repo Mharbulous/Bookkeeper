@@ -206,6 +206,10 @@ const handleFileSelect = async (event) => {
 const handleFolderSelect = (event) => {
   updateRefs()
   const files = Array.from(event.target.files)
+  
+  // Log File Explorer count for comparison with readDirectoryRecursive
+  console.log(`DEBUG: According to file explorer the folder has ${files.length} files`)
+  
   // Pass callback to handle no-subfolder case automatically
   processFolderFiles(files, async (files) => {
     // Show Upload Queue instantly with first 100 files

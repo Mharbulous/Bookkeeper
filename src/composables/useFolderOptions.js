@@ -6,7 +6,7 @@ import { useFolderTimeouts } from './useFolderTimeouts.js'
 
 export function useFolderOptions() {
   // Initialize sub-composables
-  const { preprocessFileData, hasSubfoldersQuick, readDirectoryRecursive } = useFolderAnalysis()
+  const { preprocessFileData, hasSubfoldersQuick, readDirectoryRecursive, getDirectoryEntryCount } = useFolderAnalysis()
   const { 
     mainFolderProgress, allFilesProgress, mainFolderComplete, allFilesComplete,
     isAnalyzingMainFolder, isAnalyzingAllFiles, performDualAnalysis, resetProgress
@@ -117,6 +117,10 @@ export function useFolderOptions() {
     showFolderOptions.value = true
     console.log("T = 0")
     console.log("DEBUG: showFolderOptionsWithAnalysis called with", files ? files.length : 'no files', 'files')
+    
+    // Store File Explorer count for later comparison (from file input)
+    window.fileExplorerCount = files ? files.length : null
+    
     window.folderOptionsStartTime = performance.now()
     isAnalyzing.value = true
     
@@ -156,6 +160,11 @@ export function useFolderOptions() {
     showFolderOptions.value = true
     console.log("T = 0")
     console.log("DEBUG: processFolderEntry called with dirEntry:", dirEntry.name)
+    
+    // Note: For drag-and-drop, we don't have access to File Explorer's exact count
+    // The Directory Entry API may have different visibility than File Explorer
+    window.fileExplorerCount = null
+    
     window.folderOptionsStartTime = performance.now()
     isAnalyzing.value = true
     
@@ -178,6 +187,16 @@ export function useFolderOptions() {
     })
     
     try {
+      // Get diagnostic count first (equivalent to File Explorer count)
+      console.log("DEBUG: Getting directory entry count for comparison...")
+      let explorerEquivalentCount = null
+      try {
+        explorerEquivalentCount = await getDirectoryEntryCount(dirEntry)
+        console.log(`DEBUG: According to file explorer the folder has ${explorerEquivalentCount} files`)
+      } catch (error) {
+        console.warn('Failed to get directory entry count:', error)
+      }
+      
       // Read files in background with timeout signal
       console.log("DEBUG: Starting readDirectoryRecursive...")
       updateProgressMessage('Reading directory contents...')
@@ -206,6 +225,20 @@ export function useFolderOptions() {
       
       const files = await readDirectoryRecursive(dirEntry, signal)
       console.log("DEBUG: readDirectoryRecursive completed with", files.length, "files")
+      
+      // Compare with diagnostic count if available (drag-and-drop case)
+      if (explorerEquivalentCount !== null && files.length !== explorerEquivalentCount) {
+        console.warn(`⚠️ File count mismatch: readDirectoryRecursive found ${files.length} files, but directory entry count shows ${explorerEquivalentCount} files (${explorerEquivalentCount - files.length} files missing)`)
+      }
+      
+      // Compare with File Explorer count if available (from file input)
+      if (window.fileExplorerCount !== null && window.fileExplorerCount !== undefined) {
+        if (files.length !== window.fileExplorerCount) {
+          console.warn(`⚠️ File count mismatch: readDirectoryRecursive found ${files.length} files, but file explorer shows ${window.fileExplorerCount} files (${window.fileExplorerCount - files.length} files missing)`)
+        }
+        // Clear the stored count
+        window.fileExplorerCount = null
+      }
       
       // Check if timeout occurred during file reading
       if (analysisTimedOut.value) {

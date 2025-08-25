@@ -9,6 +9,7 @@ export function useFolderTimeouts() {
   
   // Controller tracking for cleanup
   const activeControllers = new Set()
+  const eventListenerMap = new WeakMap() // Store handler functions for proper cleanup
   let localTimeoutId = null
   let globalTimeoutId = null
   let globalTimeoutController = null
@@ -62,6 +63,7 @@ export function useFolderTimeouts() {
     
     if (hasModernTimeoutSupport()) {
       controller.signal.addEventListener('abort', handleTimeout)
+      eventListenerMap.set(controller, handleTimeout) // Store for cleanup
     } else {
       // Fallback timeout handling
       localTimeoutId = setTimeout(handleTimeout, timeoutMs)
@@ -81,16 +83,21 @@ export function useFolderTimeouts() {
     activeControllers.add(globalTimeoutController)
     
     const handleGlobalTimeout = () => {
-      if (!globalTimeoutController.signal.aborted) {
+      // Capture current controller before cleanup to avoid null reference
+      const currentController = globalTimeoutController
+      if (currentController && !currentController.signal.aborted) {
         analysisTimedOut.value = true
         onTimeout()
       }
-      activeControllers.delete(globalTimeoutController)
+      if (currentController) {
+        activeControllers.delete(currentController)
+      }
       globalTimeoutController = null
     }
     
     if (hasModernTimeoutSupport()) {
       globalTimeoutController.signal.addEventListener('abort', handleGlobalTimeout)
+      eventListenerMap.set(globalTimeoutController, handleGlobalTimeout) // Store for cleanup
     } else {
       globalTimeoutId = setTimeout(handleGlobalTimeout, timeoutMs)
     }
@@ -215,10 +222,14 @@ export function useFolderTimeouts() {
     activeControllers.forEach(controller => {
       if (controller && typeof controller.abort === 'function') {
         try {
-          controller.abort()
+          // Remove event listener with the actual handler function
           if (controller.signal && typeof controller.signal.removeEventListener === 'function') {
-            controller.signal.removeEventListener('abort', () => {})
+            const handler = eventListenerMap.get(controller)
+            if (handler) {
+              controller.signal.removeEventListener('abort', handler)
+            }
           }
+          controller.abort()
         } catch (error) {
           console.warn('Error during controller cleanup:', error)
         }
@@ -237,12 +248,14 @@ export function useFolderTimeouts() {
       globalTimeoutId = null
     }
     
+    // Clear global timeout controller
+    globalTimeoutController = null
+    
     // Reset state
     analysisTimedOut.value = false
     timeoutError.value = null
     currentProgressMessage.value = ''
     resetSkippedFolders()
-    globalTimeoutController = null
   }
   
   // Reset timeout state (legacy compatibility)

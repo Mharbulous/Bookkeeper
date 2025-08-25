@@ -120,6 +120,45 @@ export function useFolderAnalysis() {
     return analyzeFiles(files, directoryStats.totalDirectoryCount, directoryStats.avgDirectoryDepth, directoryStats.avgFileDepth)
   }
 
+  // Diagnostic function to count all entries in a directory (like File Explorer would)
+  const getDirectoryEntryCount = async (dirEntry) => {
+    return new Promise((resolve) => {
+      let totalFileCount = 0
+      const reader = dirEntry.createReader()
+      
+      const countAllEntries = () => {
+        reader.readEntries(async (entries) => {
+          if (entries.length === 0) {
+            resolve(totalFileCount)
+            return
+          }
+          
+          for (const entry of entries) {
+            if (entry.isFile) {
+              totalFileCount++
+            } else if (entry.isDirectory) {
+              // Recursively count files in subdirectories
+              try {
+                const subCount = await getDirectoryEntryCount(entry)
+                totalFileCount += subCount
+              } catch (error) {
+                // Skip directories we can't access
+                console.warn(`Cannot access subdirectory ${entry.fullPath} for counting:`, error)
+              }
+            }
+          }
+          
+          countAllEntries() // Continue reading more entries
+        }, (error) => {
+          console.warn('Error during directory entry counting:', error)
+          resolve(totalFileCount)
+        })
+      }
+      
+      countAllEntries()
+    })
+  }
+
   const readDirectoryRecursive = (dirEntry, abortSignal = null) => {
     return new Promise((resolve, reject) => {
       const files = []
@@ -293,6 +332,7 @@ export function useFolderAnalysis() {
     calculateFilenameStats,
     hasSubfoldersQuick,
     performFileAnalysis,
-    readDirectoryRecursive
+    readDirectoryRecursive,
+    getDirectoryEntryCount
   }
 }
