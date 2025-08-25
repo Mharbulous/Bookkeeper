@@ -1,6 +1,9 @@
 Asynchronous Task Registry: Project To-Do
 The goal of this project is to create a robust, centralized system for managing the lifecycle of all asynchronous tasks within the application. This registry will ensure that tasks are properly tracked, terminated, and cleaned up, preventing memory leaks and improving overall system stability.
 
+## Prerequisites
+**Dependencies**: This implementation requires completion of `AsyncProcessesTable.md` first to document all existing async processes in the application before registry design can begin.
+
 Core Concepts
 The system will be built around a single TaskManager class (or module) that maintains a centralized registry of all active asynchronous processes. Each process will be identified by a unique ID and will store a reference to its parent process if one exists, creating a hierarchical structure.
 

@@ -303,6 +303,12 @@ const processFilesWithQueue = async (files) => {
     return
   }
   
+  // Additional safety check - if queue is empty, processing was likely cancelled
+  if (!files || files.length === 0) {
+    console.log('Skipping file processing - no files to process')
+    return
+  }
+  
   // Start time monitoring if not already started and we have files to process
   if (files.length > 0 && !timeWarning.startTime.value) {
     // Use folder analysis estimate if available, otherwise create basic estimate
@@ -349,8 +355,20 @@ const processFilesWithQueue = async (files) => {
       console.log(`Upload safety filter: excluded ${originalCount - safeFiles.length} files from ${skippedFolders.value.length} skipped folders`)
     }
     
+    // Final check before actually processing files
+    if (analysisTimedOut.value) {
+      console.log('Aborting file processing - analysis was cancelled during preparation')
+      return
+    }
+    
     await processFiles(safeFiles, updateUploadQueue)
   } else {
+    // Final check before actually processing files (no folder filtering path)
+    if (analysisTimedOut.value) {
+      console.log('Aborting file processing - analysis was cancelled during preparation')
+      return
+    }
+    
     await processFiles(files, updateUploadQueue)
   }
 }
@@ -393,8 +411,21 @@ const handleDrop = async (event) => {
     },
     addFilesToQueue: (files) => addFilesToQueue(files, processFilesWithQueue),
     processFolderEntry: (folder) => processFolderEntry(folder, async (files) => {
+      // Check if analysis has been aborted
+      if (analysisTimedOut.value) {
+        console.log('Aborting folder processing - analysis was cancelled')
+        return
+      }
+      
       // Show Upload Queue instantly with first 100 files
       await initializeQueueInstantly(files)
+      
+      // Check again before processing files for deduplication
+      if (analysisTimedOut.value) {
+        console.log('Aborting file queue processing - analysis was cancelled')
+        return
+      }
+      
       // Then process all files for deduplication
       addFilesToQueue(files, processFilesWithQueue)
     })
