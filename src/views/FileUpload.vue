@@ -207,8 +207,7 @@ const handleFolderSelect = (event) => {
   updateRefs()
   const files = Array.from(event.target.files)
   
-  // Log File Explorer count for comparison with readDirectoryRecursive
-  console.log(`DEBUG: According to file explorer the folder has ${files.length} files`)
+  // File Explorer count will be compared automatically in processing
   
   // Pass callback to handle no-subfolder case automatically
   processFolderFiles(files, async (files) => {

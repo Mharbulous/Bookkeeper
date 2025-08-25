@@ -188,11 +188,9 @@ export function useFolderOptions() {
     
     try {
       // Get diagnostic count first (equivalent to File Explorer count)
-      console.log("DEBUG: Getting directory entry count for comparison...")
       let explorerEquivalentCount = null
       try {
         explorerEquivalentCount = await getDirectoryEntryCount(dirEntry)
-        console.log(`DEBUG: According to file explorer the folder has ${explorerEquivalentCount} files`)
       } catch (error) {
         console.warn('Failed to get directory entry count:', error)
       }
@@ -224,17 +222,22 @@ export function useFolderOptions() {
       }
       
       const files = await readDirectoryRecursive(dirEntry, signal)
-      console.log("DEBUG: readDirectoryRecursive completed with", files.length, "files")
       
       // Compare with diagnostic count if available (drag-and-drop case)
-      if (explorerEquivalentCount !== null && files.length !== explorerEquivalentCount) {
-        console.warn(`⚠️ File count mismatch: readDirectoryRecursive found ${files.length} files, but directory entry count shows ${explorerEquivalentCount} files (${explorerEquivalentCount - files.length} files missing)`)
+      if (explorerEquivalentCount !== null) {
+        if (files.length !== explorerEquivalentCount) {
+          console.warn(`⚠️ File count mismatch: readDirectoryRecursive found ${files.length} files, but directory entry count shows ${explorerEquivalentCount} files (${explorerEquivalentCount - files.length} files missing)`)
+        } else {
+          console.info(`All ${files.length} files were accounted for. No missing files.`)
+        }
       }
       
       // Compare with File Explorer count if available (from file input)
       if (window.fileExplorerCount !== null && window.fileExplorerCount !== undefined) {
         if (files.length !== window.fileExplorerCount) {
           console.warn(`⚠️ File count mismatch: readDirectoryRecursive found ${files.length} files, but file explorer shows ${window.fileExplorerCount} files (${window.fileExplorerCount - files.length} files missing)`)
+        } else {
+          console.info(`All ${files.length} files were accounted for. No missing files.`)
         }
         // Clear the stored count
         window.fileExplorerCount = null
