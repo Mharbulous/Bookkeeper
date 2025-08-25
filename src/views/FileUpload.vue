@@ -143,7 +143,7 @@ const {
   updateUploadQueue,
   resetProgress,
   removeFromQueue,
-  clearQueue,
+  clearQueue: baseClearQueue,
   startUpload,
   showNotification
 } = useFileQueue()
@@ -204,8 +204,105 @@ queueDeduplication.setTimeMonitoringCallback({
   }
 })
 
+// Comprehensive cleanup function for all stop/cancel/clear operations
+const performComprehensiveCleanup = (source = 'unknown') => {
+  try {
+    console.log(`Starting comprehensive cleanup from: ${source}`)
+    
+    // 1. Force abort any ongoing operations by setting timeout state
+    try {
+      analysisTimedOut.value = true // This signals all ongoing operations to abort immediately
+      console.log('Forced analysis timeout to abort ongoing operations')
+    } catch (error) {
+      console.warn('Error setting analysis timeout:', error)
+    }
+    
+    // 2. Cancel any ongoing folder analysis and background processes
+    try {
+      cancelFolderUpload() // This calls cleanup() and resets folder analysis state
+      console.log('Folder analysis cancelled')
+    } catch (error) {
+      console.warn('Error cancelling folder analysis:', error)
+    }
+    
+    // 3. Stop time monitoring progress updates  
+    try {
+      timeWarning.abortProcessing()
+      console.log('Time monitoring aborted')
+    } catch (error) {
+      console.warn('Error aborting time monitoring:', error)
+    }
+    
+    // 4. Reset progress state (from Stop Now button behavior)
+    try {
+      resetProgress()
+      console.log('Progress state reset')
+    } catch (error) {
+      console.warn('Error resetting progress:', error)
+    }
+    
+    // 5. Abort deduplication processing and terminate workers
+    try {
+      if (queueDeduplication) {
+        queueDeduplication.abortProcessing()
+        console.log('Deduplication processing aborted')
+      }
+    } catch (error) {
+      console.warn('Error aborting deduplication processing:', error)
+    }
+    
+    // 6. Call the base clearQueue function (always attempt this)
+    try {
+      baseClearQueue()
+      console.log('Base queue cleared')
+    } catch (error) {
+      console.error('Error in base clearQueue:', error)
+    }
+    
+    // 7. Show notification (if requested by source)
+    if (source === 'stop-now') {
+      try {
+        showNotification('Upload stopped', 'info')
+      } catch (error) {
+        console.warn('Error showing notification:', error)
+      }
+    } else if (source === 'clear-all') {
+      try {
+        showNotification('Queue cleared', 'info')
+      } catch (error) {
+        console.warn('Error showing notification:', error)
+      }
+    }
+    
+    console.log(`Comprehensive cleanup completed from: ${source}`)
+  } catch (error) {
+    console.error(`Error during comprehensive cleanup from ${source}:`, error)
+    // Always attempt basic cleanup even if advanced cleanup fails
+    try {
+      analysisTimedOut.value = true // Force abort as fallback
+      timeWarning.abortProcessing() // Stop time monitoring as fallback
+      resetProgress() // Reset progress as fallback
+      cancelFolderUpload() // Try to cancel folder processes
+      baseClearQueue()
+    } catch (fallbackError) {
+      console.error('Fallback cleanup failed:', fallbackError)
+    }
+  }
+}
+
+// Enhanced clearQueue that uses comprehensive cleanup
+const clearQueue = () => {
+  performComprehensiveCleanup('clear-all')
+}
+
 // Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
+  // Check if analysis has been aborted before processing
+  if (analysisTimedOut.value) {
+    console.log('Skipping file processing - analysis was aborted')
+    return
+  }
+  
   // Start time monitoring if not already started and we have files to process
   if (files.length > 0 && !timeWarning.startTime.value) {
     // Use folder analysis estimate if available, otherwise create basic estimate
@@ -334,18 +431,12 @@ const triggerFolderSelectWrapper = () => {
 
 // Handle cancel processing for progress modal
 const handleCancelProcessing = () => {
-  // Stop time monitoring when cancelling
-  timeWarning.abortProcessing()
-  resetProgress()
+  performComprehensiveCleanup('cancel-processing')
 }
 
 // Cloud file warning modal handlers
 const handleStopUpload = () => {
-  // User chose to stop upload due to cloud file warning
-  timeWarning.abortProcessing()
-  resetProgress()
-  clearQueue()
-  showNotification('Upload stopped', 'info')
+  performComprehensiveCleanup('stop-now')
 }
 
 const handleContinueWaiting = () => {

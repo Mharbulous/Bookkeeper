@@ -26,7 +26,7 @@
           color="white"
           class="text-black"
           prepend-icon="mdi-broom"
-          @click="$emit('clear-queue')"
+          @click="handleClearQueue"
           :disabled="files.length === 0"
         >
           Clear All
@@ -201,7 +201,7 @@ const props = defineProps({
 })
 
 // Emits
-defineEmits(['remove-file', 'start-upload', 'clear-queue'])
+const emit = defineEmits(['remove-file', 'start-upload', 'clear-queue'])
 
 // Hash tooltip functionality (only for cache management)
 const {
@@ -245,6 +245,37 @@ watch(() => props.files, () => {
   // Re-preload initial items after files change
   preloadInitialItems(10)
 }, { deep: true })
+
+// Clear queue handler with UI component cleanup
+const handleClearQueue = () => {
+  try {
+    console.log('Clearing UI component caches...')
+    
+    // Clear lazy loading caches (idempotent operations)
+    try {
+      clearCache() // Hash tooltip cache
+    } catch (error) {
+      console.warn('Error clearing hash tooltip cache:', error)
+    }
+    
+    try {
+      resetLoadedItems() // Lazy file list cache
+    } catch (error) {
+      console.warn('Error resetting loaded items:', error)
+    }
+    
+    // Always emit the clear-queue event to parent
+    emit('clear-queue')
+  } catch (error) {
+    console.error('Error during UI component cleanup:', error)
+    // Always emit the event even if cleanup fails
+    try {
+      emit('clear-queue')
+    } catch (emitError) {
+      console.error('Failed to emit clear-queue event:', emitError)
+    }
+  }
+}
 
 // Computed properties
 const uploadableFiles = computed(() => {

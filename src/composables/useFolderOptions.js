@@ -6,15 +6,34 @@ import { useFolderTimeouts } from './useFolderTimeouts.js'
 
 export function useFolderOptions() {
   // Initialize sub-composables
-  const { preprocessFileData, hasSubfoldersQuick, readDirectoryRecursive, getDirectoryEntryCount } = useFolderAnalysis()
-  const { 
-    mainFolderProgress, allFilesProgress, mainFolderComplete, allFilesComplete,
-    isAnalyzingMainFolder, isAnalyzingAllFiles, performDualAnalysis, resetProgress
+  const {
+    preprocessFileData,
+    hasSubfoldersQuick,
+    readDirectoryRecursive,
+    getDirectoryEntryCount
+  } = useFolderAnalysis()
+  const {
+    mainFolderProgress,
+    allFilesProgress,
+    mainFolderComplete,
+    allFilesComplete,
+    isAnalyzingMainFolder,
+    isAnalyzingAllFiles,
+    performDualAnalysis,
+    resetProgress
   } = useFolderProgress()
   const {
-    analysisTimedOut, timeoutError, currentProgressMessage, skippedFolders,
-    startCloudDetection, cleanup, resetSkippedFolders, isFileInSkippedFolder,
-    updateProgressMessage, showSkipNotification, showCompletionMessage
+    analysisTimedOut,
+    timeoutError,
+    currentProgressMessage,
+    skippedFolders,
+    startCloudDetection,
+    cleanup,
+    resetSkippedFolders,
+    isFileInSkippedFolder,
+    updateProgressMessage,
+    showSkipNotification,
+    showCompletionMessage
   } = useFolderTimeouts()
   
   // Main reactive data
@@ -22,16 +41,12 @@ export function useFolderOptions() {
   const includeSubfolders = ref(false)
   const pendingFolderFiles = ref([])
   const subfolderCount = ref(0)
-  
+
   // Analysis state
   const isAnalyzing = ref(false)
   const mainFolderAnalysis = ref(null)
   const allFilesAnalysis = ref(null)
 
-
-
-
-  
   // Main analysis function that coordinates both main folder and all files analysis
   const analyzeFilesForOptions = async () => {
     if (pendingFolderFiles.value.length === 0) return
@@ -115,8 +130,8 @@ export function useFolderOptions() {
   const showFolderOptionsWithAnalysis = (files, addFilesToQueueCallback = null) => {
     // SHOW MODAL FIRST - no conditions, no calculations
     showFolderOptions.value = true
-    console.log("T = 0")
-    console.log("DEBUG: showFolderOptionsWithAnalysis called with", files ? files.length : 'no files', 'files')
+    console.log('T = 0')
+    console.log('DEBUG: showFolderOptionsWithAnalysis called with', files ? files.length : 'no files', 'files')
     
     // Store File Explorer count for later comparison (from file input)
     window.fileExplorerCount = files ? files.length : null
@@ -133,7 +148,7 @@ export function useFolderOptions() {
     resetSkippedFolders()
     
     // Start cloud detection and progress messaging
-    updateProgressMessage('Scanning folders...')
+    updateProgressMessage('Scanning directory...')
     
     const cloudDetection = startCloudDetection((detection) => {
       console.log('Cloud detection triggered:', detection)
@@ -153,13 +168,11 @@ export function useFolderOptions() {
     }, 100)
   }
 
-
-
   const processFolderEntry = async (dirEntry, addFilesToQueue) => {
     // SHOW MODAL IMMEDIATELY - don't wait for file reading
     showFolderOptions.value = true
-    console.log("T = 0")
-    console.log("DEBUG: processFolderEntry called with dirEntry:", dirEntry.name)
+    console.log('T = 0')
+    console.log('DEBUG: processFolderEntry called with dirEntry:', dirEntry.name)
     
     // Note: For drag-and-drop, we don't have access to File Explorer's exact count
     // The Directory Entry API may have different visibility than File Explorer
@@ -177,7 +190,7 @@ export function useFolderOptions() {
     resetSkippedFolders()
     
     // Start cloud detection with progress messaging
-    updateProgressMessage('Scanning folders...')
+    updateProgressMessage('Scanning directory...')
     
     const cloudDetection = startCloudDetection((detection) => {
       console.log('Cloud detection triggered:', detection)
@@ -196,7 +209,7 @@ export function useFolderOptions() {
       }
       
       // Read files in background with timeout signal
-      console.log("DEBUG: Starting readDirectoryRecursive...")
+      console.log('DEBUG: Starting readDirectoryRecursive...')
       updateProgressMessage('Reading directory contents...')
       
       // Create signal for readDirectoryRecursive with progress reporting
@@ -210,9 +223,6 @@ export function useFolderOptions() {
         },
         onProgress: (fileCount) => {
           cloudDetection.reportProgress(fileCount)
-          if (fileCount > 0) {
-            updateProgressMessage(`Found ${fileCount} files...`)
-          }
         },
         onCloudFile: (path, error) => {
           // Silently track cloud-only files - reduces console noise
@@ -245,12 +255,12 @@ export function useFolderOptions() {
       
       // Check if timeout occurred during file reading
       if (analysisTimedOut.value) {
-        console.log("DEBUG: Timeout already occurred, not proceeding with analysis")
+        console.log('DEBUG: Timeout already occurred, not proceeding with analysis')
         return
       }
       
       // Store files and start analysis
-      console.log("DEBUG: Setting pendingFolderFiles.value to", files.length, "files")
+      console.log('DEBUG: Setting pendingFolderFiles.value to', files.length, 'files')
       pendingFolderFiles.value = files
       performBackgroundAnalysis(files, addFilesToQueue)
     } catch (error) {

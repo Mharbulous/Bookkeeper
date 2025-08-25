@@ -260,6 +260,63 @@ export function useFileQueue() {
     showSingleFileNotification.value = true
   }
 
+  // Enhanced clearQueue with comprehensive cleanup
+  const clearQueue = () => {
+    try {
+      console.log('Starting comprehensive cleanup...')
+      
+      // 1. Stop time monitoring and progress bar
+      try {
+        if (timeWarningInstance) {
+          timeWarningInstance.abortProcessing()
+        }
+      } catch (error) {
+        console.warn('Error stopping time monitoring:', error)
+      }
+      
+      // 2. Reset processing states (idempotent operations)
+      try {
+        resetProgress()
+        resetUIProgress()
+        isProcessingUIUpdate.value = false
+      } catch (error) {
+        console.warn('Error resetting progress states:', error)
+      }
+      
+      // 3. Clear timing variables (safe operations)
+      try {
+        if (window.endToEndStartTime) window.endToEndStartTime = null
+        if (window.folderProcessingStartTime) window.folderProcessingStartTime = null
+        if (window.instantQueueStartTime) window.instantQueueStartTime = null
+      } catch (error) {
+        console.warn('Error clearing timing variables:', error)
+      }
+      
+      // 4. Clear file queue (delegate to core) - always attempt this
+      try {
+        queueCore.clearQueue()
+      } catch (error) {
+        console.error('Error clearing file queue:', error)
+        // Fallback: directly clear uploadQueue if core fails
+        try {
+          queueCore.uploadQueue.value = []
+        } catch (fallbackError) {
+          console.error('Fallback clearQueue also failed:', fallbackError)
+        }
+      }
+      
+      console.log('Comprehensive cleanup completed successfully')
+    } catch (error) {
+      console.error('Error during comprehensive clearQueue cleanup:', error)
+      // Ensure basic cleanup even if advanced cleanup fails
+      try {
+        queueCore.clearQueue()
+      } catch (fallbackError) {
+        console.error('Fallback clearQueue failed:', fallbackError)
+      }
+    }
+  }
+
   return {
     // Reactive data (from core + UI-specific)
     uploadQueue: queueCore.uploadQueue,
@@ -279,7 +336,7 @@ export function useFileQueue() {
     addFilesToQueue: queueCore.addFilesToQueue,
     processFileChunk: queueCore.processFileChunk,
     removeFromQueue: queueCore.removeFromQueue,
-    clearQueue: queueCore.clearQueue,
+    clearQueue, // Use our enhanced clearQueue instead of delegating
     startUpload: queueCore.startUpload,
 
     // UI coordination methods

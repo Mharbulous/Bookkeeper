@@ -8,15 +8,6 @@
       
       <v-card-text>
         <!-- Timeout Error Display -->
-        <!-- Progress Message Display -->
-        <div v-if="currentProgressMessage && !analysisTimedOut" class="mb-4 pa-3 bg-blue-lighten-5 text-blue-darken-2 rounded">
-          <div class="d-flex align-center">
-            <v-icon icon="mdi-information" class="me-2" size="small" />
-            <span class="text-body-2">{{ currentProgressMessage }}</span>
-          </div>
-        </div>
-        
-        <!-- Timeout Error Display -->
         <div v-if="analysisTimedOut" class="mb-4 pa-4 bg-error text-white rounded">
           <div class="d-flex align-center mb-2">
             <v-icon icon="mdi-alert-circle" class="me-2" />
