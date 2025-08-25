@@ -1,263 +1,297 @@
 import { ref } from 'vue'
 
 export function useFolderTimeouts() {
-  // Timeout state
+  // Modern timeout state with AbortController
   const analysisTimedOut = ref(false)
   const timeoutError = ref(null)
-  let analysisTimeoutId = null
+  const currentProgressMessage = ref('')
+  const skippedFolders = ref([])
+  
+  // Controller tracking for cleanup
+  const activeControllers = new Set()
+  let localTimeoutId = null
+  let globalTimeoutId = null
+  let globalTimeoutController = null
 
-  // Progress monitoring for cloud folder detection
-  const setupProgressMonitoring = (pendingFolderFiles) => {
-    let progressChecks = []
-    let checkCount = 0
-    
-    const checkProgress = () => {
-      checkCount++
-      const elapsed = window.folderOptionsStartTime ? Math.round(performance.now() - window.folderOptionsStartTime) : 0
-      const filesDetected = pendingFolderFiles.value ? pendingFolderFiles.value.length : 0
-      
-      progressChecks.push({ time: elapsed, files: filesDetected, check: checkCount })
-      
-      console.log(`PROGRESS CHECK ${checkCount}: ${filesDetected} files after ${elapsed}ms`)
-      
-      if (checkCount >= 3) {
-        // Analyze progress rate after 3 checks
-        const firstCheck = progressChecks[0]
-        const lastCheck = progressChecks[progressChecks.length - 1]
-        const timeDiff = lastCheck.time - firstCheck.time
-        const filesDiff = lastCheck.files - firstCheck.files
-        const progressRate = timeDiff > 0 ? filesDiff / (timeDiff / 1000) : 0 // files per second
+  // Browser compatibility check
+  const hasModernTimeoutSupport = () => {
+    return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+  }
+  
+  // Create AbortController with timeout
+  const createTimeoutController = (timeoutMs) => {
+    try {
+      if (hasModernTimeoutSupport()) {
+        const signal = AbortSignal.timeout(timeoutMs)
+        const controller = { signal, abort: () => {} } // AbortSignal.timeout creates pre-aborted signal
+        return controller
+      } else {
+        // Fallback for browsers without AbortSignal.timeout
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
         
-        console.log('=== PROGRESS RATE ANALYSIS ===')
-        console.log(`Files detected: ${firstCheck.files} → ${lastCheck.files} (${filesDiff} files)`)
-        console.log(`Time elapsed: ${firstCheck.time}ms → ${lastCheck.time}ms (${timeDiff}ms)`)
-        console.log(`Progress rate: ${progressRate.toFixed(2)} files/second`)
-        
-        if (lastCheck.files === 0 && lastCheck.time >= 1000) {
-          // No files detected after 1000+ ms = likely cloud files
-          triggerTimeout(lastCheck, progressRate)
-        } else if (progressRate > 0) {
-          console.log('DIAGNOSIS: Local files detected (making progress)')
-          // Continue processing - good progress rate
-        } else if (lastCheck.files > 0) {
-          console.log('DIAGNOSIS: Local files detected (readDirectoryRecursive completed)')
-          // Files were detected, readDirectoryRecursive likely completed
+        const originalAbort = controller.abort.bind(controller)
+        controller.abort = () => {
+          clearTimeout(timeoutId)
+          originalAbort()
         }
-        return
+        
+        return controller
       }
-      
-      // Schedule next progress check
-      const nextInterval = checkCount === 1 ? 200 : 200 // 600ms, 800ms, 1000ms intervals
-      setTimeout(checkProgress, nextInterval)
+    } catch (error) {
+      console.warn('AbortController creation failed, using fallback:', error)
+      // Ultimate fallback - return mock controller
+      return {
+        signal: { aborted: false, addEventListener: () => {}, removeEventListener: () => {} },
+        abort: () => {}
+      }
+    }
+  }
+
+  // Two-tier timeout system
+  const startLocalTimeout = (timeoutMs, onTimeout) => {
+    const controller = createTimeoutController(timeoutMs)
+    activeControllers.add(controller)
+    
+    const handleTimeout = () => {
+      if (!controller.signal.aborted) {
+        onTimeout()
+      }
+      activeControllers.delete(controller)
     }
     
-    // Start first progress check after 600ms
-    analysisTimeoutId = setTimeout(checkProgress, 600)
+    if (hasModernTimeoutSupport()) {
+      controller.signal.addEventListener('abort', handleTimeout)
+    } else {
+      // Fallback timeout handling
+      localTimeoutId = setTimeout(handleTimeout, timeoutMs)
+    }
     
-    return analysisTimeoutId
+    return controller
+  }
+  
+  const startGlobalTimeout = (timeoutMs, onTimeout) => {
+    // Clear existing global timeout
+    if (globalTimeoutController) {
+      globalTimeoutController.abort()
+      activeControllers.delete(globalTimeoutController)
+    }
+    
+    globalTimeoutController = createTimeoutController(timeoutMs)
+    activeControllers.add(globalTimeoutController)
+    
+    const handleGlobalTimeout = () => {
+      if (!globalTimeoutController.signal.aborted) {
+        analysisTimedOut.value = true
+        onTimeout()
+      }
+      activeControllers.delete(globalTimeoutController)
+      globalTimeoutController = null
+    }
+    
+    if (hasModernTimeoutSupport()) {
+      globalTimeoutController.signal.addEventListener('abort', handleGlobalTimeout)
+    } else {
+      globalTimeoutId = setTimeout(handleGlobalTimeout, timeoutMs)
+    }
+    
+    return globalTimeoutController
+  }
+  
+  const resetGlobalTimeout = () => {
+    if (globalTimeoutController && !globalTimeoutController.signal.aborted) {
+      globalTimeoutController.abort()
+    }
+    // Restart global timeout with same callback if needed
+    return true
   }
 
-  // Trigger timeout with cloud folder detection message
-  const triggerTimeout = (lastCheck, progressRate) => {
-    analysisTimedOut.value = true
+  // Skipped folder tracking
+  const addSkippedFolder = (folderPath) => {
+    if (!skippedFolders.value.includes(folderPath)) {
+      skippedFolders.value.push(folderPath)
+    }
+  }
+  
+  const resetSkippedFolders = () => {
+    skippedFolders.value = []
+  }
+  
+  const isFileInSkippedFolder = (filePath) => {
+    return skippedFolders.value.some(skippedPath => 
+      filePath.startsWith(skippedPath)
+    )
+  }
+  
+  // Progress message system
+  const updateProgressMessage = (message) => {
+    currentProgressMessage.value = message
+  }
+  
+  const showSkipNotification = (folderPath) => {
+    const folderName = folderPath.split('/').pop() || folderPath
+    updateProgressMessage(`⚠️ Skipped '${folderName}'`)
+  }
+  
+  const showCompletionMessage = (fileCount) => {
+    updateProgressMessage(`Analysis complete: ${fileCount} files processed`)
+  }
+  
+  // Cloud detection with timeout integration
+  const startCloudDetection = (onCloudDetected) => {
+    let progressCount = 0
     
-    let errorMessage = "Unable to scan the files in this folder. This is often due to files not being stored locally but being stored on a cloud or files-on-demand service such as OneDrive."
+    const handleLocalTimeout = () => {
+      if (progressCount === 0) {
+        onCloudDetected({
+          reason: 'no_progress',
+          timeElapsed: 1000,
+          message: 'No files detected after 1000ms - likely cloud storage hanging'
+        })
+      }
+    }
     
-    const infoLines = []
-    infoLines.push(`No files detected after ${lastCheck.time}ms (likely cloud files - readDirectoryRecursive stuck)`)
-    infoLines.push(`Progress rate: ${progressRate.toFixed(2)} files/second`)
+    const handleGlobalTimeout = () => {
+      analysisTimedOut.value = true
+      timeoutError.value = "Unable to scan the files in this folder. This is often due to files not being stored locally but being stored on a cloud or files-on-demand service such as OneDrive."
+      onCloudDetected({
+        reason: 'global_timeout',
+        timeElapsed: 15000,
+        message: 'Global timeout - cloud folder analysis terminated'
+      })
+    }
     
-    errorMessage += "\n\nInformation gathered:\n• " + infoLines.join("\n• ")
+    const localController = startLocalTimeout(1000, handleLocalTimeout)
+    const globalController = startGlobalTimeout(15000, handleGlobalTimeout)
     
-    timeoutError.value = errorMessage
-    
-    console.log('DIAGNOSIS: Cloud files detected (no progress) - TRIGGERING ERROR')
+    return {
+      localController,
+      globalController,
+      reportProgress: (count) => {
+        progressCount = count
+        resetGlobalTimeout() // Reset global timeout on progress
+      }
+    }
   }
 
-  // Initialize timeout monitoring for directory entry processing
-  const initializeTimeoutForDirectoryEntry = (dirEntry, pendingFolderFiles, isAnalyzing, isAnalyzingMainFolder, isAnalyzingAllFiles) => {
-    // Reset timeout state
+  // Cascade prevention
+  const handleFolderTimeout = (folderPath) => {
+    const folderName = folderPath.split('/').pop() || folderPath
+    
+    // Check if parent folder already timed out to prevent cascade messages
+    const parentAlreadySkipped = skippedFolders.value.some(skipped => 
+      folderPath.startsWith(skipped)
+    )
+    
+    if (!parentAlreadySkipped) {
+      addSkippedFolder(folderPath)
+      showSkipNotification(folderName)
+    }
+  }
+  
+  const registerParentController = (controller) => {
+    // Store reference for cascade prevention
+    activeControllers.add(controller)
+  }
+  
+  const handleChildTimeout = (childPath, childController) => {
+    // Cancel parent operations to prevent cascade
+    const parentPath = childPath.substring(0, childPath.lastIndexOf('/'))
+    if (parentPath) {
+      handleFolderTimeout(parentPath)
+    }
+    
+    // Cancel all parent controllers
+    activeControllers.forEach(controller => {
+      if (controller !== childController) {
+        controller.abort()
+      }
+    })
+  }
+
+  // Cleanup and memory management
+  const cleanup = () => {
+    // Abort all active controllers
+    activeControllers.forEach(controller => {
+      if (controller && typeof controller.abort === 'function') {
+        try {
+          controller.abort()
+          if (controller.signal && typeof controller.signal.removeEventListener === 'function') {
+            controller.signal.removeEventListener('abort', () => {})
+          }
+        } catch (error) {
+          console.warn('Error during controller cleanup:', error)
+        }
+      }
+    })
+    activeControllers.clear()
+    
+    // Clear legacy timers
+    if (localTimeoutId) {
+      clearTimeout(localTimeoutId)
+      localTimeoutId = null
+    }
+    
+    if (globalTimeoutId) {
+      clearTimeout(globalTimeoutId)
+      globalTimeoutId = null
+    }
+    
+    // Reset state
     analysisTimedOut.value = false
     timeoutError.value = null
-    
-    // Clear any existing timeout
-    if (analysisTimeoutId) {
-      clearTimeout(analysisTimeoutId)
-      analysisTimeoutId = null
-    }
-    
-    // Set up progress-rate monitoring for behavioral cloud file detection
-    let progressChecks = []
-    let checkCount = 0
-    
-    const checkProgress = () => {
-      checkCount++
-      const elapsed = window.folderOptionsStartTime ? Math.round(performance.now() - window.folderOptionsStartTime) : 0
-      const filesDetected = pendingFolderFiles.value ? pendingFolderFiles.value.length : 0
-      
-      progressChecks.push({ time: elapsed, files: filesDetected, check: checkCount })
-      
-      console.log(`PROGRESS CHECK ${checkCount}: ${filesDetected} files after ${elapsed}ms`)
-      
-      if (checkCount >= 3) {
-        // Analyze progress rate after 3 checks
-        const firstCheck = progressChecks[0]
-        const lastCheck = progressChecks[progressChecks.length - 1]
-        const timeDiff = lastCheck.time - firstCheck.time
-        const filesDiff = lastCheck.files - firstCheck.files
-        const progressRate = timeDiff > 0 ? filesDiff / (timeDiff / 1000) : 0 // files per second
-        
-        console.log('=== PROGRESS RATE ANALYSIS ===')
-        console.log(`Files detected: ${firstCheck.files} → ${lastCheck.files} (${filesDiff} files)`)
-        console.log(`Time elapsed: ${firstCheck.time}ms → ${lastCheck.time}ms (${timeDiff}ms)`)
-        console.log(`Progress rate: ${progressRate.toFixed(2)} files/second`)
-        
-        if (lastCheck.files === 0 && lastCheck.time >= 1000) {
-          // No files detected after 1000+ ms = likely cloud files
-          analysisTimedOut.value = true
-          
-          let errorMessage = "Unable to scan the files in this folder. This is often due to files not being stored locally but being stored on a cloud or files-on-demand service such as OneDrive."
-          
-          const infoLines = []
-          infoLines.push(`No files detected after ${lastCheck.time}ms (likely cloud files - readDirectoryRecursive stuck)`)
-          infoLines.push(`Progress rate: ${progressRate.toFixed(2)} files/second`)
-          
-          errorMessage += "\n\nInformation gathered:\n• " + infoLines.join("\n• ")
-          
-          timeoutError.value = errorMessage
-          isAnalyzing.value = false
-          isAnalyzingMainFolder.value = false
-          isAnalyzingAllFiles.value = false
-          
-          console.log('DIAGNOSIS: Cloud files detected (no progress) - TRIGGERING ERROR')
-        } else if (progressRate > 0) {
-          console.log('DIAGNOSIS: Local files detected (making progress)')
-          // Continue processing - good progress rate
-        } else if (lastCheck.files > 0) {
-          console.log('DIAGNOSIS: Local files detected (readDirectoryRecursive completed)')
-          // Files were detected, readDirectoryRecursive likely completed
-        }
-        return
-      }
-      
-      // Schedule next progress check
-      const nextInterval = checkCount === 1 ? 200 : 200 // 600ms, 800ms, 1000ms intervals
-      setTimeout(checkProgress, nextInterval)
-    }
-    
-    // Start first progress check after 600ms
-    analysisTimeoutId = setTimeout(checkProgress, 600)
-    
-    return analysisTimeoutId
+    currentProgressMessage.value = ''
+    resetSkippedFolders()
+    globalTimeoutController = null
   }
-
-  // Initialize timeout monitoring for file list processing
-  const initializeTimeoutForFiles = (files, pendingFolderFiles, isAnalyzing, isAnalyzingMainFolder, isAnalyzingAllFiles) => {
-    // Reset timeout state
-    analysisTimedOut.value = false
-    timeoutError.value = null
-    
-    // Clear any existing timeout
-    if (analysisTimeoutId) {
-      clearTimeout(analysisTimeoutId)
-      analysisTimeoutId = null
-    }
-    
-    // Set up progress-rate monitoring for behavioral cloud file detection
-    let progressChecks = []
-    let checkCount = 0
-    
-    const checkProgress = () => {
-      checkCount++
-      const elapsed = window.folderOptionsStartTime ? Math.round(performance.now() - window.folderOptionsStartTime) : 0
-      const filesDetected = files ? files.length : (pendingFolderFiles.value ? pendingFolderFiles.value.length : 0)
-      
-      progressChecks.push({ time: elapsed, files: filesDetected, check: checkCount })
-      
-      console.log(`PROGRESS CHECK ${checkCount}: ${filesDetected} files after ${elapsed}ms`)
-      
-      if (checkCount >= 3) {
-        // Analyze progress rate after 3 checks
-        const firstCheck = progressChecks[0]
-        const lastCheck = progressChecks[progressChecks.length - 1]
-        const timeDiff = lastCheck.time - firstCheck.time
-        const filesDiff = lastCheck.files - firstCheck.files
-        const progressRate = timeDiff > 0 ? filesDiff / (timeDiff / 1000) : 0 // files per second
-        
-        console.log('=== PROGRESS RATE ANALYSIS ===')
-        console.log(`Files detected: ${firstCheck.files} → ${lastCheck.files} (${filesDiff} files)`)
-        console.log(`Time elapsed: ${firstCheck.time}ms → ${lastCheck.time}ms (${timeDiff}ms)`)
-        console.log(`Progress rate: ${progressRate.toFixed(2)} files/second`)
-        
-        if (lastCheck.files === 0 && lastCheck.time >= 1000) {
-          // No files detected after 1000+ ms = likely cloud files
-          analysisTimedOut.value = true
-          
-          let errorMessage = "Unable to scan the files in this folder. This is often due to files not being stored locally but being stored on a cloud or files-on-demand service such as OneDrive."
-          
-          const infoLines = []
-          infoLines.push(`No files detected after ${lastCheck.time}ms (likely cloud files - readDirectoryRecursive stuck)`)
-          infoLines.push(`Progress rate: ${progressRate.toFixed(2)} files/second`)
-          
-          errorMessage += "\n\nInformation gathered:\n• " + infoLines.join("\n• ")
-          
-          timeoutError.value = errorMessage
-          isAnalyzing.value = false
-          isAnalyzingMainFolder.value = false
-          isAnalyzingAllFiles.value = false
-          
-          console.log('DIAGNOSIS: Cloud files detected (no progress) - TRIGGERING ERROR')
-        } else if (progressRate > 0) {
-          console.log('DIAGNOSIS: Local files detected (making progress)')
-          // Continue processing - good progress rate
-        } else if (lastCheck.files > 0) {
-          console.log('DIAGNOSIS: Local files detected (readDirectoryRecursive completed)')
-          // Files were detected, readDirectoryRecursive likely completed
-        }
-        return
-      }
-      
-      // Schedule next progress check
-      const nextInterval = checkCount === 1 ? 200 : 200 // 600ms, 800ms, 1000ms intervals
-      setTimeout(checkProgress, nextInterval)
-    }
-    
-    // Start first progress check after 600ms
-    analysisTimeoutId = setTimeout(checkProgress, 600)
-    
-    return analysisTimeoutId
-  }
-
-  // Clear active timeout
-  const clearAnalysisTimeout = () => {
-    if (analysisTimeoutId) {
-      clearTimeout(analysisTimeoutId)
-      analysisTimeoutId = null
-    }
-  }
-
-  // Reset timeout state
-  const resetTimeoutState = () => {
-    analysisTimedOut.value = false
-    timeoutError.value = null
-    clearAnalysisTimeout()
-  }
-
+  
+  // Reset timeout state (legacy compatibility)
+  const resetTimeoutState = cleanup
+  
+  // Clear active timeout (legacy compatibility)  
+  const clearAnalysisTimeout = cleanup
+  
   // Check if analysis should continue (not timed out)
   const shouldContinueAnalysis = () => {
     return !analysisTimedOut.value
   }
 
   return {
-    // Timeout state
+    // State
     analysisTimedOut,
     timeoutError,
+    currentProgressMessage,
+    skippedFolders,
     
-    // Methods
-    setupProgressMonitoring,
-    triggerTimeout,
-    initializeTimeoutForDirectoryEntry,
-    initializeTimeoutForFiles,
+    // Modern timeout methods
+    hasModernTimeoutSupport,
+    createTimeoutController,
+    startLocalTimeout,
+    startGlobalTimeout,
+    resetGlobalTimeout,
+    
+    // Folder tracking
+    addSkippedFolder,
+    resetSkippedFolders,
+    isFileInSkippedFolder,
+    
+    // Progress messaging
+    updateProgressMessage,
+    showSkipNotification,
+    showCompletionMessage,
+    
+    // Cloud detection
+    startCloudDetection,
+    
+    // Cascade prevention
+    handleFolderTimeout,
+    registerParentController,
+    handleChildTimeout,
+    
+    // Cleanup
+    cleanup,
+    
+    // Legacy compatibility
     clearAnalysisTimeout,
     resetTimeoutState,
     shouldContinueAnalysis

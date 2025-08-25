@@ -10,13 +10,14 @@ export function useQueueDeduplication() {
   const queueProgress = useQueueProgress()
   
   // Create main thread processing function with core logic
-  const processFilesMainThread = async (files, updateUploadQueue, onProgress = null) => {
+  const processFilesMainThread = async (files, updateUploadQueue, onProgress = null, skippedFolders = []) => {
     return queueProgress.processFilesMainThread(
       files, 
       updateUploadQueue,
       queueCore.processMainThreadDeduplication,
       queueCore.processDuplicateGroups,
-      onProgress
+      onProgress,
+      skippedFolders
     )
   }
   
@@ -40,8 +41,10 @@ export function useQueueDeduplication() {
     // Main processing methods (coordinated)
     processFiles,
     processFilesMainThread,
-    forceMainThreadProcessing: (files, updateUploadQueue, onProgress = null) => 
-      queueProgress.forceMainThreadProcessing(files, updateUploadQueue, processFilesMainThread, onProgress),
+    forceMainThreadProcessing: (files, updateUploadQueue, onProgress = null, skippedFolders = []) => 
+      queueProgress.forceMainThreadProcessing(files, updateUploadQueue, 
+        (files, updateUploadQueue, onProgress) => processFilesMainThread(files, updateUploadQueue, onProgress, skippedFolders), 
+        onProgress),
     
     // Status and management (from useQueueWorkers)
     getProcessingStatus: queueWorkers.getProcessingStatus,

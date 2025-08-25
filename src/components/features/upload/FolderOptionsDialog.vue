@@ -8,6 +8,15 @@
       
       <v-card-text>
         <!-- Timeout Error Display -->
+        <!-- Progress Message Display -->
+        <div v-if="currentProgressMessage && !analysisTimedOut" class="mb-4 pa-3 bg-blue-lighten-5 text-blue-darken-2 rounded">
+          <div class="d-flex align-center">
+            <v-icon icon="mdi-information" class="me-2" size="small" />
+            <span class="text-body-2">{{ currentProgressMessage }}</span>
+          </div>
+        </div>
+        
+        <!-- Timeout Error Display -->
         <div v-if="analysisTimedOut" class="mb-4 pa-4 bg-error text-white rounded">
           <div class="d-flex align-center mb-2">
             <v-icon icon="mdi-alert-circle" class="me-2" />
@@ -41,7 +50,7 @@
                       width="2"
                       class="me-2"
                     />
-                    Analyzing files...
+                    {{ currentProgressMessage || 'Analyzing files...' }}
                   </template>
                   <template v-else>
                     <strong>{{ formatNumber(mainFolderAnalysis.totalFiles) }}</strong> files in this folder totalling 
@@ -72,7 +81,7 @@
                       width="2"
                       class="me-2"
                     />
-                    Analyzing files...
+                    {{ currentProgressMessage || 'Analyzing files...' }}
                   </template>
                   <template v-else>
                     <strong>{{ formatNumber(allFilesAnalysis.totalFiles) }}</strong> files in 
@@ -103,7 +112,7 @@
             color="primary"
             class="me-2"
           />
-          <span class="text-body-1 text-grey-darken-1">Calculating estimate...</span>
+          <span class="text-body-1 text-grey-darken-1">{{ currentProgressMessage || 'Calculating estimate...' }}</span>
         </div>
         
         <v-spacer />
@@ -180,6 +189,10 @@ const props = defineProps({
   timeoutError: {
     type: String,
     default: null
+  },
+  currentProgressMessage: {
+    type: String,
+    default: ''
   }
 })
 

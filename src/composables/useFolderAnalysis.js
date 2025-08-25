@@ -120,33 +120,170 @@ export function useFolderAnalysis() {
     return analyzeFiles(files, directoryStats.totalDirectoryCount, directoryStats.avgDirectoryDepth, directoryStats.avgFileDepth)
   }
 
-  const readDirectoryRecursive = (dirEntry) => {
-    return new Promise((resolve) => {
+  const readDirectoryRecursive = (dirEntry, abortSignal = null) => {
+    return new Promise((resolve, reject) => {
       const files = []
+      
+      // Early abort check
+      if (abortSignal?.aborted) {
+        resolve([])
+        return
+      }
+      
       const reader = dirEntry.createReader()
       
-      const readEntries = () => {
-        reader.readEntries(async (entries) => {
-          if (entries.length === 0) {
-            resolve(files)
+      // Handle abort during operation
+      const handleAbort = () => {
+        console.log(`Directory read aborted: ${dirEntry.fullPath}`)
+        if (abortSignal?.onSkipFolder) {
+          abortSignal.onSkipFolder(dirEntry.fullPath)
+        }
+        resolve([]) // Return empty array on abort
+      }
+      
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', handleAbort)
+      }
+      
+      const readEntries = async () => {
+        try {
+          // Check abort status before each readEntries call
+          if (abortSignal?.aborted) {
+            resolve([])
             return
           }
           
-          for (const entry of entries) {
-            if (entry.isFile) {
-              const file = await new Promise((resolve) => entry.file(resolve))
-              files.push({ file, path: entry.fullPath })
-            } else if (entry.isDirectory) {
-              const subFiles = await readDirectoryRecursive(entry)
-              files.push(...subFiles)
+          reader.readEntries(async (entries) => {
+            try {
+              // Check abort after getting entries
+              if (abortSignal?.aborted) {
+                resolve([])
+                return
+              }
+              
+              if (entries.length === 0) {
+                // Report progress on successful completion
+                if (abortSignal?.onProgress) {
+                  abortSignal.onProgress(files.length)
+                }
+                
+                // Reset global timeout on successful directory read
+                if (abortSignal?.resetGlobalTimeout) {
+                  abortSignal.resetGlobalTimeout()
+                }
+                
+                resolve(files)
+                return
+              }
+              
+              for (const entry of entries) {
+                // Check abort before processing each entry
+                if (abortSignal?.aborted) {
+                  resolve(files) // Return whatever we have so far
+                  return
+                }
+                
+                if (entry.isFile) {
+                  try {
+                    const file = await new Promise((resolve, reject) => {
+                      const timeoutId = setTimeout(() => {
+                        reject(new Error('File read timeout'))
+                      }, 5000) // 5 second timeout for individual files
+                      
+                      entry.file((file) => {
+                        clearTimeout(timeoutId)
+                        resolve(file)
+                      }, (error) => {
+                        clearTimeout(timeoutId)
+                        reject(error)
+                      })
+                    })
+                    
+                    files.push({ file, path: entry.fullPath })
+                    
+                    // Report incremental progress
+                    if (abortSignal?.onProgress) {
+                      abortSignal.onProgress(files.length)
+                    }
+                    
+                  } catch (error) {
+                    // Cloud files show NotFoundError when not locally available
+                    // This is expected behavior - count and continue silently
+                    if (error.name === 'NotFoundError') {
+                      // Track cloud-only files for user feedback
+                      if (abortSignal?.onCloudFile) {
+                        abortSignal.onCloudFile(entry.fullPath, error)
+                      }
+                    } else {
+                      // Log unexpected file errors for debugging
+                      console.warn(`Unexpected file read error for ${entry.fullPath}:`, error)
+                    }
+                    // Continue processing other files
+                  }
+                } else if (entry.isDirectory) {
+                  try {
+                    // Create child signal for cascade prevention
+                    let childSignal = abortSignal
+                    
+                    if (abortSignal && abortSignal.parentController) {
+                      // Set up cascade prevention
+                      childSignal = {
+                        ...abortSignal,
+                        currentPath: entry.fullPath,
+                        onSkipFolder: (path) => {
+                          if (abortSignal.onSkipFolder) abortSignal.onSkipFolder(path)
+                          // Cancel parent to prevent cascade
+                          if (abortSignal.parentController) {
+                            abortSignal.parentController.abort()
+                          }
+                        }
+                      }
+                    }
+                    
+                    const subFiles = await readDirectoryRecursive(entry, childSignal)
+                    
+                    // Check abort after subdirectory processing
+                    if (abortSignal?.aborted) {
+                      resolve(files)
+                      return
+                    }
+                    
+                    files.push(...subFiles)
+                    
+                    // Report progress after subdirectory
+                    if (abortSignal?.onProgress) {
+                      abortSignal.onProgress(files.length)
+                    }
+                    
+                  } catch (error) {
+                    console.warn(`Subdirectory read error for ${entry.fullPath}:`, error)
+                    // Continue processing other entries
+                  }
+                }
+              }
+              
+              readEntries() // Continue reading more entries
+              
+            } catch (error) {
+              console.error('Error processing entries:', error)
+              resolve(files) // Return what we have so far
             }
-          }
+          }, (error) => {
+            console.error('readEntries error:', error)
+            resolve(files) // Return what we have so far
+          })
           
-          readEntries() // Continue reading
-        })
+        } catch (error) {
+          console.error('Error in readEntries:', error)
+          resolve(files)
+        }
       }
       
-      readEntries()
+      // Start reading
+      readEntries().catch(error => {
+        console.error('readDirectoryRecursive error:', error)
+        resolve(files)
+      })
     })
   }
 

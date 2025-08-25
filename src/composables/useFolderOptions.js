@@ -12,8 +12,9 @@ export function useFolderOptions() {
     isAnalyzingMainFolder, isAnalyzingAllFiles, performDualAnalysis, resetProgress
   } = useFolderProgress()
   const {
-    analysisTimedOut, timeoutError, initializeTimeoutForDirectoryEntry, initializeTimeoutForFiles,
-    clearAnalysisTimeout, resetTimeoutState, shouldContinueAnalysis
+    analysisTimedOut, timeoutError, currentProgressMessage, skippedFolders,
+    startCloudDetection, cleanup, resetSkippedFolders, isFileInSkippedFolder,
+    updateProgressMessage, showSkipNotification, showCompletionMessage
   } = useFolderTimeouts()
   
   // Main reactive data
@@ -36,7 +37,7 @@ export function useFolderOptions() {
     if (pendingFolderFiles.value.length === 0) return
     
     // Check if already timed out before proceeding
-    if (!shouldContinueAnalysis()) {
+    if (analysisTimedOut.value) {
       return
     }
     
@@ -44,8 +45,10 @@ export function useFolderOptions() {
       // Use the progress module to perform dual analysis
       await performDualAnalysis(pendingFolderFiles.value, mainFolderAnalysis, allFilesAnalysis, analysisTimedOut)
       
-      // Clear timeout on successful completion
-      clearAnalysisTimeout()
+      // Show completion message and cleanup
+      const fileCount = pendingFolderFiles.value.length - skippedFolders.value.length
+      showCompletionMessage(fileCount)
+      setTimeout(() => cleanup(), 500) // Brief delay to show completion message
       
       // Update subfolder count
       const { folderStats } = preprocessFileData(pendingFolderFiles.value)
@@ -53,11 +56,11 @@ export function useFolderOptions() {
       
     } catch (error) {
       console.error('Error analyzing files for folder options:', error)
-      clearAnalysisTimeout()
+      cleanup()
       // Fallback analysis is handled in performDualAnalysis
     } finally {
-      // Only clear analyzing state if not timed out (timeout handler clears it)
-      if (shouldContinueAnalysis()) {
+      // Only clear analyzing state if not timed out
+      if (!analysisTimedOut.value) {
         isAnalyzing.value = false
       }
     }
@@ -67,7 +70,7 @@ export function useFolderOptions() {
   const performBackgroundAnalysis = async (files, addFilesToQueueCallback = null) => {
     try {
       // Check if already timed out before starting analysis
-      if (!shouldContinueAnalysis()) {
+      if (analysisTimedOut.value) {
         return { hasSubfolders: true }
       }
       
@@ -76,7 +79,7 @@ export function useFolderOptions() {
       
       if (!subfolderResult) {
         // Clear timeout since we're successfully completing
-        clearAnalysisTimeout()
+        cleanup()
         
         showFolderOptions.value = false
         isAnalyzing.value = false
@@ -99,8 +102,8 @@ export function useFolderOptions() {
       
     } catch (error) {
       console.error('Background analysis failed:', error)
-      // Don't clear isAnalyzing here if timed out - let timeout handler manage state
-      if (shouldContinueAnalysis()) {
+      // Don't clear isAnalyzing here if timed out
+      if (!analysisTimedOut.value) {
         isAnalyzing.value = false
       }
     }
@@ -122,10 +125,18 @@ export function useFolderOptions() {
     allFilesAnalysis.value = null
     resetProgress()
     includeSubfolders.value = false
-    resetTimeoutState()
+    cleanup()
+    resetSkippedFolders()
     
-    // Initialize timeout monitoring for file list
-    initializeTimeoutForFiles(files, pendingFolderFiles, isAnalyzing, isAnalyzingMainFolder, isAnalyzingAllFiles)
+    // Start cloud detection and progress messaging
+    updateProgressMessage('Scanning folders...')
+    
+    const cloudDetection = startCloudDetection((detection) => {
+      console.log('Cloud detection triggered:', detection)
+      isAnalyzing.value = false
+      isAnalyzingMainFolder.value = false
+      isAnalyzingAllFiles.value = false
+    })
     
     // Store files for analysis
     if (files) {
@@ -153,19 +164,51 @@ export function useFolderOptions() {
     allFilesAnalysis.value = null
     resetProgress()
     includeSubfolders.value = false
-    resetTimeoutState()
+    cleanup()
+    resetSkippedFolders()
     
-    // Initialize timeout monitoring for directory entry
-    initializeTimeoutForDirectoryEntry(dirEntry, pendingFolderFiles, isAnalyzing, isAnalyzingMainFolder, isAnalyzingAllFiles)
+    // Start cloud detection with progress messaging
+    updateProgressMessage('Scanning folders...')
+    
+    const cloudDetection = startCloudDetection((detection) => {
+      console.log('Cloud detection triggered:', detection)
+      isAnalyzing.value = false
+      isAnalyzingMainFolder.value = false
+      isAnalyzingAllFiles.value = false
+    })
     
     try {
-      // Read files in background - this is where cloud files often get stuck
+      // Read files in background with timeout signal
       console.log("DEBUG: Starting readDirectoryRecursive...")
-      const files = await readDirectoryRecursive(dirEntry)
+      updateProgressMessage('Reading directory contents...')
+      
+      // Create signal for readDirectoryRecursive with progress reporting
+      const signal = {
+        aborted: analysisTimedOut.value,
+        addEventListener: () => {},
+        onSkipFolder: (path) => {
+          console.log('Folder skipped:', path)
+          const folderName = path.split('/').pop()
+          showSkipNotification(folderName)
+        },
+        onProgress: (fileCount) => {
+          cloudDetection.reportProgress(fileCount)
+          if (fileCount > 0) {
+            updateProgressMessage(`Found ${fileCount} files...`)
+          }
+        },
+        onCloudFile: (path, error) => {
+          // Silently track cloud-only files - reduces console noise
+          console.debug(`Cloud-only file detected: ${path}`)
+        },
+        resetGlobalTimeout: cloudDetection.reportProgress
+      }
+      
+      const files = await readDirectoryRecursive(dirEntry, signal)
       console.log("DEBUG: readDirectoryRecursive completed with", files.length, "files")
       
       // Check if timeout occurred during file reading
-      if (!shouldContinueAnalysis()) {
+      if (analysisTimedOut.value) {
         console.log("DEBUG: Timeout already occurred, not proceeding with analysis")
         return
       }
@@ -229,8 +272,7 @@ export function useFolderOptions() {
     pendingFolderFiles.value = []
     
     // Clear timeout and reset state
-    clearAnalysisTimeout()
-    resetTimeoutState()
+    cleanup()
   }
 
   return {
@@ -248,6 +290,8 @@ export function useFolderOptions() {
     // Timeout state (from timeout module)
     analysisTimedOut,
     timeoutError,
+    currentProgressMessage,
+    skippedFolders,
     
     // Progress tracking (from progress module)
     mainFolderProgress,

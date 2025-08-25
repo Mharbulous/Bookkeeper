@@ -32,6 +32,7 @@
         :is-analyzing-all-files="isAnalyzingAllFiles"
         :analysis-timed-out="analysisTimedOut"
         :timeout-error="timeoutError"
+        :current-progress-message="currentProgressMessage"
         @update:show="showFolderOptions = $event"
         @update:include-subfolders="includeSubfolders = $event"
         @confirm="confirmFolderOptions"
@@ -143,6 +144,8 @@ const {
   // Timeout state
   analysisTimedOut,
   timeoutError,
+  currentProgressMessage,
+  skippedFolders,
   // Progress tracking
   mainFolderProgress,
   allFilesProgress,
@@ -156,9 +159,34 @@ const {
   cancelFolderUpload
 } = useFolderOptions()
 
-// Integrate processFiles with updateUploadQueue
+// Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
-  await processFiles(files, updateUploadQueue)
+  // Double-check safety filter: exclude any files from skipped folders
+  if (skippedFolders.value && skippedFolders.value.length > 0) {
+    const originalCount = files.length
+    const safeFiles = files.filter(file => {
+      const filePath = file.path || file.webkitRelativePath || file.name
+      const isInSkippedFolder = skippedFolders.value.some(skippedPath => {
+        const normalizedFilePath = filePath.replace(/\\/g, '/').toLowerCase()
+        const normalizedSkippedPath = skippedPath.replace(/\\/g, '/').toLowerCase()
+        return normalizedFilePath.startsWith(normalizedSkippedPath)
+      })
+      
+      if (isInSkippedFolder) {
+        console.log(`Upload safety filter: excluding ${filePath} from skipped folder`)
+        return false
+      }
+      return true
+    })
+    
+    if (safeFiles.length !== originalCount) {
+      console.log(`Upload safety filter: excluded ${originalCount - safeFiles.length} files from ${skippedFolders.value.length} skipped folders`)
+    }
+    
+    await processFiles(safeFiles, updateUploadQueue)
+  } else {
+    await processFiles(files, updateUploadQueue)
+  }
 }
 
 // Event handlers with composable integration

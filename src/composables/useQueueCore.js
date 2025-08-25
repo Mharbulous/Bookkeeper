@@ -53,11 +53,57 @@ export function useQueueCore() {
     })[0]
   }
 
+  // Helper function to check if file is in a skipped folder
+  const isFileInSkippedFolder = (filePath, skippedFolders = []) => {
+    if (!skippedFolders || skippedFolders.length === 0) {
+      return false
+    }
+    
+    return skippedFolders.some(skippedPath => {
+      // Normalize paths for comparison
+      const normalizedFilePath = filePath.replace(/\\/g, '/').toLowerCase()
+      const normalizedSkippedPath = skippedPath.replace(/\\/g, '/').toLowerCase()
+      
+      return normalizedFilePath.startsWith(normalizedSkippedPath)
+    })
+  }
+  
+  // Filter files to exclude those from skipped folders
+  const filterFilesFromSkippedFolders = (files, skippedFolders = []) => {
+    if (!skippedFolders || skippedFolders.length === 0) {
+      console.log('No skipped folders - processing all files')
+      return { processableFiles: files, skippedFiles: [] }
+    }
+    
+    const processableFiles = []
+    const skippedFiles = []
+    
+    files.forEach(file => {
+      const filePath = getFilePath(file)
+      
+      if (isFileInSkippedFolder(filePath, skippedFolders)) {
+        skippedFiles.push(file)
+        console.log(`Skipping file from cloud folder: ${filePath}`)
+      } else {
+        processableFiles.push(file)
+      }
+    })
+    
+    console.log(`File filtering complete: ${processableFiles.length} processable, ${skippedFiles.length} skipped`)
+    return { processableFiles, skippedFiles }
+  }
+
   // Core deduplication logic extracted from main thread processing
-  const processMainThreadDeduplication = async (files, onProgress = null) => {
+  const processMainThreadDeduplication = async (files, onProgress = null, skippedFolders = []) => {
+    // Filter out files from skipped folders before processing
+    const { processableFiles, skippedFiles } = filterFilesFromSkippedFolders(files, skippedFolders)
+    
+    if (skippedFiles.length > 0) {
+      console.log(`Excluded ${skippedFiles.length} files from skipped cloud folders`)
+    }
     // Track progress for main thread processing
     let processedCount = 0
-    const totalFiles = files.length
+    const totalFiles = processableFiles.length // Use processable files count for progress
     
     const sendProgress = () => {
       if (onProgress) {
@@ -65,7 +111,7 @@ export function useQueueCore() {
           current: processedCount,
           total: totalFiles,
           percentage: Math.round((processedCount / totalFiles) * 100),
-          currentFile: processedCount < totalFiles ? files[processedCount]?.name : ''
+          currentFile: processedCount < totalFiles ? processableFiles[processedCount]?.name : ''
         })
       }
     }
@@ -76,7 +122,7 @@ export function useQueueCore() {
     // Step 1: Group files by size to identify unique-sized files
     const fileSizeGroups = new Map() // file_size -> [file_references]
     
-    files.forEach((file, index) => {
+    processableFiles.forEach((file, index) => {
       const fileSize = file.size
       const fileRef = {
         file,
@@ -142,7 +188,7 @@ export function useQueueCore() {
       }
     }
     
-    return { uniqueFiles, hashGroups }
+    return { uniqueFiles, hashGroups, skippedFiles }
   }
 
   // Process hash groups to identify true duplicates
@@ -220,6 +266,10 @@ export function useQueueCore() {
     generateFileHash,
     chooseBestFile,
     processMainThreadDeduplication,
-    processDuplicateGroups
+    processDuplicateGroups,
+    
+    // File filtering methods
+    isFileInSkippedFolder,
+    filterFilesFromSkippedFolders
   }
 }
