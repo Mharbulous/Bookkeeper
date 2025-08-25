@@ -292,3 +292,4 @@ The system uses real-time hardware calibration for accurate predictions:
 - **Team Context**: All data access is scoped by team ID (currently userId for solo users)
 - **Cross-App Testing**: Use dedicated dev commands for SSO testing across multiple apps
 - **Firebase Consistency**: All apps in SSO architecture must use identical Firebase configuration
+- NEVER proceed with a documented implementation plan in markdown format unless the plan-reviewer has expressly gives the plan a PASSING grade.

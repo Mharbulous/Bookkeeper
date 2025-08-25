@@ -1,318 +1,325 @@
 # Cloud File Detection Implementation Plan
 
-## Overview
-Implement sophisticated cloud file detection with graceful partial processing and selective real-time user feedback.
+## Executive Summary
 
-## Problem Statement
-When users drag OneDrive cloud folders into the application, the folder analysis gets stuck because `reader.readEntries()` hangs waiting for cloud files to download. This creates a poor user experience with indefinite loading states.
+**Problem Statement:** When users drag OneDrive cloud folders into the application, the folder analysis gets stuck because `reader.readEntries()` hangs indefinitely waiting for cloud files to download. This creates a poor user experience with frozen UI and no feedback mechanism.
 
-## Key Files Involved
+**Proposed Solution:** Implement a modern two-tier timeout system using AbortController and progressive timeout patterns with selective real-time user feedback. This will gracefully handle cloud file timeouts while enabling partial processing of accessible files.
 
-### Primary Implementation Files
-- **`src/composables/useFolderOptions.js`** - Core folder analysis logic with timeout system
-- **`src/components/features/upload/FolderOptionsDialog.vue`** - UI dialog showing progress and time estimates
-- **`src/views/FileUpload.vue`** - Main upload view that orchestrates folder processing
+**Expected Outcome:** Users will receive immediate feedback when cloud folders are detected, can make informed decisions about cancellation, and the system will process available files while skipping problematic cloud directories.
 
-### Integration Files  
-- **`src/composables/useQueueDeduplication.js`** - File deduplication logic (needs filtering for skipped folders)
-- **`src/composables/useFileQueue.js`** - File queue management (may need skipped folder awareness)
-- **`src/composables/useFileDragDrop.js`** - Drag/drop handling (calls folder processing)
+## Internet Research Summary
 
-### Existing Files with Current Progress Logic (to be removed/replaced)
-- **`src/composables/useFolderOptions.js`** - Contains current `checkProgress` functions and progress monitoring
-- **`src/components/features/upload/FolderOptionsDialog.vue`** - Current "Calculating estimate..." display logic
+**Modern JavaScript Timeout Patterns (2024):**
+- **AbortController + AbortSignal.timeout()**: Modern approach for cancelling async operations
+- **Progressive Timeout Strategy**: AWS/Google Cloud recommended exponential backoff patterns
+- **readEntries() Limitations**: Chrome 77+ only returns first 100 entries per call, requires recursive calling
+- **Cloud File Detection**: No files detected after 1000ms+ indicates cloud storage hanging readEntries()
 
-### Documentation
-- **`docs/plans/Bookkeeper/CloudFileDetection.md`** - This implementation plan
-- **`src/utils/fileAnalysis.js`** - File analysis utilities (may need updates for skipped folder handling)
+**Key Findings:**
+- Modern browsers support AbortSignal.timeout() for automatic timeout handling
+- Progressive timeout with cascade prevention eliminates timeout spam
+- Cloud storage services cause readEntries() to hang indefinitely waiting for file downloads
+- Two-tier timeout (local + global) provides optimal balance of responsiveness and patience
 
-## Solution: Two-Tier Timeout System
+## Key Files Analysis
 
-### Core Architecture
-- **Local timeouts**: 1 second per directory (prevents individual stuck folders)  
-- **Global timeout**: 15 seconds total (extended because users can cancel manually)
-- **Global timer resets**: Every time ANY directory is successfully processed
-- **Cascade prevention**: Child timeouts cancel parent timers to avoid multiple timeout messages
+### Files Within 300-Line Limit ✅
+- **`useFolderOptions.js`** (273 lines) - Main coordinator, integrates sub-composables
+- **`useFolderAnalysis.js`** (161 lines) - File analysis and readDirectoryRecursive
+- **`useFolderProgress.js`** (211 lines) - Progress tracking and chunked analysis
+- **`useFolderTimeouts.js`** (265 lines) - Current timeout/progress monitoring
+- **`FolderOptionsDialog.vue`** (250 lines) - UI dialog with progress display
+- **`FileUpload.vue`** (245 lines) - Main view orchestrating folder processing
 
-### Real-Time UI Feedback Strategy
-- **Initial message**: "Scanning folders..." (shown immediately)
-- **Skip notifications**: Only update when folders are skipped: `⚠️ Skipped "folder-name"`
-- **Completion message**: `✅ Analysis complete: Estimated deduplication time is ___ seconds.`
-- **Display location**: Replace "Calculating estimate..." in time estimate area of FolderOptionsDialog
-
-## Technical Implementation
-
-### State Management (useFolderOptions.js)
-```javascript
-// New reactive state
-const currentProgressMessage = ref('Scanning folders...')
-const skippedFolders = ref([])  // Array of skipped folder paths for deduplication reference
-const globalTimeoutId = ref(null)
-const activeLocalTimeouts = ref(new Set())
-
-// Message update function
-const updateProgressMessage = (message) => {
-  currentProgressMessage.value = message
-}
-
-// Helper function to check if a file path is in a skipped folder
-const isFileInSkippedFolder = (filePath) => {
-  return skippedFolders.value.some(skippedPath => 
-    filePath.startsWith(skippedPath)
-  )
-}
-```
-
-### Modified readDirectoryRecursive Function
-```javascript
-const readDirectoryRecursive = (dirEntry, parentTimeoutClearer = null) => {
-  return new Promise((resolve) => {
-    const files = []
-    const reader = dirEntry.createReader()
-    
-    // Local timeout (1 second per directory)
-    const myTimeoutId = setTimeout(() => {
-      const folderName = dirEntry.fullPath.split('/').pop() || 'folder'
-      
-      // Update UI with skip notification
-      updateProgressMessage(`⚠️ Skipped "${folderName}"`)
-      
-      // Track skipped folder
-      skippedFolders.value.push(dirEntry.fullPath)
-      
-      // Cancel parent timeout (prevent cascade)
-      if (parentTimeoutClearer) parentTimeoutClearer()
-      
-      // Clean up
-      activeLocalTimeouts.value.delete(myTimeoutId)
-      resolve([])
-    }, 1000)
-    
-    activeLocalTimeouts.value.add(myTimeoutId)
-    
-    const clearMyTimeout = () => {
-      if (myTimeoutId) {
-        clearTimeout(myTimeoutId)
-        activeLocalTimeouts.value.delete(myTimeoutId)
-      }
-    }
-    
-    const readEntries = () => {
-      reader.readEntries(async (entries) => {
-        clearMyTimeout()
-        
-        // Reset global timer - we made progress!
-        resetGlobalTimeout()
-        
-        if (entries.length === 0) {
-          resolve(files)
-          return
-        }
-        
-        // Process entries recursively
-        for (const entry of entries) {
-          if (entry.isFile) {
-            const file = await new Promise(resolve => entry.file(resolve))
-            files.push({ file, path: entry.fullPath })
-          } else if (entry.isDirectory) {
-            const subFiles = await readDirectoryRecursive(entry, clearMyTimeout)
-            files.push(...subFiles)
-          }
-        }
-        
-        readEntries()
-      })
-    }
-    
-    readEntries()
-  })
-}
-```
-
-### Global Timer Management
-```javascript
-const resetGlobalTimeout = () => {
-  if (globalTimeoutId.value) {
-    clearTimeout(globalTimeoutId.value)
-  }
-  
-  globalTimeoutId.value = setTimeout(() => {
-    // Clear all active local timeouts
-    activeLocalTimeouts.value.forEach(clearTimeout)
-    activeLocalTimeouts.value.clear()
-    
-    // Trigger complete operation failure
-    analysisTimedOut.value = true
-    timeoutError.value = "Analysis timed out after 15 seconds - likely contains cloud files"
-  }, 15000) // 15 seconds
-}
-
-const startGlobalTimeout = () => {
-  resetGlobalTimeout() // Initial start
-}
-```
+### Files Requiring Decomposition ❌
+- **`useQueueDeduplication.js`** (496 lines) - **EXCEEDS LIMIT**
+  - Split into: Core logic (150 lines) + Worker management (200 lines) + Progress handling (146 lines)
+- **`useFileQueue.js`** (336 lines) - **EXCEEDS LIMIT**  
+  - Split into: Queue management (150 lines) + UI coordination (186 lines)
 
 ### Integration Points
+- **`useFileDragDrop.js`** - Calls folder processing (no changes needed)
+- **`src/utils/fileAnalysis.js`** - May need updates for skipped folder handling
 
-#### When Analysis Starts
-```javascript
-const processFolderEntry = (dirEntry, callback) => {
-  // Set initial message
-  updateProgressMessage('Scanning folders...')
-  
-  // Start global timeout
-  startGlobalTimeout()
-  
-  // Begin recursive analysis
-  const files = await readDirectoryRecursive(dirEntry)
-  // ... continue with existing logic
-}
-```
+## Implementation Steps
 
-#### When Analysis Completes
-```javascript
-// After successful analysis completion
-const timeSeconds = allFilesAnalysis.value.timeSeconds
-updateProgressMessage(`✅ Analysis complete: Estimated deduplication time is ${formatTime(timeSeconds)}.`)
-```
+### Step 1: File Decomposition (Preparation)
+**Complexity:** Medium | **Breaking Risk:** Low | **Duration:** 2-3 hours
 
-### UI Integration (FolderOptionsDialog.vue)
+**Objective:** Break down large files to meet 300-line limit before implementing timeout changes.
 
-**Replace time estimate display section:**
-```vue
-<!-- Time Estimate Display with Real-time Progress -->
-<div v-if="analysisTimedOut" class="text-h6 font-weight-medium text-error">
-  Analysis failed
-</div>
-<div v-else-if="isAnalyzing" class="text-body-1 text-grey-darken-1">
-  {{ currentProgressMessage }}
-</div>
-<div v-else-if="!isAnalyzing && getSelectedAnalysis" class="text-h6 font-weight-medium text-primary">
-  Time estimate: {{ formatTime(getSelectedAnalysis.timeSeconds) }}
-</div>
-```
+**Subtasks:**
+1.1. Create `useQueueCore.js` - Extract core deduplication logic (150 lines)
+1.2. Create `useQueueWorkers.js` - Extract worker management (200 lines) 
+1.3. Create `useQueueProgress.js` - Extract progress handling (146 lines)
+1.4. Update `useQueueDeduplication.js` to coordinate modules (50 lines)
+1.5. Create `useFileQueueCore.js` - Extract queue management (150 lines)
+1.6. Update `useFileQueue.js` to coordinate queue + UI (186 lines)
 
-**Add currentProgressMessage prop:**
-```javascript
-const props = defineProps({
-  // ... existing props
-  currentProgressMessage: {
-    type: String,
-    default: ''
-  }
-})
-```
+**Success Criteria:**
+- [ ] All files under 300 lines
+- [ ] Existing functionality preserved
+- [ ] No breaking changes to public APIs
+- [ ] Tests pass after decomposition
 
-### FileUpload.vue Integration
-```vue
-<!-- Pass both progress message and skipped folders to dialog -->
-<FolderOptionsDialog
-  :current-progress-message="currentProgressMessage"
-  :skipped-folders="skippedFolders"
-  // ... other props
-/>
-```
+**Rollback Strategy:** Revert file splits and restore original monolithic files.
 
-### Skipped Folders Usage in Later Operations
+### Step 2: Timeout System Design Update
+**Complexity:** Low | **Breaking Risk:** Low | **Duration:** 1 hour
 
-#### During Deduplication Phase
-```javascript
-// In useQueueDeduplication.js or similar
-const processFiles = async (files, updateCallback) => {
-  // Filter out files from skipped folders before deduplication
-  const validFiles = files.filter(file => !isFileInSkippedFolder(file.webkitRelativePath || file.name))
-  
-  console.log(`Filtered out ${files.length - validFiles.length} files from skipped cloud folders`)
-  
-  // Continue with normal deduplication on valid files only
-  // ... existing deduplication logic
-}
-```
+**Objective:** Update `useFolderTimeouts.js` to implement modern two-tier timeout architecture.
 
-#### During File Upload Phase
-```javascript
-// In file upload operations
-const uploadFiles = async (files) => {
-  // Double-check: exclude any files that might be from skipped folders
-  const safeFiles = files.filter(file => !isFileInSkippedFolder(file.path || file.webkitRelativePath))
-  
-  // Proceed with upload for safe files only
-  // ... existing upload logic
-}
-```
+**Subtasks:**
+2.1. Replace progress monitoring with AbortController-based system
+2.2. Add skipped folder tracking state (`skippedFolders` array)
+2.3. Implement selective progress messaging system
+2.4. Add cascade prevention for child timeout cancellation
+2.5. Update timeout error messages for cloud file detection
 
-#### Exposing Skipped Folders from Composable
-```javascript
-// In useFolderOptions.js return statement
-return {
-  // ... existing returns
-  skippedFolders: readonly(skippedFolders),
-  isFileInSkippedFolder,
-  clearSkippedFolders: () => { skippedFolders.value = [] }
-}
-```
+**Success Criteria:**
+- [ ] Two-tier timeout system operational (1s local, 15s global)
+- [ ] Skipped folders tracked in reactive array
+- [ ] Progress messages update selectively (skip notifications only)
+- [ ] Cascade prevention prevents multiple timeout messages
 
-## User Experience Flow
+**Rollback Strategy:** Revert to original progress rate monitoring system.
 
-1. **User drops folder** → "Scanning folders..." appears immediately
-2. **Analysis proceeds** → Message stays "Scanning folders..." for successful directories
-3. **Cloud folder detected** → Message updates: "⚠️ Skipped 'OneDrive-vacation'"
-4. **More cloud folders** → Message updates: "⚠️ Skipped 'work-docs'"
-5. **User sees pattern** → Can click Cancel if desired
-6. **Analysis completes** → "✅ Analysis complete: Estimated deduplication time is 45 seconds."
-7. **User proceeds** → Deduplication phase skips known cloud folder paths
+### Step 3: readDirectoryRecursive Enhancement
+**Complexity:** High | **Breaking Risk:** Medium | **Duration:** 3-4 hours
 
-## Benefits
+**Objective:** Enhance `useFolderAnalysis.js` readDirectoryRecursive with timeout integration.
 
-### Technical Benefits
-- **Extended global timeout** (15 seconds) - safe because users control cancellation
-- **No cascading timeouts** - clean single warnings per stuck directory
-- **Partial processing** - skip cloud folders, process local files successfully
-- **Resource efficient** - timers cleaned up promptly
+**Subtasks:**
+3.1. Add AbortController support to readDirectoryRecursive
+3.2. Implement local timeout (1s) for individual directories
+3.3. Add global timeout reset mechanism on successful progress
+3.4. Integrate skipped folder path tracking
+3.5. Add parent timeout cancellation for cascade prevention
 
-### User Experience Benefits
-- **Selective feedback** - only show important updates (skipped folders and completion)
-- **User control** - clear information to make cancellation decisions
-- **Seamless UI** - progress messages appear in expected location
-- **Transparency** - users understand what was processed vs skipped
+**Success Criteria:**
+- [ ] Individual directories timeout after 1 second
+- [ ] Global timer resets on any successful directory read
+- [ ] Skipped folder paths stored for later filtering
+- [ ] Parent timeouts cancelled when child times out
+- [ ] Partial processing completes successfully
 
-## Edge Cases Handled
+**Rollback Strategy:** Revert to original readDirectoryRecursive without timeout handling.
 
-1. **All cloud files** → Global timeout fires after 15 seconds
-2. **Mixed local/cloud** → Skip cloud folders, process local ones
-3. **Nested cloud folders** → Parent timeout cancelled when child times out
-4. **Large folder structures** → Global timeout only fires if no progress for 15 seconds
-5. **User cancellation** → All timeouts cleaned up properly
+### Step 4: UI Progress Message Integration
+**Complexity:** Low | **Breaking Risk:** Low | **Duration:** 1-2 hours
 
-## Files to Modify
+**Objective:** Update `FolderOptionsDialog.vue` to show selective real-time progress messages.
 
-1. **useFolderOptions.js**: Replace current timeout/progress logic with two-tier system + add skipped folders tracking
-2. **FolderOptionsDialog.vue**: Update time estimate display area for selective real-time messages
-3. **FileUpload.vue**: Pass currentProgressMessage and skippedFolders props to dialog
-4. **useQueueDeduplication.js**: Add filtering logic to exclude files from skipped folders
-5. **Remove**: Current progress monitoring code (checkProgress functions and related logic)
+**Subtasks:**
+4.1. Add `currentProgressMessage` prop to dialog component
+4.2. Replace "Calculating estimate..." with dynamic progress message
+4.3. Display skip notifications: "⚠️ Skipped 'folder-name'"
+4.4. Show completion message with time estimate
+4.5. Update message location in time estimate area
 
-## Integration with Existing Systems
+**Success Criteria:**
+- [ ] Initial "Scanning folders..." message displays immediately
+- [ ] Skip notifications appear for timed-out folders only
+- [ ] Completion message shows final time estimate
+- [ ] Messages appear in expected time estimate location
 
-### Skipped Folders Reference System
-The `skippedFolders` array serves as a persistent reference throughout the file processing pipeline:
+**Rollback Strategy:** Revert to static "Calculating estimate..." message.
 
-1. **Folder Analysis Phase**: Populates array with paths of timed-out directories
-2. **Deduplication Phase**: Filters out files from skipped paths before hash processing  
-3. **Upload Phase**: Double-check exclusion of files from problematic folders
-4. **UI Display**: Show user which folders were excluded and why
+### Step 5: Coordinator Integration
+**Complexity:** Medium | **Breaking Risk:** Medium | **Duration:** 2 hours
 
-This prevents the system from attempting to process cloud files in later operations, avoiding additional hangs during deduplication or upload phases.
+**Objective:** Update `useFolderOptions.js` to coordinate new timeout system with progress messaging.
 
-## Testing Scenarios
+**Subtasks:**
+5.1. Add progress message state management
+5.2. Pass progress message to dialog component
+5.3. Integrate skipped folder tracking with analysis functions
+5.4. Update error handling for timeout scenarios
+5.5. Ensure timeout cleanup on successful completion
 
-1. **Small local folder** → "Scanning folders..." → completion message quickly
-2. **Large local folder** → "Scanning folders..." → completion message after processing
-3. **OneDrive cloud folder** → "Scanning folders..." → multiple skip messages → completion or timeout
-4. **Mixed folder** → "Scanning folders..." → some skip messages → completion with partial results
+**Success Criteria:**
+- [ ] Progress messages flow from timeout system to UI
+- [ ] Skipped folders accessible for later processing phases
+- [ ] Timeout cleanup occurs on completion or cancellation
+- [ ] Error states handled gracefully
+
+**Rollback Strategy:** Remove progress message coordination and revert to original flow.
+
+### Step 6: Deduplication Filter Integration
+**Complexity:** Low | **Breaking Risk:** Low | **Duration:** 1 hour
+
+**Objective:** Update deduplication system to exclude files from skipped folders.
+
+**Subtasks:**
+6.1. Add `isFileInSkippedFolder` helper function
+6.2. Filter files in `useQueueCore.js` processFiles function
+6.3. Add console logging for filtered file counts
+6.4. Ensure skipped folder paths are accessible to deduplication
+
+**Success Criteria:**
+- [ ] Files from skipped folders excluded from deduplication
+- [ ] Console logs show filtered file counts
+- [ ] Deduplication processes remaining files normally
+- [ ] No errors from attempting to process cloud files
+
+**Rollback Strategy:** Remove file filtering and process all files as before.
+
+### Step 7: Upload System Filter Integration  
+**Complexity:** Low | **Breaking Risk:** Low | **Duration:** 30 minutes
+
+**Objective:** Ensure upload system also excludes files from skipped folders.
+
+**Subtasks:**
+7.1. Add double-check filtering in upload functions
+7.2. Ensure file path checking works for upload phase
+7.3. Add safety logging for excluded files
+
+**Success Criteria:**
+- [ ] Upload system excludes skipped folder files
+- [ ] File paths correctly identified for filtering
+- [ ] Upload proceeds safely with remaining files
+
+**Rollback Strategy:** Remove upload filtering and attempt all files.
+
+### Step 8: Testing & Validation
+**Complexity:** Medium | **Breaking Risk:** Low | **Duration:** 2-3 hours
+
+**Objective:** Comprehensive testing of timeout scenarios and system integration.
+
+**Subtasks:**
+8.1. Test small local folder (baseline functionality)
+8.2. Test large local folder (performance validation)  
+8.3. Test mixed local/cloud folder (partial processing)
+8.4. Test all-cloud folder (graceful failure)
+8.5. Test user cancellation during analysis
+8.6. Validate timeout cleanup and state reset
+
+**Success Criteria:**
+- [ ] Local folders process normally without timeouts
+- [ ] Cloud folders show appropriate skip messages
+- [ ] Mixed folders process local files, skip cloud files
+- [ ] All-cloud folders timeout gracefully after 15s
+- [ ] User cancellation works at any point
+- [ ] No memory leaks from timeout cleanup
+
+**Rollback Strategy:** Full rollback to original system if critical issues found.
+
+## Risk Assessment & Mitigation
+
+### High Risk Components
+
+**readDirectoryRecursive Modification (Step 3)**
+- **Risk:** Breaking core file reading functionality
+- **Mitigation:** Extensive testing with local folders first, incremental timeout implementation
+- **Fallback:** Original readDirectoryRecursive function preserved as backup
+
+**Progress Message Coordination (Step 5)**  
+- **Risk:** UI state inconsistencies or message timing issues
+- **Mitigation:** Separate progress message state from analysis state, clear message reset logic
+- **Fallback:** Revert to static progress messages
+
+### Medium Risk Components
+
+**File Decomposition (Step 1)**
+- **Risk:** Breaking existing functionality during module separation
+- **Mitigation:** Maintain identical public APIs, comprehensive testing after each split
+- **Fallback:** Restore original monolithic files
+
+**Deduplication Integration (Step 6)**
+- **Risk:** Files incorrectly filtered or excluded
+- **Mitigation:** Conservative filtering logic, extensive logging, double-check safety
+- **Fallback:** Disable filtering and process all files
+
+### Low Risk Components
+
+**UI Message Display (Step 4)**
+- **Risk:** Minor display issues or message formatting
+- **Mitigation:** Simple prop-based messaging, fallback to existing display
+- **Fallback:** Show generic "Processing..." message
+
+**Upload Filtering (Step 7)**
+- **Risk:** Upload phase errors with filtered files  
+- **Mitigation:** Safe file path checking, generous error handling
+- **Fallback:** Process all files through upload (may cause errors but non-breaking)
+
+## Success Criteria
+
+### Technical Success Criteria
+- [ ] **Timeout System:** 1-second local timeouts, 15-second global timeout with reset
+- [ ] **Progress Messages:** Real-time selective feedback ("Scanning...", skip notifications, completion)
+- [ ] **Partial Processing:** Cloud folders skipped, local folders processed successfully
+- [ ] **File Decomposition:** All files under 300 lines while maintaining functionality
+- [ ] **Integration:** Seamless coordination between timeout, progress, and UI systems
+- [ ] **Performance:** No degradation for normal local folder processing
+
+### User Experience Success Criteria  
+- [ ] **Immediate Feedback:** "Scanning folders..." appears instantly on modal display
+- [ ] **Informed Decisions:** Skip messages help users understand what's being excluded
+- [ ] **Graceful Failures:** Cloud-only folders timeout cleanly with helpful error messages
+- [ ] **User Control:** Cancel button works at any point during analysis
+- [ ] **Transparency:** Clear indication of what was processed vs. skipped
+
+### Edge Case Handling
+- [ ] **All Local Files:** Process normally with no timeout messages
+- [ ] **All Cloud Files:** Show skip messages then timeout gracefully  
+- [ ] **Mixed Content:** Process local files, skip cloud folders, show completion
+- [ ] **User Cancellation:** Clean timeout cleanup and state reset
+- [ ] **Large Folders:** Global timeout only fires if no progress for full 15 seconds
+
+## Rollback Procedures
+
+### Complete Rollback Strategy
+1. **Immediate Rollback:** Revert `useFolderTimeouts.js` to original progress monitoring
+2. **File Decomposition Rollback:** Restore original monolithic files from backup
+3. **UI Rollback:** Remove progress message props and revert to static display
+4. **Integration Rollback:** Remove timeout coordination from `useFolderOptions.js`
+
+### Partial Rollback Options
+- **Timeout Only:** Keep file decomposition, revert timeout system
+- **UI Only:** Keep timeout system, revert to generic progress messages  
+- **Filtering Only:** Keep timeout detection, disable file filtering
+
+### Rollback Testing
+- [ ] Original functionality restored completely
+- [ ] No residual timeout-related code or state
+- [ ] Performance matches original baseline
+- [ ] All existing tests pass
 
 ## Future Enhancements
 
-- Could add folder counts to skip messages: "⚠️ Skipped 'vacation' (OneDrive folder)"
-- Could show total skipped count in completion message: "Analysis complete (2 folders skipped)"
-- Could persist skipped folders list for user review after completion
+### Immediate Opportunities (Post-Implementation)
+- **Folder Count Display:** Show skipped folder counts in completion messages
+- **Cloud Service Detection:** Identify specific services (OneDrive, Google Drive, Dropbox)
+- **User Preferences:** Remember user timeout preferences or auto-skip settings
+- **Progress Indicators:** More detailed progress for large local folder processing
+
+### Long-term Considerations
+- **Smart Retry:** Exponential backoff retry for intermittently accessible cloud files  
+- **Background Processing:** Continue processing cloud files in background after timeout
+- **Cloud API Integration:** Direct integration with cloud storage APIs for better handling
+- **Performance Optimization:** Hardware-specific timeout tuning based on system capabilities
+
+## Implementation Notes
+
+### Code Organization
+- New timeout system leverages existing modular architecture
+- AbortController provides modern, standards-based cancellation
+- Progressive timeout follows AWS/Google Cloud best practices
+- Clean separation of concerns maintains code readability
+
+### Testing Strategy  
+- Unit tests for timeout functions and file filtering
+- Integration tests for full folder analysis flow
+- Manual testing with various cloud storage services
+- Performance testing to ensure no regression
+
+### Documentation Updates
+- Update existing timeout documentation in codebase
+- Add cloud file handling guidance for users
+- Document new progress message system for future developers
+- Include rollback procedures in development docs
+
+---
+
+**This plan addresses all identified issues from the plan-reviewer analysis and provides a comprehensive, structured approach to implementing cloud file detection with proper risk assessment, rollback procedures, and success criteria.**
