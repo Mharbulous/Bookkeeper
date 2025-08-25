@@ -35,7 +35,11 @@
       "Bash(npm run test:*)",
       "Bash(find:*)",
       "Bash(npm run lint:*)",
-      "Bash(echo $EDITOR)"
+      "Bash(echo $EDITOR)",
+      "Bash(for:*)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(move:*)"
     ],
     "deny": [],
     "ask": [],
