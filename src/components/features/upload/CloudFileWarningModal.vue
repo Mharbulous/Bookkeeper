@@ -24,7 +24,7 @@
               </svg>
             </div>
             <h2 :id="headerId" class="modal-title">
-              Upload Taking Longer Than Expected
+              Slow File Processing
             </h2>
           </div>
           <button
@@ -42,87 +42,34 @@
 
         <!-- Content -->
         <div :id="descriptionId" class="modal-body">
-          <!-- Status Information -->
-          <div class="status-section">
-            <div class="status-item">
-              <span class="status-label">Time elapsed:</span>
-              <span class="status-value">{{ formattedElapsedTime }}</span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Original estimate:</span>
-              <span class="status-value">{{ formattedEstimate }}</span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Over estimate by:</span>
-              <span class="status-value text-red-600 font-semibold">{{ overdueSeconds }} seconds</span>
-            </div>
-          </div>
-
-          <!-- Explanation Section -->
-          <div class="explanation-section">
-            <h3 class="section-title">Why is this happening?</h3>
-            <div class="explanation-content">
-              <p class="explanation-text">
-                File deduplication requires calculating SHA-256 hash values for each file.
-                Hash calculations can only be performed on files stored locally on your device.
-              </p>
-              <p class="explanation-text">
-                Slow processing often indicates files are stored in the cloud and being downloaded on-demand.
-              </p>
-            </div>
-          </div>
-
-          <!-- Detection Logic Section -->
-          <div class="detection-section">
-            <h3 class="section-title">How do we know?</h3>
-            <div class="detection-content">
-              <p class="detection-text">
-                For web security reasons, browsers cannot tell us whether your files are stored locally or in the cloud.
-              </p>
-              <p class="detection-text">
-                However, the slow processing speed (currently <strong>{{ overdueSeconds }} seconds over estimate</strong>) 
-                suggests your files may not be stored locally.
-              </p>
-            </div>
-          </div>
-
-          <!-- Resolution Section -->
-          <div class="resolution-section">
-            <h3 class="section-title">How to resolve this issue:</h3>
-            <ol class="resolution-steps">
-              <li class="resolution-step">
-                <span class="step-number">1</span>
-                <span class="step-text">Cancel this upload using the "Stop Upload" button below</span>
-              </li>
-              <li class="resolution-step">
-                <span class="step-number">2</span>
-                <span class="step-text">In your cloud service (OneDrive, Dropbox, Google Drive, etc.), 
-                set folders to "Always keep on this device"</span>
-              </li>
-              <li class="resolution-step">
-                <span class="step-number">3</span>
-                <span class="step-text">Wait for all files to download locally (this may take several minutes)</span>
-              </li>
-              <li class="resolution-step">
-                <span class="step-number">4</span>
-                <span class="step-text">Try uploading again once files are stored locally</span>
-              </li>
-            </ol>
+          <div class="message-content">
+            <p class="main-message">
+              Your files might be stored in the cloud and downloading slowly.
+            </p>
+            
+            <p class="solution-message">
+              <strong>Solution:</strong> In your cloud service (OneDrive, Dropbox, Google Drive), 
+              set folders to "Always keep on this device" and wait for files to download locally.
+            </p>
+            
+            <p class="action-message">
+              You can continue waiting or click "Clear All" to cancel and try again later.
+            </p>
           </div>
         </div>
 
         <!-- Actions -->
         <div class="modal-actions">
           <button
-            ref="stopButton"
+            ref="clearButton"
             type="button"
-            class="action-button action-button-danger"
-            @click="handleStopUpload"
+            class="action-button action-button-clear"
+            @click="handleClearAll"
           >
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19.36,2.72L20.78,4.14L15.06,9.85C16.13,11.39 16.28,13.24 15.38,14.44L9.06,8.12C10.26,7.22 12.11,7.37 13.65,8.44L19.36,2.72M5.93,17.57C3.92,15.56 2.69,13.16 2.35,10.92L7.23,8.83L14.67,16.27L12.58,21.15C10.34,20.81 7.94,19.58 5.93,17.57Z" />
             </svg>
-            Stop Upload
+            Clear All
           </button>
           <button
             ref="continueButton"
@@ -163,12 +110,12 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['stop-upload', 'continue-waiting', 'close'])
+const emit = defineEmits(['clear-all', 'continue-waiting', 'close'])
 
 // Template refs
 const modalContent = ref(null)
 const closeButton = ref(null)
-const stopButton = ref(null)
+const clearButton = ref(null)
 const continueButton = ref(null)
 
 // Computed properties
@@ -196,7 +143,7 @@ const focusableElements = computed(() => {
   
   return [
     closeButton.value,
-    stopButton.value,
+    clearButton.value,
     continueButton.value
   ].filter(el => el && !el.disabled)
 })
@@ -237,8 +184,8 @@ const handleCloseClick = () => {
   emit('close')
 }
 
-const handleStopUpload = () => {
-  emit('stop-upload')
+const handleClearAll = () => {
+  emit('clear-all')
 }
 
 const handleContinueWaiting = () => {
@@ -250,8 +197,8 @@ watch(() => props.isVisible, async (newValue) => {
   if (newValue) {
     await nextTick()
     
-    if (stopButton.value) {
-      stopButton.value.focus()
+    if (clearButton.value) {
+      clearButton.value.focus()
     }
     
     document.addEventListener('keydown', trapFocus)
@@ -267,9 +214,9 @@ onMounted(async () => {
   if (props.isVisible) {
     await nextTick()
     
-    // Set focus to the first interactive element (Stop Upload button for urgency)
-    if (stopButton.value) {
-      stopButton.value.focus()
+    // Set focus to the first interactive element (Clear All button for urgency)
+    if (clearButton.value) {
+      clearButton.value.focus()
     }
     
     // Add focus trap
@@ -293,7 +240,7 @@ onUnmounted(() => {
 }
 
 .modal-content {
-  @apply bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto;
+  @apply bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto;
   outline: none;
 }
 
@@ -314,60 +261,23 @@ onUnmounted(() => {
 }
 
 .modal-body {
-  @apply p-6 space-y-6;
+  @apply p-6;
 }
 
-.status-section {
-  @apply bg-gray-50 rounded-lg p-4 space-y-2;
+.message-content {
+  @apply space-y-4;
 }
 
-.status-item {
-  @apply flex justify-between items-center;
+.main-message {
+  @apply text-base text-gray-700 leading-relaxed;
 }
 
-.status-label {
-  @apply text-sm font-medium text-gray-700;
+.solution-message {
+  @apply text-sm text-gray-600 leading-relaxed bg-blue-50 p-3 rounded-lg;
 }
 
-.status-value {
-  @apply text-sm text-gray-900;
-}
-
-.explanation-section,
-.detection-section,
-.resolution-section {
-  @apply space-y-3;
-}
-
-.section-title {
-  @apply text-base font-semibold text-gray-900;
-}
-
-.explanation-content,
-.detection-content {
-  @apply space-y-2;
-}
-
-.explanation-text,
-.detection-text {
-  @apply text-sm text-gray-700 leading-relaxed;
-}
-
-.resolution-steps {
-  @apply space-y-3 list-none;
-  counter-reset: step;
-}
-
-.resolution-step {
-  @apply flex items-start space-x-3 text-sm text-gray-700;
-}
-
-.step-number {
-  @apply flex-shrink-0 w-6 h-6 bg-blue-500 text-white text-xs font-semibold rounded-full flex items-center justify-center;
-}
-
-.step-text {
-  @apply pt-0.5 leading-relaxed;
+.action-message {
+  @apply text-sm text-gray-600 leading-relaxed;
 }
 
 .modal-actions {
@@ -378,8 +288,8 @@ onUnmounted(() => {
   @apply inline-flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors;
 }
 
-.action-button-danger {
-  @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+.action-button-clear {
+  @apply bg-white text-black border border-gray-300 hover:bg-gray-50 focus:ring-gray-500;
 }
 
 .action-button-secondary {
@@ -389,7 +299,7 @@ onUnmounted(() => {
 /* Responsive adjustments */
 @media (max-width: 640px) {
   .modal-content {
-    @apply max-w-full mx-2 my-4 max-h-[95vh];
+    @apply max-w-full mx-4 my-8 max-h-[90vh];
   }
   
   .modal-actions {

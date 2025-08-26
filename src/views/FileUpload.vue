@@ -95,7 +95,7 @@
         :formatted-elapsed-time="timeWarning.formattedElapsedTime.value"
         :estimated-duration="timeWarning.estimatedDuration.value"
         :overdue-seconds="timeWarning.overdueSeconds.value"
-        @stop-upload="handleStopUpload"
+        @clear-all="handleClearAll"
         @continue-waiting="handleContinueWaiting"
         @close="handleCloseWarning"
       />
@@ -526,8 +526,8 @@ const handleCancelProcessing = () => {
 }
 
 // Cloud file warning modal handlers
-const handleStopUpload = () => {
-  performComprehensiveCleanup('stop-now')
+const handleClearAll = () => {
+  performComprehensiveCleanup('clear-all')
 }
 
 const handleContinueWaiting = () => {
