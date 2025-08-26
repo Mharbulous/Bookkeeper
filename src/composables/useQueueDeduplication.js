@@ -1,97 +1,105 @@
-import { useQueueCore } from './useQueueCore'
-import { useQueueWorkers } from './useQueueWorkers'
-import { useQueueProgress } from './useQueueProgress'
+import { useQueueCore } from './useQueueCore';
+import { useQueueWorkers } from './useQueueWorkers';
+import { useQueueProgress } from './useQueueProgress';
 
 export function useQueueDeduplication() {
   // Initialize component modules
-  const queueCore = useQueueCore()
-  const queueWorkers = useQueueWorkers()
-  const queueProgress = useQueueProgress()
+  const queueCore = useQueueCore();
+  const queueWorkers = useQueueWorkers();
+  const queueProgress = useQueueProgress();
 
   // Time monitoring integration
-  let timeMonitoringCallback = null
-  
+  let timeMonitoringCallback = null;
+
   // Create main thread processing function with core logic
-  const processFilesMainThread = async (files, updateUploadQueue, onProgress = null, skippedFolders = []) => {
+  const processFilesMainThread = async (
+    files,
+    updateUploadQueue,
+    onProgress = null,
+    skippedFolders = [],
+  ) => {
     return queueProgress.processFilesMainThread(
       files,
       updateUploadQueue,
       queueCore.processMainThreadDeduplication,
       queueCore.processDuplicateGroups,
       onProgress,
-      skippedFolders
-    )
-  }
-  
+      skippedFolders,
+    );
+  };
+
   // Main processFiles function that coordinates worker vs main thread
-  const processFiles = async (files, updateUploadQueue, onProgress = null) => {
+  const processFiles = async (files, updateUploadQueue, onProgress = null, abortChecker = null) => {
     // Start time monitoring if callback is set
     if (timeMonitoringCallback) {
-      timeMonitoringCallback.onProcessingStart?.()
+      timeMonitoringCallback.onProcessingStart?.();
     }
-    
+
     try {
       const result = await queueProgress.processFiles(
         files,
         updateUploadQueue,
         queueWorkers.processFilesWithWorker,
         processFilesMainThread,
-        onProgress
-      )
-      
+        onProgress,
+        abortChecker,
+      );
+
       // Stop time monitoring on successful completion
       if (timeMonitoringCallback) {
         if (import.meta.env.DEV) {
-          console.debug('[QueueDeduplication] Calling onProcessingComplete callback')
+          console.debug('[QueueDeduplication] Calling onProcessingComplete callback');
         }
-        
-        timeMonitoringCallback.onProcessingComplete?.()
-        
+
+        timeMonitoringCallback.onProcessingComplete?.();
+
         if (import.meta.env.DEV) {
-          console.debug('[QueueDeduplication] onProcessingComplete callback completed')
+          console.debug('[QueueDeduplication] onProcessingComplete callback completed');
         }
       } else {
         if (import.meta.env.DEV) {
-          console.warn('[QueueDeduplication] No timeMonitoringCallback available for onProcessingComplete')
+          console.warn(
+            '[QueueDeduplication] No timeMonitoringCallback available for onProcessingComplete',
+          );
         }
       }
-      
-      return result
+
+      return result;
     } catch (error) {
       // Stop time monitoring on error
       if (timeMonitoringCallback) {
-        timeMonitoringCallback.onProcessingError?.(error)
+        timeMonitoringCallback.onProcessingError?.(error);
       }
-      throw error
+      throw error;
     }
-  }
+  };
 
   // Time monitoring methods
   const setTimeMonitoringCallback = (callback) => {
-    timeMonitoringCallback = callback
-  }
-  
+    timeMonitoringCallback = callback;
+  };
+
   const clearTimeMonitoringCallback = () => {
-    timeMonitoringCallback = null
-  }
-  
+    timeMonitoringCallback = null;
+  };
+
   const abortProcessing = () => {
     // Terminate any running workers
-    queueWorkers.terminateWorker()
-    
+    queueWorkers.terminateWorker();
+
     // Clear monitoring callback
     if (timeMonitoringCallback) {
-      timeMonitoringCallback.onProcessingAborted?.()
-      timeMonitoringCallback = null
+      timeMonitoringCallback.onProcessingAborted?.();
+      timeMonitoringCallback = null;
     }
-  }
+  };
 
   return {
     // Core methods (from useQueueCore)
     generateFileHash: queueCore.generateFileHash,
     chooseBestFile: queueCore.chooseBestFile,
     getFilePath: queueCore.getFilePath,
-    
+
     // Main processing methods (coordinated)
     processFiles,
     processFilesMainThread,
@@ -99,25 +107,26 @@ export function useQueueDeduplication() {
       queueProgress.forceMainThreadProcessing(
         files,
         updateUploadQueue,
-        (files, updateUploadQueue, onProgress) => processFilesMainThread(files, updateUploadQueue, onProgress, skippedFolders),
-        onProgress
+        (files, updateUploadQueue, onProgress) =>
+          processFilesMainThread(files, updateUploadQueue, onProgress, skippedFolders),
+        onProgress,
       ),
-    
+
     // Status and management (from useQueueWorkers)
     getProcessingStatus: queueWorkers.getProcessingStatus,
     forceWorkerRestart: queueWorkers.forceWorkerRestart,
     terminateWorker: queueWorkers.terminateWorker,
-    
+
     // Error handling (from useQueueProgress)
     handleProcessingError: queueProgress.handleProcessingError,
-    
+
     // Worker access (for backwards compatibility)
     workerInstance: queueWorkers.workerInstance,
     workerManager: queueWorkers.workerManager,
-    
+
     // Time monitoring integration
     setTimeMonitoringCallback,
     clearTimeMonitoringCallback,
-    abortProcessing
-  }
+    abortProcessing,
+  };
 }

@@ -97,11 +97,6 @@ export const useTimeBasedWarning = () => {
     // Clear any existing interval
     stopMonitoring()
     
-    // TEMPORARY: Show modal immediately for testing
-    console.log('🧪 TESTING MODE: Showing cloud file warning modal immediately')
-    showCloudFileWarning.value = true
-    warningShown.value = true
-    
     // Start monitoring interval
     monitoringInterval.value = setInterval(checkForWarning, CHECK_INTERVAL)
   }
