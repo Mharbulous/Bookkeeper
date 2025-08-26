@@ -137,7 +137,6 @@ const focusableElements = computed(() => {
   
   return [
     closeButton.value,
-    clearButton.value,
     continueButton.value
   ].filter(el => el && !el.disabled)
 })
@@ -191,8 +190,9 @@ watch(() => props.isVisible, async (newValue) => {
   if (newValue) {
     await nextTick()
     
-    if (clearButton.value) {
-      clearButton.value.focus()
+    // Focus management - focus on modal content instead of Vuetify component
+    if (modalContent.value) {
+      modalContent.value.focus()
     }
     
     document.addEventListener('keydown', trapFocus)
@@ -208,9 +208,9 @@ onMounted(async () => {
   if (props.isVisible) {
     await nextTick()
     
-    // Set focus to the first interactive element (Clear All button for urgency)
-    if (clearButton.value) {
-      clearButton.value.focus()
+    // Set focus to modal content for accessibility
+    if (modalContent.value) {
+      modalContent.value.focus()
     }
     
     // Add focus trap

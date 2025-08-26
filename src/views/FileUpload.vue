@@ -531,9 +531,8 @@ const handleClearAll = () => {
 }
 
 const handleContinueWaiting = () => {
-  // User chose to wait 1 more minute
+  // User chose to continue waiting
   timeWarning.snoozeWarning()
-  showNotification('Continuing upload - will check again in 1 minute', 'info')
 }
 
 const handleCloseWarning = () => {
