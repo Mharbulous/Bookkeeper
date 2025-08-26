@@ -85,9 +85,14 @@ export function useQueueProgress() {
 
     if (workerResult.fallback) {
       // Check if processing was aborted before falling back
-      if (abortChecker && abortChecker()) {
-        console.info('❌ Skipping fallback to main thread - processing was aborted');
-        return { readyFiles: [], duplicateFiles: [] };
+      console.log('🔍 FALLBACK DEBUG: abortChecker exists:', !!abortChecker);
+      if (abortChecker) {
+        const isAborted = abortChecker();
+        console.log('🔍 FALLBACK DEBUG: abortChecker() result:', isAborted);
+        if (isAborted) {
+          console.info('❌ Skipping fallback to main thread - processing was aborted');
+          return { readyFiles: [], duplicateFiles: [] };
+        }
       }
 
       // Fall back to main thread processing

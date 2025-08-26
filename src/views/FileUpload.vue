@@ -207,12 +207,20 @@ queueDeduplication.setTimeMonitoringCallback({
 // Comprehensive cleanup function for all stop/cancel/clear operations
 const performComprehensiveCleanup = (source = 'unknown') => {
   try {
-    console.log(`Starting comprehensive cleanup from: ${source}`);
+    console.log(`🧹 Starting comprehensive cleanup from: ${source}`);
+    
+    // 🔍 DEBUG: Log AsyncTracker state BEFORE cleanup
+    if (window.__asyncTracker) {
+      const beforeStats = window.__asyncTracker.stats();
+      console.log('📊 AsyncTracker BEFORE cleanup:', beforeStats);
+      window.__asyncTracker.logStats();
+    }
 
     // 1. Force abort any ongoing operations by setting timeout state
     try {
+      console.log('🔍 SETTING analysisTimedOut.value = true');
       analysisTimedOut.value = true; // This signals all ongoing operations to abort immediately
-      console.log('Forced analysis timeout to abort ongoing operations');
+      console.log('✅ Forced analysis timeout to abort ongoing operations, analysisTimedOut.value =', analysisTimedOut.value);
     } catch (error) {
       console.warn('Error setting analysis timeout:', error);
     }
@@ -272,7 +280,14 @@ const performComprehensiveCleanup = (source = 'unknown') => {
       // Queue cleared - no notification needed as it's obvious from user action
     }
 
-    console.log(`Comprehensive cleanup completed from: ${source}`);
+    // 🔍 DEBUG: Log AsyncTracker state AFTER cleanup
+    if (window.__asyncTracker) {
+      const afterStats = window.__asyncTracker.stats();
+      console.log('📊 AsyncTracker AFTER cleanup:', afterStats);
+      window.__asyncTracker.logStats();
+    }
+    
+    console.log(`✅ Comprehensive cleanup completed from: ${source}`);
   } catch (error) {
     console.error(`Error during comprehensive cleanup from ${source}:`, error);
     // Always attempt basic cleanup even if advanced cleanup fails
@@ -290,20 +305,31 @@ const performComprehensiveCleanup = (source = 'unknown') => {
 
 // Enhanced clearQueue that uses comprehensive cleanup
 const clearQueue = () => {
-  performComprehensiveCleanup('clear-all');
+  // Simple and reliable: just refresh the page
+  console.log('🔄 Clear All: Refreshing page to reset all state');
+  window.location.reload();
 };
 
 // Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
-  // Check if analysis has been aborted before processing
+  const processId = `processFilesWithQueue-${Date.now()}`;
+  console.log(`🚀 [${processId}] ENTRY: processFilesWithQueue called with ${files?.length} files, analysisTimedOut: ${analysisTimedOut.value}`);
+  
+  // 🔍 DEBUG: Log AsyncTracker state at entry
+  if (window.__asyncTracker) {
+    const entryStats = window.__asyncTracker.stats();
+    console.log(`📊 [${processId}] AsyncTracker at ENTRY:`, entryStats);
+  }
+  
+  // Check if analysis has been aborted before processing (should be false now)
   if (analysisTimedOut.value) {
-    console.log('Skipping file processing - analysis was aborted');
+    console.log(`❌ [${processId}] EXIT EARLY: analysis was aborted`);
     return;
   }
 
   // Additional safety check - if queue is empty, processing was likely cancelled
   if (!files || files.length === 0) {
-    console.log('Skipping file processing - no files to process');
+    console.log(`❌ [${processId}] EXIT EARLY: no files to process`);
     return;
   }
 
@@ -373,7 +399,7 @@ const processFilesWithQueue = async (files) => {
 
   // Check if processing was aborted after time monitoring setup
   if (analysisTimedOut.value) {
-    console.log('Aborting file processing - analysis was cancelled after time monitoring setup');
+    console.log(`❌ [${processId}] EXIT EARLY: aborted after time monitoring setup`);
     return;
   }
 
@@ -403,16 +429,14 @@ const processFilesWithQueue = async (files) => {
 
     // Final check before actually processing files
     if (analysisTimedOut.value) {
-      console.log('Aborting file processing - analysis was cancelled during preparation');
+      console.log(`❌ [${processId}] EXIT EARLY: aborted during file preparation`);
       return;
     }
 
     try {
       // Final abort check immediately before processFiles call
       if (analysisTimedOut.value) {
-        console.log(
-          'Aborting file processing - analysis was cancelled right before processFiles call',
-        );
+        console.log(`❌ [${processId}] EXIT EARLY: aborted right before processFiles call`);
         return;
       }
 
@@ -420,9 +444,7 @@ const processFilesWithQueue = async (files) => {
 
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {
-        console.log(
-          'Processing was aborted after completion - skipping cleanup to avoid repopulation',
-        );
+        console.log(`❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`);
         return;
       }
 
@@ -435,7 +457,7 @@ const processFilesWithQueue = async (files) => {
 
       // Check if error was due to abort
       if (analysisTimedOut.value) {
-        console.log('Error handling: Processing was aborted - skipping error cleanup');
+        console.log(`❌ [${processId}] EXIT ERROR ABORT: processing aborted during error handling`);
         return;
       }
 
@@ -454,9 +476,7 @@ const processFilesWithQueue = async (files) => {
     try {
       // Final abort check immediately before processFiles call
       if (analysisTimedOut.value) {
-        console.log(
-          'Aborting file processing - analysis was cancelled right before processFiles call',
-        );
+        console.log(`❌ [${processId}] EXIT EARLY: aborted right before processFiles call`);
         return;
       }
 
@@ -464,9 +484,7 @@ const processFilesWithQueue = async (files) => {
 
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {
-        console.log(
-          'Processing was aborted after completion - skipping cleanup to avoid repopulation',
-        );
+        console.log(`❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`);
         return;
       }
 
@@ -479,7 +497,7 @@ const processFilesWithQueue = async (files) => {
 
       // Check if error was due to abort
       if (analysisTimedOut.value) {
-        console.log('Error handling: Processing was aborted - skipping error cleanup');
+        console.log(`❌ [${processId}] EXIT ERROR ABORT: processing aborted during error handling`);
         return;
       }
 
@@ -488,6 +506,13 @@ const processFilesWithQueue = async (files) => {
       queueDeduplication.clearTimeMonitoringCallback();
       throw error; // Re-throw to maintain error handling
     }
+  }
+  
+  // 🔍 DEBUG: Log AsyncTracker state at successful exit
+  console.log(`✅ [${processId}] EXIT SUCCESS: processFilesWithQueue completed normally`);
+  if (window.__asyncTracker) {
+    const exitStats = window.__asyncTracker.stats();
+    console.log(`📊 [${processId}] AsyncTracker at EXIT:`, exitStats);
   }
 };
 
