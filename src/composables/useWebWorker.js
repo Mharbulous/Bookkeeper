@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { useAsyncRegistry } from './useAsyncRegistry'
 
 /**
  * Generic Web Worker communication composable
@@ -24,6 +25,11 @@ export function useWebWorker(workerPath) {
   const HEALTH_CHECK_INTERVAL = 15000 // 15 seconds - less aggressive
   const HEALTH_CHECK_TIMEOUT = 8000 // 8 seconds - more time for response
   const HEALTH_CHECK_GRACE_PERIOD = 30000 // 30 seconds before first health check
+
+  // Registry integration
+  const registry = useAsyncRegistry()
+  let workerRegistryId = null
+  let healthCheckRegistryId = null
   
   // Initialize worker
   const initializeWorker = () => {
@@ -64,6 +70,22 @@ export function useWebWorker(workerPath) {
       isWorkerHealthy.value = true
       workerError.value = null
       consecutiveHealthFailures = 0
+
+      // Register worker with registry
+      workerRegistryId = registry.register(
+        registry.generateId('worker'),
+        'worker',
+        () => {
+          if (worker.value) {
+            worker.value.terminate()
+          }
+        },
+        {
+          component: 'WebWorker',
+          workerPath,
+          initialized: Date.now()
+        }
+      )
       
       // Start health monitoring after grace period
       setTimeout(() => {
@@ -85,6 +107,9 @@ export function useWebWorker(workerPath) {
   const startHealthChecking = () => {
     if (healthCheckInterval) {
       clearInterval(healthCheckInterval)
+      if (healthCheckRegistryId) {
+        registry.unregister(healthCheckRegistryId)
+      }
     }
     
     healthCheckInterval = setInterval(async () => {
@@ -95,12 +120,33 @@ export function useWebWorker(workerPath) {
         handleHealthCheckFailure()
       }
     }, HEALTH_CHECK_INTERVAL)
+
+    // Register health check interval with registry
+    healthCheckRegistryId = registry.register(
+      registry.generateId('health-check'),
+      'health-monitor',
+      () => {
+        if (healthCheckInterval) {
+          clearInterval(healthCheckInterval)
+          healthCheckInterval = null
+        }
+      },
+      {
+        component: 'WebWorker',
+        interval: HEALTH_CHECK_INTERVAL,
+        purpose: 'worker-health-monitoring'
+      }
+    )
   }
   
   const stopHealthChecking = () => {
     if (healthCheckInterval) {
       clearInterval(healthCheckInterval)
       healthCheckInterval = null
+    }
+    if (healthCheckRegistryId) {
+      registry.unregister(healthCheckRegistryId)
+      healthCheckRegistryId = null
     }
   }
   
@@ -277,6 +323,12 @@ export function useWebWorker(workerPath) {
   const terminateWorker = () => {
     // Stop health checking
     stopHealthChecking()
+    
+    // Unregister worker from registry
+    if (workerRegistryId) {
+      registry.unregister(workerRegistryId)
+      workerRegistryId = null
+    }
     
     if (worker.value) {
       worker.value.terminate()

@@ -1,12 +1,11 @@
 <template>
   <v-card
-    class="upload-dropzone pa-8 mb-6"
+    class="upload-dropzone pa-8"
     :class="{ 'dropzone-active': isDragOver }"
     @dragover.prevent="handleDragOver"
     @dragleave.prevent="handleDragLeave"
     @drop.prevent="handleDrop"
     variant="outlined"
-    :style="{ height: '60vh', width: '60vw', minHeight: '400px', minWidth: '600px', margin: '0 auto' }"
   >
     <div class="text-center h-100 d-flex flex-column justify-center align-center">
       <v-icon
@@ -119,6 +118,9 @@ const handleDrop = (event) => {
   border-radius: 12px;
   transition: all 0.3s ease;
   cursor: pointer;
+  width: 100%;
+  height: calc(100vh - 100px);
+  background-color: #ffffff;
 }
 
 .upload-dropzone:hover {

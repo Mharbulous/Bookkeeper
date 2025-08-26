@@ -1,10 +1,9 @@
 <template>
-  <v-card class="mt-6" variant="outlined">
+  <v-card variant="outlined" class="upload-queue">
     <v-card-title class="d-flex align-center justify-space-between">
       <div class="d-flex align-center">
         <v-icon icon="mdi-file-multiple" class="me-2" />
         Upload Queue
-        <!-- Time Progress Bar (shown during deduplication) -->
         <QueueTimeProgress
           v-if="showTimeProgress"
           :is-visible="showTimeProgress"
@@ -46,7 +45,6 @@
 
     <v-divider />
 
-    <!-- File List -->
     <div class="pa-4">
       <!-- Status Chips -->
       <FileQueueChips
@@ -384,6 +382,11 @@ const getPhaseMessage = () => {
 </script>
 
 <style scoped>
+.upload-queue {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
 .gap-2 {
   gap: 8px;
 }

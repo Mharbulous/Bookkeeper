@@ -1,6 +1,5 @@
 <template>
-  <v-container fluid class="pa-6">
-    <div class="max-w-4xl mx-auto mt-16">
+  <v-container fluid class="main-viewport">
 
       <!-- Main Upload Area -->
       <UploadDropzone
@@ -100,7 +99,6 @@
         @continue-waiting="handleContinueWaiting"
         @close="handleCloseWarning"
       />
-    </div>
   </v-container>
 </template>
 
@@ -483,5 +481,12 @@ const handleCloseWarning = () => {
 </script>
 
 <style scoped>
-/* Styles moved to individual components */
+.main-viewport {
+  background-color: #f8fafc;
+  padding: 50px !important;
+}
+
+:global(body) {
+  overflow: hidden;
+}
 </style>

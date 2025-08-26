@@ -31,6 +31,7 @@ import { useAuthStore } from './stores/auth'
 import AppSidebar from './components/layout/AppSidebar.vue'
 import AppHeader from './components/layout/AppHeader.vue'
 import { useFavicon } from './composables/useFavicon'
+import { useAsyncInspector } from './composables/useAsyncInspector'
 
 export default {
   name: 'App',
@@ -44,7 +45,19 @@ export default {
     // Initialize favicon switching
     useFavicon()
     
-    return { authStore }
+    // Development inspector integration
+    const inspector = useAsyncInspector()
+    
+    // Optional: Auto-log stats every 30 seconds in development
+    if (inspector.isEnabled) {
+      setInterval(() => {
+        if (inspector.stats.value.total > 0) {
+          inspector.logStats()
+        }
+      }, 30000)
+    }
+    
+    return { authStore, inspector }
   },
   data() {
     return {

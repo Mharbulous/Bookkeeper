@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { useAsyncRegistry } from './useAsyncRegistry'
 
 export function useFolderTimeouts() {
   // Modern timeout state with AbortController
@@ -14,21 +15,24 @@ export function useFolderTimeouts() {
   let globalTimeoutId = null
   let globalTimeoutController = null
 
+  // Registry integration
+  const registry = useAsyncRegistry()
+
   // Browser compatibility check
   const hasModernTimeoutSupport = () => {
     return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
   }
   
   // Create AbortController with timeout
-  const createTimeoutController = (timeoutMs) => {
+  const createTimeoutController = (timeoutMs, processType = 'timeout') => {
     try {
+      let controller
       if (hasModernTimeoutSupport()) {
         const signal = AbortSignal.timeout(timeoutMs)
-        const controller = { signal, abort: () => {} } // AbortSignal.timeout creates pre-aborted signal
-        return controller
+        controller = { signal, abort: () => {} } // AbortSignal.timeout creates pre-aborted signal
       } else {
         // Fallback for browsers without AbortSignal.timeout
-        const controller = new AbortController()
+        controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
         
         const originalAbort = controller.abort.bind(controller)
@@ -36,9 +40,23 @@ export function useFolderTimeouts() {
           clearTimeout(timeoutId)
           originalAbort()
         }
-        
-        return controller
       }
+
+      // Register with registry
+      const registryId = registry.generateId(processType)
+      registry.register(registryId, processType, () => controller.abort(), {
+        component: 'FolderTimeouts',
+        timeoutMs
+      })
+
+      // Enhance abort method to unregister
+      const originalAbort = controller.abort
+      controller.abort = (...args) => {
+        registry.unregister(registryId)
+        return originalAbort?.apply(controller, args)
+      }
+
+      return controller
     } catch (error) {
       console.warn('AbortController creation failed, using fallback:', error)
       // Ultimate fallback - return mock controller
@@ -51,7 +69,7 @@ export function useFolderTimeouts() {
 
   // Two-tier timeout system
   const startLocalTimeout = (timeoutMs, onTimeout) => {
-    const controller = createTimeoutController(timeoutMs)
+    const controller = createTimeoutController(timeoutMs, 'local-timeout')
     activeControllers.add(controller)
     
     const handleTimeout = () => {
@@ -79,7 +97,7 @@ export function useFolderTimeouts() {
       activeControllers.delete(globalTimeoutController)
     }
     
-    globalTimeoutController = createTimeoutController(timeoutMs)
+    globalTimeoutController = createTimeoutController(timeoutMs, 'global-timeout')
     activeControllers.add(globalTimeoutController)
     
     const handleGlobalTimeout = () => {
@@ -218,6 +236,9 @@ export function useFolderTimeouts() {
 
   // Cleanup and memory management
   const cleanup = () => {
+    // Registry cleanup first
+    registry.cleanup()
+    
     // Abort all active controllers
     activeControllers.forEach(controller => {
       if (controller && typeof controller.abort === 'function') {
@@ -307,6 +328,9 @@ export function useFolderTimeouts() {
     // Legacy compatibility
     clearAnalysisTimeout,
     resetTimeoutState,
-    shouldContinueAnalysis
+    shouldContinueAnalysis,
+    
+    // Registry access for testing/debugging
+    registry
   }
 }
