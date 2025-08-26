@@ -70,23 +70,29 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
   const estimatedDuplicationPercent = Math.round((bufferedDuplicateCandidates / bufferedTotalFiles) * 100)
   
 
-  // Hardware-calibrated predictions
-  let calibratedPrediction = null;
+  // Hardware-calibrated predictions (always available)
+  let hardwarePerformanceFactor = getStoredHardwarePerformanceFactor();
   let usedHardwareCalibration = false;
   
-  const storedH = getStoredHardwarePerformanceFactor();
-  if (storedH && storedH > 0) {
-    const folderData = {
-      totalFiles: files.length,
-      duplicateCandidates: duplicateCandidates.length,
-      duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
-      avgDirectoryDepth,
-      totalDirectoryCount
-    };
-    
-    calibratedPrediction = calculateCalibratedProcessingTime(folderData, storedH);
+  if (!hardwarePerformanceFactor || hardwarePerformanceFactor <= 0) {
+    // Use baseline H-factor for new users or invalid stored values
+    hardwarePerformanceFactor = 1.61; // Standard baseline from performance analysis
+    console.log('Using baseline hardware performance factor: 1.61 files/ms (new user or invalid stored value)')
+  } else {
     usedHardwareCalibration = true;
+    console.log(`Using stored hardware performance factor: ${hardwarePerformanceFactor.toFixed(2)} files/ms`)
   }
+  
+  const folderData = {
+    totalFiles: files.length,
+    duplicateCandidates: duplicateCandidates.length,
+    duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
+    avgDirectoryDepth,
+    totalDirectoryCount
+  };
+  
+  // Always generate calibrated prediction - never null
+  const calibratedPrediction = calculateCalibratedProcessingTime(folderData, hardwarePerformanceFactor);
   
   // Calculate unique file size (files that can skip hash calculation)
   const uniqueFilesSizeMB = uniqueFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)
@@ -100,15 +106,15 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
     duplicateCandidatesSizeMB: Math.round(totalSizeMB * 10) / 10,
     estimatedDuplicationPercent,
     
-    // Hardware-calibrated predictions
-    timeMs: calibratedPrediction ? calibratedPrediction.totalTimeMs : 0,
-    timeSeconds: calibratedPrediction ? calibratedPrediction.totalTimeSeconds : 0,
+    // Hardware-calibrated predictions (always available)
+    timeMs: calibratedPrediction.totalTimeMs,
+    timeSeconds: calibratedPrediction.totalTimeSeconds,
     isHardwareCalibrated: usedHardwareCalibration,
     totalDirectoryCount: totalDirectoryCount,
     
-    // Hardware-calibrated phase breakdown
-    phases: calibratedPrediction ? calibratedPrediction.phases : null,
-    calibration: calibratedPrediction ? calibratedPrediction.calibration : null
+    // Hardware-calibrated phase breakdown  
+    phases: calibratedPrediction.phases,
+    calibration: calibratedPrediction.calibration
   }
 }
 

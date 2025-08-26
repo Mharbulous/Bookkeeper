@@ -114,6 +114,7 @@ import { useFileDragDrop } from '../composables/useFileDragDrop.js'
 import { useQueueDeduplication } from '../composables/useQueueDeduplication.js'
 import { useFolderOptions } from '../composables/useFolderOptions.js'
 import { useTimeBasedWarning } from '../composables/useTimeBasedWarning.js'
+import { calculateCalibratedProcessingTime, getStoredHardwarePerformanceFactor } from '../utils/hardwareCalibration.js'
 
 // Component configuration
 defineOptions({
@@ -247,6 +248,7 @@ const performComprehensiveCleanup = (source = 'unknown') => {
       if (queueDeduplication) {
         queueDeduplication.abortProcessing()
         queueDeduplication.terminateWorker()
+        queueDeduplication.clearTimeMonitoringCallback()
         console.log('Deduplication processing aborted and workers terminated')
       }
     } catch (error) {
@@ -313,25 +315,55 @@ const processFilesWithQueue = async (files) => {
   
   // Start time monitoring if not already started and we have files to process
   if (files.length > 0 && !timeWarning.startTime.value) {
-    // Use folder analysis estimate if available, otherwise create basic estimate
     const folderAnalysis = allFilesAnalysis.value || mainFolderAnalysis.value
     let estimatedTime = 0
     
-    if (folderAnalysis && folderAnalysis.totalEstimatedTime) {
-      estimatedTime = folderAnalysis.totalEstimatedTime
-      console.log(`Starting time monitoring with folder analysis estimate: ${estimatedTime}ms`)
+    if (folderAnalysis && folderAnalysis.timeMs && folderAnalysis.timeMs > 0) {
+      // Use existing folder analysis estimate (already hardware-calibrated)
+      estimatedTime = folderAnalysis.timeMs
+      console.log(`Starting time monitoring with folder analysis estimate: ${estimatedTime}ms (hardware-calibrated)`)
     } else {
-      // Basic time estimate for deduplication: 35ms base + 6.5ms per file + size factor
+      // Generate hardware-calibrated estimate on-the-fly for files without folder analysis
+      console.log('No folder analysis available, generating hardware-calibrated estimate for file processing')
+      
+      // Get stored hardware performance factor or use baseline
+      let hardwarePerformanceFactor = getStoredHardwarePerformanceFactor()
+      if (!hardwarePerformanceFactor || hardwarePerformanceFactor <= 0) {
+        // Use baseline H-factor for new users (1.61 files/ms)
+        hardwarePerformanceFactor = 1.61
+        console.log('Using baseline hardware performance factor for new user: 1.61 files/ms')
+      }
+      
+      // Create file analysis data for calibrated estimation
       const totalSizeMB = files.reduce((sum, file) => sum + (file.size || 0), 0) / (1024 * 1024)
-      estimatedTime = Math.max(1000, 35 + (6.5 * files.length) + (0.8 * totalSizeMB)) // Minimum 1 second for visibility
-      console.log(`Starting time monitoring with basic deduplication estimate: ${estimatedTime}ms for ${files.length} files (${totalSizeMB.toFixed(1)}MB)`)
+      const sizeMap = new Map()
+      files.forEach(file => {
+        const size = file.size || 0
+        sizeMap.set(size, (sizeMap.get(size) || 0) + 1)
+      })
+      const duplicateCandidates = files.filter(file => sizeMap.get(file.size || 0) > 1)
+      const duplicateCandidatesSizeMB = duplicateCandidates.reduce((sum, file) => sum + (file.size || 0), 0) / (1024 * 1024)
+      
+      const folderData = {
+        totalFiles: files.length,
+        duplicateCandidates: duplicateCandidates.length,
+        duplicateCandidatesSizeMB: Math.round(duplicateCandidatesSizeMB * 10) / 10,
+        avgDirectoryDepth: 2.5, // Default assumption for direct file processing
+        totalDirectoryCount: 1
+      }
+      
+      // Generate hardware-calibrated estimate
+      const calibratedPrediction = calculateCalibratedProcessingTime(folderData, hardwarePerformanceFactor)
+      estimatedTime = calibratedPrediction.totalTimeMs
+      
+      console.log(`Generated hardware-calibrated estimate: ${estimatedTime}ms for ${files.length} files (${totalSizeMB.toFixed(1)}MB, H=${hardwarePerformanceFactor.toFixed(2)})`)
     }
     
     if (estimatedTime > 0) {
       timeWarning.startMonitoring(estimatedTime)
       console.log(`Time monitoring started: estimated=${estimatedTime}ms, files=${files.length}`)
     } else {
-      console.warn('Time monitoring not started: estimatedTime is 0 or invalid')
+      console.warn('Time monitoring not started: Unable to generate hardware-calibrated estimate')
     }
   }
   

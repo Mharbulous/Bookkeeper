@@ -188,8 +188,10 @@ export function useWorkerManager() {
     
     const workerState = workers.get(workerId)
     if (!workerState) {
-      console.warn(`Worker ${workerId} not found`)
-      return false
+      if (import.meta.env.DEV) {
+        console.debug(`Worker ${workerId} not found (may have already been terminated)`)
+      }
+      return true // Return true since the worker is already gone
     }
     
     try {
@@ -201,6 +203,9 @@ export function useWorkerManager() {
       return true
     } catch (error) {
       console.error(`Error terminating worker ${workerId}:`, error)
+      // Still remove from registry even if termination failed
+      workers.delete(workerId)
+      updateGlobalState()
       return false
     }
   }
