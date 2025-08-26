@@ -119,7 +119,8 @@ const handleDrop = (event) => {
   transition: all 0.3s ease;
   cursor: pointer;
   width: 100%;
-  height: calc(100vh - 100px);
+  flex: 1;
+  min-height: 400px;
   background-color: #ffffff;
 }
 

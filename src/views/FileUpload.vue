@@ -191,14 +191,17 @@ queueDeduplication.setTimeMonitoringCallback({
   },
   onProcessingComplete: () => {
     timeWarning.resetMonitoring()
-    console.log('File processing completed - time monitoring reset')
+    queueDeduplication.terminateWorker()
+    console.log('File processing completed - time monitoring reset and workers terminated')
   },
   onProcessingError: (error) => {
     timeWarning.resetMonitoring()
-    console.log('File processing error - time monitoring reset:', error)
+    queueDeduplication.terminateWorker()
+    console.log('File processing error - time monitoring reset and workers terminated:', error)
   },
   onProcessingAborted: () => {
-    console.log('File processing aborted - time monitoring stopped')
+    queueDeduplication.terminateWorker()
+    console.log('File processing aborted - workers terminated')
   }
 })
 
@@ -243,7 +246,8 @@ const performComprehensiveCleanup = (source = 'unknown') => {
     try {
       if (queueDeduplication) {
         queueDeduplication.abortProcessing()
-        console.log('Deduplication processing aborted')
+        queueDeduplication.terminateWorker()
+        console.log('Deduplication processing aborted and workers terminated')
       }
     } catch (error) {
       console.warn('Error aborting deduplication processing:', error)
@@ -484,6 +488,9 @@ const handleCloseWarning = () => {
 .main-viewport {
   background-color: #f8fafc;
   padding: 50px !important;
+  height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
 }
 
 :global(body) {
