@@ -293,7 +293,7 @@ const processFilesWithQueue = async (files) => {
 
   // Check if processing was aborted after time monitoring setup
   if (analysisTimedOut.value) {
-    console.log(`❌ [${processId}] EXIT EARLY: aborted after time monitoring setup`);
+    console.log('Aborting file processing - analysis was cancelled after time monitoring setup');
     return;
   }
 
