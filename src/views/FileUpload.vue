@@ -395,7 +395,20 @@ const processFilesWithQueue = async (files) => {
       return
     }
     
-    await processFiles(safeFiles, updateUploadQueue)
+    try {
+      await processFiles(safeFiles, updateUploadQueue)
+      
+      // Processing completed successfully - perform cleanup
+      console.log('File processing completed successfully - cleaning up time monitoring')
+      timeWarning.resetMonitoring()
+      queueDeduplication.clearTimeMonitoringCallback()
+    } catch (error) {
+      console.error('Error during file processing:', error)
+      // Cleanup on error as well
+      timeWarning.resetMonitoring()
+      queueDeduplication.clearTimeMonitoringCallback()
+      throw error // Re-throw to maintain error handling
+    }
   } else {
     // Final check before actually processing files (no folder filtering path)
     if (analysisTimedOut.value) {
@@ -403,7 +416,20 @@ const processFilesWithQueue = async (files) => {
       return
     }
     
-    await processFiles(files, updateUploadQueue)
+    try {
+      await processFiles(files, updateUploadQueue)
+      
+      // Processing completed successfully - perform cleanup
+      console.log('File processing completed successfully - cleaning up time monitoring')
+      timeWarning.resetMonitoring()
+      queueDeduplication.clearTimeMonitoringCallback()
+    } catch (error) {
+      console.error('Error during file processing:', error)
+      // Cleanup on error as well
+      timeWarning.resetMonitoring()
+      queueDeduplication.clearTimeMonitoringCallback()
+      throw error // Re-throw to maintain error handling
+    }
   }
 }
 
