@@ -58,7 +58,6 @@ export function useQueueProgress() {
     processFilesWithWorker,
     processFilesMainThread,
     onProgress = null,
-    abortChecker = null,
   ) => {
     // Check if files array is valid
     if (!files || !Array.isArray(files) || files.length === 0) {
@@ -84,17 +83,6 @@ export function useQueueProgress() {
     }
 
     if (workerResult.fallback) {
-      // Check if processing was aborted before falling back
-      console.log('🔍 FALLBACK DEBUG: abortChecker exists:', !!abortChecker);
-      if (abortChecker) {
-        const isAborted = abortChecker();
-        console.log('🔍 FALLBACK DEBUG: abortChecker() result:', isAborted);
-        if (isAborted) {
-          console.info('❌ Skipping fallback to main thread - processing was aborted');
-          return { readyFiles: [], duplicateFiles: [] };
-        }
-      }
-
       // Fall back to main thread processing
       console.info('Falling back to main thread processing...');
       return await processFilesMainThread(files, updateUploadQueue, onProgress);

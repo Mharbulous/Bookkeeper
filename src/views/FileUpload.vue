@@ -204,104 +204,7 @@ queueDeduplication.setTimeMonitoringCallback({
   },
 });
 
-// Comprehensive cleanup function for all stop/cancel/clear operations
-const performComprehensiveCleanup = (source = 'unknown') => {
-  try {
-    console.log(`🧹 Starting comprehensive cleanup from: ${source}`);
-    
-    // 🔍 DEBUG: Log AsyncTracker state BEFORE cleanup
-    if (window.__asyncTracker) {
-      const beforeStats = window.__asyncTracker.stats();
-      console.log('📊 AsyncTracker BEFORE cleanup:', beforeStats);
-      window.__asyncTracker.logStats();
-    }
-
-    // 1. Force abort any ongoing operations by setting timeout state
-    try {
-      console.log('🔍 SETTING analysisTimedOut.value = true');
-      analysisTimedOut.value = true; // This signals all ongoing operations to abort immediately
-      console.log('✅ Forced analysis timeout to abort ongoing operations, analysisTimedOut.value =', analysisTimedOut.value);
-    } catch (error) {
-      console.warn('Error setting analysis timeout:', error);
-    }
-
-    // 2. Cancel any ongoing folder analysis and background processes
-    try {
-      cancelFolderUpload(); // This calls cleanup() and resets folder analysis state
-      console.log('Folder analysis cancelled');
-    } catch (error) {
-      console.warn('Error cancelling folder analysis:', error);
-    }
-
-    // 3. Stop time monitoring progress updates
-    try {
-      timeWarning.abortProcessing();
-      console.log('Time monitoring aborted');
-    } catch (error) {
-      console.warn('Error aborting time monitoring:', error);
-    }
-
-    // 4. Reset progress state (from Stop Now button behavior)
-    try {
-      resetProgress();
-      console.log('Progress state reset');
-    } catch (error) {
-      console.warn('Error resetting progress:', error);
-    }
-
-    // 5. Abort deduplication processing and terminate workers
-    try {
-      if (queueDeduplication) {
-        queueDeduplication.abortProcessing();
-        queueDeduplication.terminateWorker();
-        queueDeduplication.clearTimeMonitoringCallback();
-        console.log('Deduplication processing aborted and workers terminated');
-      }
-    } catch (error) {
-      console.warn('Error aborting deduplication processing:', error);
-    }
-
-    // 6. Call the base clearQueue function (always attempt this)
-    try {
-      baseClearQueue();
-      console.log('Base queue cleared');
-    } catch (error) {
-      console.error('Error in base clearQueue:', error);
-    }
-
-    // 7. Show notification (if requested by source)
-    if (source === 'stop-now') {
-      try {
-        showNotification('Upload stopped', 'info');
-      } catch (error) {
-        console.warn('Error showing notification:', error);
-      }
-    } else if (source === 'clear-all') {
-      // Queue cleared - no notification needed as it's obvious from user action
-    }
-
-    // 🔍 DEBUG: Log AsyncTracker state AFTER cleanup
-    if (window.__asyncTracker) {
-      const afterStats = window.__asyncTracker.stats();
-      console.log('📊 AsyncTracker AFTER cleanup:', afterStats);
-      window.__asyncTracker.logStats();
-    }
-    
-    console.log(`✅ Comprehensive cleanup completed from: ${source}`);
-  } catch (error) {
-    console.error(`Error during comprehensive cleanup from ${source}:`, error);
-    // Always attempt basic cleanup even if advanced cleanup fails
-    try {
-      analysisTimedOut.value = true; // Force abort as fallback
-      timeWarning.abortProcessing(); // Stop time monitoring as fallback
-      resetProgress(); // Reset progress as fallback
-      cancelFolderUpload(); // Try to cancel folder processes
-      baseClearQueue();
-    } catch (fallbackError) {
-      console.error('Fallback cleanup failed:', fallbackError);
-    }
-  }
-};
+// Legacy: Complex cleanup function replaced by simple page refresh
 
 // Enhanced clearQueue that uses comprehensive cleanup
 const clearQueue = () => {
@@ -312,24 +215,15 @@ const clearQueue = () => {
 
 // Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
-  const processId = `processFilesWithQueue-${Date.now()}`;
-  console.log(`🚀 [${processId}] ENTRY: processFilesWithQueue called with ${files?.length} files, analysisTimedOut: ${analysisTimedOut.value}`);
-  
-  // 🔍 DEBUG: Log AsyncTracker state at entry
-  if (window.__asyncTracker) {
-    const entryStats = window.__asyncTracker.stats();
-    console.log(`📊 [${processId}] AsyncTracker at ENTRY:`, entryStats);
-  }
-  
-  // Check if analysis has been aborted before processing (should be false now)
+  // Check if analysis has been aborted before processing
   if (analysisTimedOut.value) {
-    console.log(`❌ [${processId}] EXIT EARLY: analysis was aborted`);
+    console.log('Skipping file processing - analysis was aborted');
     return;
   }
 
   // Additional safety check - if queue is empty, processing was likely cancelled
   if (!files || files.length === 0) {
-    console.log(`❌ [${processId}] EXIT EARLY: no files to process`);
+    console.log('Skipping file processing - no files to process');
     return;
   }
 
@@ -440,7 +334,7 @@ const processFilesWithQueue = async (files) => {
         return;
       }
 
-      await processFiles(safeFiles, updateUploadQueue, null, () => analysisTimedOut.value);
+      await processFiles(safeFiles, updateUploadQueue);
 
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {
@@ -480,7 +374,7 @@ const processFilesWithQueue = async (files) => {
         return;
       }
 
-      await processFiles(files, updateUploadQueue, null, () => analysisTimedOut.value);
+      await processFiles(files, updateUploadQueue);
 
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {

@@ -29,7 +29,7 @@ export function useQueueDeduplication() {
   };
 
   // Main processFiles function that coordinates worker vs main thread
-  const processFiles = async (files, updateUploadQueue, onProgress = null, abortChecker = null) => {
+  const processFiles = async (files, updateUploadQueue, onProgress = null) => {
     // Start time monitoring if callback is set
     if (timeMonitoringCallback) {
       timeMonitoringCallback.onProcessingStart?.();
@@ -42,7 +42,6 @@ export function useQueueDeduplication() {
         queueWorkers.processFilesWithWorker,
         processFilesMainThread,
         onProgress,
-        abortChecker,
       );
 
       // Stop time monitoring on successful completion
