@@ -24,7 +24,7 @@
               </svg>
             </div>
             <h2 :id="headerId" class="modal-title">
-              Slow File Processing
+              Cloud storage detected.
             </h2>
           </div>
           <button
@@ -60,17 +60,10 @@
 
         <!-- Actions -->
         <div class="modal-actions">
-          <button
+          <ClearAllButton
             ref="clearButton"
-            type="button"
-            class="action-button action-button-clear"
             @click="handleClearAll"
-          >
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M19.36,2.72L20.78,4.14L15.06,9.85C16.13,11.39 16.28,13.24 15.38,14.44L9.06,8.12C10.26,7.22 12.11,7.37 13.65,8.44L19.36,2.72M5.93,17.57C3.92,15.56 2.69,13.16 2.35,10.92L7.23,8.83L14.67,16.27L12.58,21.15C10.34,20.81 7.94,19.58 5.93,17.57Z" />
-            </svg>
-            Clear All
-          </button>
+          />
           <button
             ref="continueButton"
             type="button"
@@ -80,7 +73,7 @@
             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
-            Wait 1 More Minute
+            Continue Waiting
           </button>
         </div>
       </div>
@@ -90,6 +83,7 @@
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import ClearAllButton from '../../base/ClearAllButton.vue'
 
 const props = defineProps({
   isVisible: {
@@ -288,9 +282,6 @@ onUnmounted(() => {
   @apply inline-flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors;
 }
 
-.action-button-clear {
-  @apply bg-white text-black border border-gray-300 hover:bg-gray-50 focus:ring-gray-500;
-}
 
 .action-button-secondary {
   @apply bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500;

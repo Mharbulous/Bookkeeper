@@ -20,16 +20,10 @@
       </div>
 
       <div class="d-flex gap-2">
-        <v-btn
-          variant="elevated"
-          color="white"
-          class="text-black"
-          prepend-icon="mdi-broom"
-          @click="handleClearQueue"
+        <ClearAllButton
           :disabled="files.length === 0"
-        >
-          Clear All
-        </v-btn>
+          @click="handleClearQueue"
+        />
 
         <v-btn
           color="primary"
@@ -152,6 +146,7 @@ import FileQueuePlaceholder from './FileQueuePlaceholder.vue'
 import LazyFileItem from './LazyFileItem.vue'
 import FileQueueChips from './FileQueueChips.vue'
 import QueueTimeProgress from './QueueTimeProgress.vue'
+import ClearAllButton from '../../base/ClearAllButton.vue'
 
 // Component configuration
 defineOptions({
