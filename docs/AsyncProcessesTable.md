@@ -80,6 +80,17 @@ Each async process is documented using the following structured template:
 
 ### **TIMERS & INTERVALS**
 
+**ASYNC PROCESS: AsyncTracker Statistics Monitor**
+- **Location**: `src/App.vue:54-61`
+- **Type**: setInterval
+- **Trigger**: Application startup (component mount)
+- **Cleanup**: `clearInterval()` in `App.vue:78-82` on unmount
+- **Dependencies**: AsyncTracker system, development environment
+- **Risk Level**: Low (expected system monitoring process)
+- **Parent Process**: Application Lifecycle
+- **Cleanup Verification**: ✓
+- **Notes**: Self-monitoring process that tracks async processes every 30 seconds. Registered as 'async-monitoring' type and excluded from suspicious process detection. This process is expected to persist for the application's lifetime and should never be flagged as suspicious.
+
 **ASYNC PROCESS: Folder Analysis Timeout Controller**
 - **Location**: `src/composables/useFolderTimeouts.js:32`
 - **Type**: setTimeout with AbortController
@@ -441,7 +452,7 @@ Each async process is documented using the following structured template:
 
 ### Process Distribution by Category
 - **Web Workers & Management**: 4 processes
-- **Timers & Intervals**: 5 processes  
+- **Timers & Intervals**: 6 processes (including AsyncTracker monitoring)
 - **Event Listeners**: 4 processes (including global DOM listeners)
 - **Vue Reactivity & Watchers**: 6 processes
 - **Component Lifecycle & DOM**: 4 processes
@@ -449,7 +460,7 @@ Each async process is documented using the following structured template:
 - **Lazy Loading & Dynamic Imports**: 3 processes
 - **Specialized Async Patterns**: 2 processes
 
-**Total: 33 distinct async processes identified**
+**Total: 34 distinct async processes identified**
 
 ### Risk Assessment Results
 - **High Risk**: 2 processes (Firebase auth listener, global document event listeners)
@@ -457,9 +468,38 @@ Each async process is documented using the following structured template:
 - **Low Risk**: 23 processes (framework-managed, short-lived, auto-cleanup)
 
 ### Cleanup Verification Status
-- **✓ Verified**: 29 processes have confirmed cleanup methods
+- **✓ Verified**: 30 processes have confirmed cleanup methods
 - **Partial**: 4 processes have incomplete or complex cleanup verification
 - **✗ Missing**: 0 processes (all have some form of cleanup)
+
+## AsyncTracker Monitoring Logic
+
+The AsyncTracker system includes sophisticated monitoring logic designed to identify problematic async processes while excluding expected system processes:
+
+### Suspicious Process Detection
+- **Long-running threshold**: 30 seconds from process creation
+- **Excluded process types**: `'watcher'`, `'listener'`, `'async-monitoring'`
+- **Self-monitoring exclusion**: The AsyncTracker's own monitoring interval is never flagged as suspicious
+
+### Process Classification
+1. **async-monitoring**: The AsyncTracker's 30-second statistics logging interval
+   - Expected to run continuously for application lifetime
+   - Explicitly excluded from suspicious process detection
+   - Registered with proper cleanup on component unmount
+
+2. **Suspicious processes**: Long-running processes that are NOT expected system processes
+   - Triggers warning messages in console
+   - Indicates potential memory leaks or stuck operations
+
+3. **Expected system processes**: Long-running but legitimate processes
+   - Shows info message: "Long-running processes detected, but all are expected system processes"
+   - No warning generated when only these processes are running
+
+### Console Output Behavior
+- **Every 30 seconds**: Statistics table showing process counts by type
+- **Suspicious processes found**: Warning with details
+- **Only expected processes**: Informational message
+- **No suspicious processes**: Statistics table only
 
 ### Critical Implementation Requirements for Task Registry
 
@@ -468,10 +508,12 @@ Each async process is documented using the following structured template:
 3. **Worker Lifecycle**: Complex worker management with health checks and restart logic
 4. **AbortController Integration**: Modern timeout patterns with signal cleanup
 5. **Vue Reactivity Integration**: Must not interfere with Vue's built-in cleanup mechanisms
+6. **Self-Monitoring Awareness**: Task Registry must exclude its own monitoring processes from leak detection
 
 ## Enhanced Methodology Validation
 
-The improved methodology successfully identified **12 additional processes** beyond the initial 21, including:
+The improved methodology successfully identified **13 additional processes** beyond the initial 21, including:
+- AsyncTracker self-monitoring interval (critical system process)
 - Document event listeners (click outside, focus trapping)
 - Vue reactivity watchers (route, props, visibility)
 - AbortController signal listeners

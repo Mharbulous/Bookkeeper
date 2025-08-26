@@ -25,7 +25,7 @@ export function useAsyncInspector() {
   
   const suspiciousProcesses = computed(() => {
     return longRunningProcesses.value.filter(process => 
-      !['watcher', 'listener'].includes(process.type)
+      !['watcher', 'listener', 'async-monitoring'].includes(process.type)
     )
   })
   
@@ -34,7 +34,9 @@ export function useAsyncInspector() {
     console.group('[AsyncTracker] Current Statistics')
     console.table(stats.value.byType)
     if (suspiciousProcesses.value.length > 0) {
-      console.warn('Suspicious long-running processes:', suspiciousProcesses.value)
+      console.warn('Suspicious long-running processes (excluding normal monitoring):', suspiciousProcesses.value)
+    } else if (longRunningProcesses.value.length > 0) {
+      console.info('Long-running processes detected, but all are expected system processes')
     }
     console.groupEnd()
   }
@@ -45,7 +47,44 @@ export function useAsyncInspector() {
       stats: () => getGlobalStats(),
       processes: () => processes.value,
       logStats,
-      cleanup: () => useGlobalAsyncRegistry().cleanupAll()
+      cleanup: () => useGlobalAsyncRegistry().cleanupAll(),
+      // Debug helper to see what worker processes exist
+      debugWorkers: () => {
+        const workerProcesses = processes.value.filter(p => p.type === 'worker')
+        console.group('[AsyncTracker] Worker Process Debug')
+        console.log('Total worker processes:', workerProcesses.length)
+        workerProcesses.forEach((process, index) => {
+          console.log(`Worker ${index + 1}:`, {
+            id: process.id,
+            type: process.type,
+            component: process.component,
+            meta: process.meta,
+            age: Date.now() - process.created + 'ms',
+            created: new Date(process.created).toISOString(),
+            hasCleanup: typeof process.cleanup === 'function'
+          })
+          console.log(`Worker ${index + 1} cleanup function:`, process.cleanup?.toString())
+        })
+        console.groupEnd()
+        return workerProcesses
+      },
+      // Test cleanup on a specific worker
+      cleanupWorker: (workerId) => {
+        const { processes } = useGlobalAsyncRegistry()
+        const allProcesses = processes.value
+        const worker = allProcesses.find(p => p.id === workerId)
+        if (worker) {
+          console.log('Attempting to cleanup worker:', workerId)
+          try {
+            worker.cleanup?.()
+            console.log('Worker cleanup function executed')
+          } catch (error) {
+            console.error('Error during worker cleanup:', error)
+          }
+        } else {
+          console.warn('Worker not found:', workerId)
+        }
+      }
     }
   }
   

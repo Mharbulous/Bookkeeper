@@ -182,6 +182,10 @@ export function useWorkerManager() {
   
   // Terminate a specific worker
   const terminateWorker = (workerId) => {
+    if (import.meta.env.DEV) {
+      console.debug(`[WorkerManager] terminateWorker called with ID: ${workerId}`)
+    }
+    
     const workerState = workers.get(workerId)
     if (!workerState) {
       console.warn(`Worker ${workerId} not found`)

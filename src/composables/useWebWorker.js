@@ -76,9 +76,16 @@ export function useWebWorker(workerPath) {
         registry.generateId('worker'),
         'worker',
         () => {
+          // The proper cleanup is handled by terminateWorker()
+          // This cleanup function is called by the registry's global cleanup
           if (worker.value) {
             worker.value.terminate()
+            worker.value = null
+            isWorkerReady.value = false
+            isWorkerHealthy.value = false
           }
+          // Note: We can't unregister here due to circular reference
+          // The registry will handle removing this entry after cleanup executes
         },
         {
           component: 'WebWorker',
@@ -86,6 +93,10 @@ export function useWebWorker(workerPath) {
           initialized: Date.now()
         }
       )
+      
+      if (import.meta.env.DEV) {
+        console.debug('[WebWorker] Main worker registered with ID:', workerRegistryId)
+      }
       
       // Start health monitoring after grace period
       setTimeout(() => {
@@ -137,16 +148,37 @@ export function useWebWorker(workerPath) {
         purpose: 'worker-health-monitoring'
       }
     )
+    
+    if (import.meta.env.DEV) {
+      console.debug('[WebWorker] Health monitor registered with ID:', healthCheckRegistryId)
+    }
   }
   
   const stopHealthChecking = () => {
+    if (import.meta.env.DEV) {
+      console.debug('[WebWorker] Stopping health monitoring. Interval exists:', !!healthCheckInterval, 'Registry ID exists:', !!healthCheckRegistryId)
+    }
+    
     if (healthCheckInterval) {
       clearInterval(healthCheckInterval)
       healthCheckInterval = null
+      
+      if (import.meta.env.DEV) {
+        console.debug('[WebWorker] Health check interval cleared')
+      }
     }
+    
     if (healthCheckRegistryId) {
+      if (import.meta.env.DEV) {
+        console.debug('[WebWorker] Unregistering health monitor with ID:', healthCheckRegistryId)
+      }
+      
       registry.unregister(healthCheckRegistryId)
       healthCheckRegistryId = null
+      
+      if (import.meta.env.DEV) {
+        console.debug('[WebWorker] Health monitor unregistered successfully')
+      }
     }
   }
   
@@ -321,13 +353,25 @@ export function useWebWorker(workerPath) {
   
   // Terminate worker
   const terminateWorker = () => {
+    if (import.meta.env.DEV) {
+      console.debug('[WebWorker] Terminating worker. Main registry ID:', workerRegistryId, 'Health registry ID:', healthCheckRegistryId)
+    }
+    
     // Stop health checking
     stopHealthChecking()
     
     // Unregister worker from registry
     if (workerRegistryId) {
+      if (import.meta.env.DEV) {
+        console.debug('[WebWorker] Unregistering main worker with ID:', workerRegistryId)
+      }
+      
       registry.unregister(workerRegistryId)
       workerRegistryId = null
+      
+      if (import.meta.env.DEV) {
+        console.debug('[WebWorker] Main worker unregistered successfully')
+      }
     }
     
     if (worker.value) {

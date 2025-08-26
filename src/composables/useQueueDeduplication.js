@@ -41,7 +41,19 @@ export function useQueueDeduplication() {
       
       // Stop time monitoring on successful completion
       if (timeMonitoringCallback) {
+        if (import.meta.env.DEV) {
+          console.debug('[QueueDeduplication] Calling onProcessingComplete callback')
+        }
+        
         timeMonitoringCallback.onProcessingComplete?.()
+        
+        if (import.meta.env.DEV) {
+          console.debug('[QueueDeduplication] onProcessingComplete callback completed')
+        }
+      } else {
+        if (import.meta.env.DEV) {
+          console.warn('[QueueDeduplication] No timeMonitoringCallback available for onProcessingComplete')
+        }
       }
       
       return result

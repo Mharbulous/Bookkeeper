@@ -221,12 +221,37 @@ export function useQueueWorkers() {
   
   // Terminate worker (cleanup)
   const terminateWorker = () => {
-    if (workerState) {
-      return workerManager.terminateWorker(WORKER_ID)
-    } else {
-      workerInstance.terminateWorker()
-      return true
+    if (import.meta.env.DEV) {
+      console.debug('[QueueWorkers] Terminating worker. State exists:', !!workerState, 'Worker ID:', WORKER_ID)
+      console.debug('[QueueWorkers] Worker instance exists:', !!workerInstance)
+      console.debug('[QueueWorkers] Worker instance ready:', workerInstance?.isWorkerReady?.value)
     }
+    
+    // Always terminate both the managed worker (if exists) and the direct worker instance
+    let managerResult = true
+    let instanceResult = true
+    
+    if (workerState) {
+      if (import.meta.env.DEV) {
+        console.debug('[QueueWorkers] Terminating managed worker')
+      }
+      managerResult = workerManager.terminateWorker(WORKER_ID)
+    }
+    
+    // Also terminate the direct worker instance (fallback case)
+    if (workerInstance && workerInstance.isWorkerReady?.value) {
+      if (import.meta.env.DEV) {
+        console.debug('[QueueWorkers] Terminating direct worker instance')
+      }
+      workerInstance.terminateWorker()
+      instanceResult = true
+    }
+    
+    if (import.meta.env.DEV) {
+      console.debug('[QueueWorkers] Termination complete. Manager result:', managerResult, 'Instance result:', instanceResult)
+    }
+    
+    return managerResult && instanceResult
   }
 
   return {
