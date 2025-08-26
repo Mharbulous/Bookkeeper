@@ -24,20 +24,45 @@ export function useAsyncInspector() {
   })
   
   const suspiciousProcesses = computed(() => {
-    return longRunningProcesses.value.filter(process => 
-      !['watcher', 'listener', 'async-monitoring'].includes(process.type)
+    const suspicious = longRunningProcesses.value.filter(process => 
+      !['watcher', 'listener'].includes(process.type)
     )
+    
+    // Check for multiple async-monitoring processes (should only be 1)
+    const monitoringProcesses = suspicious.filter(p => p.type === 'async-monitoring')
+    if (monitoringProcesses.length > 1) {
+      return suspicious // Include all if multiple monitors detected
+    }
+    
+    // Exclude single async-monitoring process (normal case)
+    return suspicious.filter(process => process.type !== 'async-monitoring')
   })
   
   // Console logging for debugging
   const logStats = () => {
+    const allProcesses = processes.value
+    const monitoringProcesses = allProcesses.filter(p => p.type === 'async-monitoring')
+    const nonMonitoringProcesses = allProcesses.filter(p => p.type !== 'async-monitoring')
+    
+    // Silent when only exactly 1 async-monitoring process exists and nothing else
+    if (monitoringProcesses.length === 1 && nonMonitoringProcesses.length === 0) {
+      return // Complete silence - normal state
+    }
+    
+    // All other cases: show full statistics table including async-monitoring
     console.group('[AsyncTracker] Current Statistics')
     console.table(stats.value.byType)
-    if (suspiciousProcesses.value.length > 0) {
-      console.warn('Suspicious long-running processes (excluding normal monitoring):', suspiciousProcesses.value)
-    } else if (longRunningProcesses.value.length > 0) {
-      console.info('Long-running processes detected, but all are expected system processes')
+    
+    // Special case: multiple monitoring processes (should never happen)
+    if (monitoringProcesses.length > 1) {
+      console.error(`Multiple async-monitoring processes detected (${monitoringProcesses.length})! Should only be 1:`, monitoringProcesses)
     }
+    
+    // Show suspicious non-monitoring processes if any
+    if (suspiciousProcesses.value.length > 0) {
+      console.warn('Suspicious long-running processes:', suspiciousProcesses.value)
+    }
+    
     console.groupEnd()
   }
   

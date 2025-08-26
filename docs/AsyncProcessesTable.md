@@ -496,10 +496,30 @@ The AsyncTracker system includes sophisticated monitoring logic designed to iden
    - No warning generated when only these processes are running
 
 ### Console Output Behavior
-- **Every 30 seconds**: Statistics table showing process counts by type
-- **Suspicious processes found**: Warning with details
-- **Only expected processes**: Informational message
-- **No suspicious processes**: Statistics table only
+
+The AsyncTracker monitoring system follows a simple rule:
+
+**Desired Behavior:**
+- **Only 1 async-monitoring process** → **No console output at all**
+- **Any other scenario** → **Show full statistics table including async-monitoring**
+
+**Specific Cases:**
+
+✅ **Silent Cases (No Console Output):**
+- Only 1 `async-monitoring` process running (normal application state)
+
+🔊 **Console Output Cases (Full Statistics Table Displayed):**
+- 1 `async-monitoring` + 1 `worker` → Show table with both processes
+- 2+ `async-monitoring` processes → Show table + error about duplicates (bug condition)
+- 0 `async-monitoring` + other processes → Show table with other processes
+- Any combination of processes beyond just the single expected `async-monitoring`
+
+**When Console Output Occurs, It Includes:**
+- **Always**: Full statistics table showing ALL process types including `async-monitoring`
+- **If multiple monitors detected**: Error message about duplicate monitoring processes
+- **If suspicious processes found**: Warning about potentially problematic long-running processes
+
+**Monitoring Interval:** Every 30 seconds
 
 ### Critical Implementation Requirements for Task Registry
 
