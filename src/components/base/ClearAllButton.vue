@@ -22,6 +22,6 @@ const props = defineProps({
 const emit = defineEmits(['click'])
 
 const handleClick = () => {
-  emit('click')
+  window.location.reload()
 }
 </script>
