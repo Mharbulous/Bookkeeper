@@ -271,11 +271,7 @@ const performComprehensiveCleanup = (source = 'unknown') => {
         console.warn('Error showing notification:', error)
       }
     } else if (source === 'clear-all') {
-      try {
-        showNotification('Queue cleared', 'info')
-      } catch (error) {
-        console.warn('Error showing notification:', error)
-      }
+      // Queue cleared - no notification needed as it's obvious from user action
     }
     
     console.log(`Comprehensive cleanup completed from: ${source}`)
