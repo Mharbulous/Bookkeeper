@@ -250,6 +250,7 @@ const clearQueue = () => {
   window.location.reload();
 };
 
+
 // Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
   const processId = Math.random().toString(36).substr(2, 9);

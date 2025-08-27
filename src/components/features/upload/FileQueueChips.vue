@@ -43,8 +43,27 @@
         blocked
       </v-chip>
 
-      <!-- Previous uploads chip (fourth) -->
+      <!-- New files chip (fourth) -->
       <v-chip
+        size="large"
+        variant="flat"
+        color="blue"
+        class="text-white"
+      >
+        <v-progress-circular
+          v-if="shouldShowSpinnerForDeduplicationChips"
+          indeterminate
+          size="16"
+          width="2"
+          class="me-1"
+        />
+        <template v-else>{{ newFilesCount }}</template>
+        new
+      </v-chip>
+
+      <!-- Previous uploads chip (fifth) -->
+      <v-chip
+        v-if="hasUploadStarted"
         size="large"
         variant="flat"
         color="orange"
@@ -61,26 +80,9 @@
         previous uploads
       </v-chip>
 
-      <!-- New files chip (fifth) -->
-      <v-chip
-        size="large"
-        variant="flat"
-        color="blue"
-        class="text-white"
-      >
-        <v-progress-circular
-          v-if="shouldShowSpinnerForUploadChips"
-          indeterminate
-          size="16"
-          width="2"
-          class="me-1"
-        />
-        <template v-else>{{ pendingCount }}</template>
-        new
-      </v-chip>
-
       <!-- Failed uploads chip (sixth) -->
       <v-chip
+        v-if="hasUploadStarted"
         size="large"
         variant="flat"
         color="red"
@@ -98,6 +100,7 @@
 
       <!-- Successful uploads chip (seventh) -->
       <v-chip
+        v-if="hasUploadStarted"
         size="large"
         variant="flat"
         color="green"
@@ -142,6 +145,10 @@ const props = defineProps({
   totalAnalyzedFiles: {
     type: Number,
     default: null
+  },
+  hasUploadStarted: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -171,6 +178,11 @@ const queueDuplicatesCount = computed(() => {
   return props.files.filter(file => file.isDuplicate).length
 })
 
+const newFilesCount = computed(() => {
+  // New files = total - duplicates
+  return totalCount.value - queueDuplicatesCount.value
+})
+
 const previouslyUploadedCount = computed(() => {
   return props.files.filter(file => file.isPreviousUpload).length
 })
@@ -194,9 +206,10 @@ const shouldShowSpinnerForDeduplicationChips = computed(() => {
 })
 
 const shouldShowSpinnerForUploadChips = computed(() => {
-  // Show spinner during deduplication AND continue showing after deduplication finishes
+  // Show spinner during deduplication AND awaiting-upload phases
   // (This will be controlled by the parent component passing appropriate phase values)
-  return props.uiUpdateProgress.phase === 'loading' || props.uiUpdateProgress.phase === 'awaiting-upload'
+  return props.uiUpdateProgress.phase === 'loading' || 
+         props.uiUpdateProgress.phase === 'awaiting-upload'
 })
 </script>
 

@@ -60,7 +60,7 @@
       <div class="d-flex align-center">
         <!-- Status indicator for existing files and processing only -->
         <v-chip
-          v-if="file.isPreviousUpload || file.status === 'processing'"
+          v-if="file.isDuplicate || file.status === 'processing'"
           :color="getStatusColor(file.status, file)"
           size="small"
           variant="flat"
@@ -96,7 +96,7 @@
             </template>
           </v-tooltip>
           <v-tooltip 
-            v-else-if="file.isDuplicate || file.isPreviousUpload" 
+            v-else-if="file.isDuplicate" 
             text="Skip"
             location="bottom"
           >
@@ -204,7 +204,6 @@ const getStatusColor = (status, file) => {
   
   // Handle special cases based on file properties
   if (file?.isQueueDuplicate) return 'purple'
-  if (file?.isPreviousUpload) return 'blue'
   
   return statusColors[status] || 'grey'
 }
@@ -223,7 +222,6 @@ const getStatusText = (status, file) => {
   
   // Handle special cases based on file properties
   if (file?.isQueueDuplicate) return 'Duplicate'
-  if (file?.isPreviousUpload) return 'Existing'
   
   return statusTexts[status] || 'Unknown'
 }

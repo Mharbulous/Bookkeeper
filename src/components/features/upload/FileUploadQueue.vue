@@ -81,6 +81,7 @@
         :is-processing-ui-update="isProcessingUIUpdate"
         :ui-update-progress="uiUpdateProgress"
         :total-analyzed-files="totalAnalyzedFiles"
+        :has-upload-started="hasUploadStarted"
       />
 
       <!-- UI Update Progress Indicator -->
@@ -386,6 +387,10 @@ const totalSize = computed(() => {
 
 const hasErrors = computed(() => {
   return props.files.some(file => file.status === 'error')
+})
+
+const hasUploadStarted = computed(() => {
+  return props.isUploading || props.isPaused || props.isStartingUpload
 })
 
 // Methods
