@@ -41,6 +41,7 @@
     <!-- Upload Queue/Preview -->
     <FileUploadQueue
       v-if="uploadQueue.length > 0 || isProcessingUIUpdate"
+      class="flex-grow-1"
       :files="uploadQueue"
       :is-processing-ui-update="isProcessingUIUpdate"
       :ui-update-progress="uiUpdateProgress"

@@ -449,7 +449,7 @@ const getPhaseMessage = () => {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  height: 600px; /* Set a fixed height for the queue */
+  height: 100%; /* Fill available height from parent container */
 }
 
 /* Static header section */
@@ -474,38 +474,26 @@ const getPhaseMessage = () => {
 .scrollable-content {
   flex: 1;
   overflow-y: auto;
-  scrollbar-width: none; /* Firefox - hide scrollbar by default */
-  -ms-overflow-style: none; /* IE/Edge - hide scrollbar by default */
+  scrollbar-width: thick; /* Firefox - always show thick scrollbar */
+  -ms-overflow-style: scrollbar; /* IE/Edge - always show scrollbar */
 }
 
-/* Hide scrollbar by default in Webkit browsers */
+/* Always visible thick scrollbar in Webkit browsers */
 .scrollable-content::-webkit-scrollbar {
-  width: 0px;
-  background: transparent;
+  width: 16px; /* Twice as thick as the original 8px */
 }
 
-/* Show scrollbar on hover - entire upload queue container */
-.upload-queue:hover .scrollable-content {
-  scrollbar-width: thin; /* Firefox - show scrollbar on hover */
-  -ms-overflow-style: scrollbar; /* IE/Edge - show scrollbar on hover */
-}
-
-/* Show scrollbar in Webkit browsers on hover */
-.upload-queue:hover .scrollable-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.upload-queue:hover .scrollable-content::-webkit-scrollbar-track {
+.scrollable-content::-webkit-scrollbar-track {
   background: #f1f1f1;
-  border-radius: 4px;
+  border-radius: 8px; /* Increased border radius for thicker scrollbar */
 }
 
-.upload-queue:hover .scrollable-content::-webkit-scrollbar-thumb {
+.scrollable-content::-webkit-scrollbar-thumb {
   background: #c1c1c1;
-  border-radius: 4px;
+  border-radius: 8px; /* Increased border radius for thicker scrollbar */
 }
 
-.upload-queue:hover .scrollable-content::-webkit-scrollbar-thumb:hover {
+.scrollable-content::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
 
