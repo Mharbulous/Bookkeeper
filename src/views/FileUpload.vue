@@ -43,6 +43,7 @@
       :files="uploadQueue"
       :is-processing-ui-update="isProcessingUIUpdate"
       :ui-update-progress="uiUpdateProgress"
+      :total-analyzed-files="totalAnalyzedFiles"
       :show-time-progress="
         timeWarning.startTime.value !== null && (uploadQueue.length === 0 || isProcessingUIUpdate)
       "
@@ -127,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import FileUploadQueue from '../components/features/upload/FileUploadQueue.vue';
 import UploadDropzone from '../components/features/upload/UploadDropzone.vue';
 import FolderOptionsDialog from '../components/features/upload/FolderOptionsDialog.vue';
@@ -641,6 +642,16 @@ const handleClearQueueFromModal = () => {
   // Then clear queue using existing handler
   clearQueue();
 };
+
+// Computed property for total analyzed files count
+const totalAnalyzedFiles = computed(() => {
+  if (includeSubfolders.value && allFilesAnalysis.value) {
+    return allFilesAnalysis.value.totalFiles;
+  } else if (mainFolderAnalysis.value) {
+    return mainFolderAnalysis.value.totalFiles;
+  }
+  return null; // No analysis data available yet
+});
 </script>
 
 <style scoped>

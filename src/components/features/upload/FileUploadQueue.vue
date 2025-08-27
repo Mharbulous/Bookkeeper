@@ -80,6 +80,7 @@
         :files="files"
         :is-processing-ui-update="isProcessingUIUpdate"
         :ui-update-progress="uiUpdateProgress"
+        :total-analyzed-files="totalAnalyzedFiles"
       />
 
       <!-- UI Update Progress Indicator -->
@@ -240,6 +241,10 @@ const props = defineProps({
   isStartingUpload: {
     type: Boolean,
     default: false
+  },
+  totalAnalyzedFiles: {
+    type: Number,
+    default: null
   }
 })
 

@@ -103,15 +103,7 @@
         class="text-black border-black"
         style="border-width: 1px;"
       >
-        <v-progress-circular
-          v-if="uiUpdateProgress.phase === 'loading'"
-          indeterminate
-          size="16"
-          width="2"
-          color="black"
-          class="me-1"
-        />
-        <template v-else>{{ totalCount }}</template>
+        {{ totalCount }}
         total
       </v-chip>
     </div>
@@ -140,12 +132,17 @@ const props = defineProps({
       percentage: 0,
       phase: 'loading'
     })
+  },
+  totalAnalyzedFiles: {
+    type: Number,
+    default: null
   }
 })
 
 // Computed properties for file counts
 const totalCount = computed(() => {
-  return props.files.length
+  // Use analyzed files total if available, otherwise fall back to current queue length
+  return props.totalAnalyzedFiles !== null ? props.totalAnalyzedFiles : props.files.length
 })
 
 const uploadableFiles = computed(() => {
