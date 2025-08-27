@@ -147,7 +147,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 **Purpose**: Store unique combinations of file metadata using metadata hash as document ID
 
 **Hash Generation**: 
-- **File Hash**: Standard SHA-256 of file content only (`abc123def456789...`)
+- **File Hash**: SHA-256 of file content (`abc123def456789abcdef012345...`)
 - **Metadata Hash**: SHA-256 of concatenated string: `originalName|lastModified|fileHash`
 
 ```javascript

@@ -128,6 +128,8 @@ import { storage } from '../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useAuthStore } from '../stores/auth.js';
 import { useLazyHashTooltip } from '../composables/useLazyHashTooltip.js';
+import { useUploadLogger } from '../composables/useUploadLogger.js';
+import { useFileMetadata } from '../composables/useFileMetadata.js';
 
 // Component configuration
 defineOptions({
@@ -142,6 +144,20 @@ const authStore = useAuthStore();
 
 // Hash tooltip system for cache management
 const { populateExistingHash } = useLazyHashTooltip();
+
+// Upload logging system
+const {
+  startUploadSession,
+  logUploadSession,
+  getCurrentSessionId,
+  getSessionDuration
+} = useUploadLogger();
+
+// File metadata system
+const {
+  createMetadataRecord,
+  generateMetadataHash
+} = useFileMetadata();
 
 // Composables
 const {
@@ -232,7 +248,7 @@ const calculateFileHash = async (file) => {
 // Simple upload helper functions
 const generateStoragePath = (fileHash, originalFileName) => {
   const extension = originalFileName.split('.').pop();
-  return `teams/${authStore.currentTeam}/files/${fileHash}.${extension}`;
+  return `teams/${authStore.currentTeam}/matters/general/files/${fileHash}.${extension}`;
 };
 
 const checkFileExists = async (fileHash, originalFileName) => {
@@ -712,6 +728,19 @@ const continueUpload = async () => {
           console.log(`File already exists: ${queueFile.name}`);
           updateUploadStatus('previouslyUploaded');
           updateFileStatus(queueFile.name, 'previouslyUploaded');
+          
+          // Create metadata record even for existing files (metadata may be different)
+          try {
+            await createMetadataRecord({
+              originalName: queueFile.name,
+              lastModified: queueFile.lastModified,
+              fileHash: fileHash,
+              sessionId: getCurrentSessionId()
+            });
+          } catch (metadataError) {
+            console.error(`Failed to create metadata record for existing file ${queueFile.name}:`, metadataError);
+            // Don't fail the upload process for metadata errors
+          }
         } else {
           // Check if upload was aborted before uploading
           if (uploadAbortController.signal.aborted) {
@@ -726,6 +755,19 @@ const continueUpload = async () => {
           updateUploadStatus('successful');
           updateFileStatus(queueFile.name, 'completed');
           console.log(`Successfully uploaded: ${queueFile.name}`);
+          
+          // Create metadata record for successfully uploaded file
+          try {
+            await createMetadataRecord({
+              originalName: queueFile.name,
+              lastModified: queueFile.lastModified,
+              fileHash: fileHash,
+              sessionId: getCurrentSessionId()
+            });
+          } catch (metadataError) {
+            console.error(`Failed to create metadata record for ${queueFile.name}:`, metadataError);
+            // Don't fail the upload process for metadata errors
+          }
         }
       } catch (error) {
         if (error.name === 'AbortError') {
@@ -748,6 +790,23 @@ const continueUpload = async () => {
         failed: uploadStatus.value.failed,
         previouslyUploaded: uploadStatus.value.previouslyUploaded
       });
+
+      // Log upload session completion
+      try {
+        const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
+        const totalSizeMB = filesToUpload.reduce((sum, file) => sum + (file.size / (1024 * 1024)), 0);
+        
+        await logUploadSession({
+          filesProcessed: filesToUpload.length,
+          successful: uploadStatus.value.successful,
+          failed: uploadStatus.value.failed,
+          duplicatesSkipped: uploadQueue.value.length - filesToUpload.length,
+          totalSizeMB: totalSizeMB
+        });
+      } catch (logError) {
+        console.error('Failed to log upload session:', logError);
+        // Don't fail the upload process for logging errors
+      }
 
       // Show completion notification
       const totalProcessed = uploadStatus.value.successful + uploadStatus.value.previouslyUploaded;
@@ -781,6 +840,10 @@ const handleStartUpload = async () => {
     if (!isPaused.value) {
       resetUploadStatus();
       currentUploadIndex.value = 0;
+      
+      // Start upload session logging for new uploads
+      const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
+      await startUploadSession(filesToUpload.length);
     }
     
     updateUploadStatus('start');
