@@ -31,6 +31,16 @@ export function useFileQueue() {
     phase: 'loading' // 'loading', 'awaiting-upload', 'complete'
   })
 
+  // Upload status tracking
+  const uploadStatus = ref({
+    successful: 0,
+    failed: 0,
+    previouslyUploaded: 0,
+    isUploading: false,
+    currentFile: null,
+    currentAction: null // 'calculating_hash', 'checking_existing', 'uploading'
+  })
+
   // Worker progress update handler
   const updateProgress = (progressData) => {
     processingProgress.value = {
@@ -67,6 +77,44 @@ export function useFileQueue() {
   // Set phase to complete (called when upload actually starts)
   const setPhaseComplete = () => {
     uiUpdateProgress.value.phase = 'complete'
+  }
+
+  // Upload status management
+  const resetUploadStatus = () => {
+    uploadStatus.value = {
+      successful: 0,
+      failed: 0,
+      previouslyUploaded: 0,
+      isUploading: false,
+      currentFile: null,
+      currentAction: null
+    }
+  }
+
+  const updateUploadStatus = (type, fileName = null, action = null) => {
+    switch (type) {
+      case 'start':
+        uploadStatus.value.isUploading = true
+        break
+      case 'complete':
+        uploadStatus.value.isUploading = false
+        uploadStatus.value.currentFile = null
+        uploadStatus.value.currentAction = null
+        break
+      case 'successful':
+        uploadStatus.value.successful++
+        break
+      case 'failed':
+        uploadStatus.value.failed++
+        break
+      case 'previouslyUploaded':
+        uploadStatus.value.previouslyUploaded++
+        break
+      case 'currentFile':
+        uploadStatus.value.currentFile = fileName
+        uploadStatus.value.currentAction = action
+        break
+    }
   }
 
   // Instant Upload Queue initialization - show immediately with first 100 files
@@ -332,6 +380,7 @@ export function useFileQueue() {
     processingProgress,
     isProcessingUIUpdate,
     uiUpdateProgress,
+    uploadStatus,
 
     // Core methods (delegated to core)
     getFilePath: queueCore.getFilePath,
@@ -358,6 +407,10 @@ export function useFileQueue() {
     startTimeMonitoring,
     stopTimeMonitoring,
     abortProcessing,
-    setPhaseComplete
+    setPhaseComplete,
+
+    // Upload status methods
+    resetUploadStatus,
+    updateUploadStatus
   }
 }

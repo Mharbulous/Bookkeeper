@@ -46,6 +46,7 @@
       :is-processing-ui-update="isProcessingUIUpdate"
       :ui-update-progress="uiUpdateProgress"
       :total-analyzed-files="totalAnalyzedFiles"
+      :upload-status="uploadStatus"
       :show-time-progress="
         timeWarning.startTime.value !== null && (uploadQueue.length === 0 || isProcessingUIUpdate)
       "
@@ -59,14 +60,11 @@
         formattedTimeRemaining: timeWarning.formattedTimeRemaining.value,
         estimatedDuration: timeWarning.estimatedDuration.value,
       }"
-      :is-uploading="uploadManager.isUploading.value"
-      :is-paused="uploadManager.isPaused.value"
+      :is-uploading="uploadStatus.isUploading"
+      :is-paused="false"
       :is-starting-upload="isStartingUpload"
       @remove-file="removeFromQueue"
       @start-upload="handleStartUpload"
-      @pause-upload="handlePauseUpload"
-      @resume-upload="handleResumeUpload"
-      @cancel-upload="handleCancelUpload"
       @clear-queue="clearQueue"
     />
 
@@ -104,28 +102,7 @@
       @close="handleCloseWarning"
     />
 
-    <!-- Upload Progress Modal -->
-    <UploadProgressModal
-      v-model:show="showUploadProgress"
-      :upload-state="uploadManager.uploadState.value"
-      :overall-progress="uploadManager.overallProgress"
-      :upload-metrics="uploadManager.uploadMetrics"
-      :file-states="uploadManager.fileStates.value"
-      :error-summary="uploadManager.errorSummary"
-      :can-show-pause-button="uploadManager.canShowPauseButton.value"
-      :can-show-resume-button="uploadManager.canShowResumeButton.value"
-      :can-show-cancel-button="uploadManager.canShowCancelButton.value"
-      :can-retry="uploadManager.canRetry.value"
-      :files="uploadQueue"
-      @pause="handlePauseUpload"
-      @resume="handleResumeUpload"
-      @cancel="handleCancelUpload"
-      @retry-file="handleRetryFile"
-      @retry-all="handleRetryAll"
-      @close="handleCloseUploadProgress"
-      @view-results="handleViewResults"
-      @clear-queue="handleClearQueueFromModal"
-    />
+    <!-- Simple upload progress is now handled in the FileUploadQueue component directly -->
   </v-container>
 </template>
 
@@ -136,17 +113,19 @@ import UploadDropzone from '../components/features/upload/UploadDropzone.vue';
 import FolderOptionsDialog from '../components/features/upload/FolderOptionsDialog.vue';
 import ProcessingProgressModal from '../components/features/upload/ProcessingProgressModal.vue';
 import CloudFileWarningModal from '../components/features/upload/CloudFileWarningModal.vue';
-import UploadProgressModal from '../components/features/upload/UploadProgressModal.vue';
 import { useFileQueue } from '../composables/useFileQueue.js';
 import { useFileDragDrop } from '../composables/useFileDragDrop.js';
 import { useQueueDeduplication } from '../composables/useQueueDeduplication.js';
 import { useFolderOptions } from '../composables/useFolderOptions.js';
 import { useTimeBasedWarning } from '../composables/useTimeBasedWarning.js';
-import { useUploadManager } from '../composables/useUploadManager.js';
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
 } from '../utils/hardwareCalibration.js';
+import { storage } from '../services/firebase.js';
+import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { useAuthStore } from '../stores/auth.js';
+import { useLazyHashTooltip } from '../composables/useLazyHashTooltip.js';
 
 // Component configuration
 defineOptions({
@@ -155,6 +134,12 @@ defineOptions({
 
 // Template refs
 const dropzoneRef = ref(null);
+
+// Auth store
+const authStore = useAuthStore();
+
+// Hash tooltip system for cache management
+const { populateExistingHash } = useLazyHashTooltip();
 
 // Composables
 const {
@@ -166,6 +151,7 @@ const {
   processingProgress,
   isProcessingUIUpdate,
   uiUpdateProgress,
+  uploadStatus,
   triggerFileSelect,
   triggerFolderSelect,
   processSingleFile,
@@ -175,6 +161,8 @@ const {
   removeFromQueue,
   showNotification,
   setPhaseComplete,
+  resetUploadStatus,
+  updateUploadStatus,
 } = useFileQueue();
 
 const {
@@ -215,12 +203,75 @@ const {
 
 const timeWarning = useTimeBasedWarning();
 
-// Upload manager
-const uploadManager = useUploadManager();
-
-// Upload state tracking
-const showUploadProgress = ref(false);
+// Upload state tracking  
 const isStartingUpload = ref(false);
+
+// Simple hash calculation function (same as worker)
+const calculateFileHash = async (file) => {
+  try {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // Add size suffix for collision safety (SHA-256 + size = virtually impossible collision)
+    return `${hash}_${file.size}`;
+  } catch (error) {
+    throw new Error(`Failed to generate hash for file ${file.name}: ${error.message}`);
+  }
+};
+
+// Simple upload helper functions
+const generateStoragePath = (fileHash, originalFileName) => {
+  const extension = originalFileName.split('.').pop();
+  return `teams/${authStore.currentTeam}/files/${fileHash}.${extension}`;
+};
+
+const checkFileExists = async (fileHash, originalFileName) => {
+  try {
+    const storagePath = generateStoragePath(fileHash, originalFileName);
+    const storageReference = storageRef(storage, storagePath);
+    await getDownloadURL(storageReference);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const uploadSingleFile = async (file, fileHash, originalFileName) => {
+    const storagePath = generateStoragePath(fileHash, originalFileName);
+    const storageReference = storageRef(storage, storagePath);
+    
+    const uploadTask = uploadBytesResumable(storageReference, file, {
+      customMetadata: {
+        teamId: authStore.currentTeam,
+        userId: authStore.user.uid,
+        originalName: originalFileName,
+        hash: fileHash,
+      },
+    });
+
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        'state_changed',
+        () => {
+          // Progress updates could be added here if needed
+        },
+        (error) => {
+          reject(error);
+        },
+        async () => {
+          // Upload completed successfully
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve({ success: true, downloadURL });
+          } catch (error) {
+            reject(error);
+          }
+        }
+      );
+    });
+};
 
 // Connect time monitoring to deduplication processing
 queueDeduplication.setTimeMonitoringCallback({
@@ -288,7 +339,6 @@ const processFilesWithQueue = async (files) => {
       }
 
       // Create file analysis data for calibrated estimation
-      const totalSizeMB = files.reduce((sum, file) => sum + (file.size || 0), 0) / (1024 * 1024);
       const sizeMap = new Map();
       files.forEach((file) => {
         const size = file.size || 0;
@@ -550,90 +600,98 @@ const handleCloseWarning = () => {
   timeWarning.dismissWarning();
 };
 
-// Upload control handlers
+// Simple upload control handler
 const handleStartUpload = async () => {
   try {
     isStartingUpload.value = true;
-    showUploadProgress.value = true;
-    // Set phase to complete when upload actually starts (removes spinners from upload-related chips)
     setPhaseComplete();
+    
+    // Reset upload status counters
+    resetUploadStatus();
+    updateUploadStatus('start');
 
-    console.log('Starting upload process...');
+    console.log('Starting simple upload process...');
 
-    const results = await uploadManager.startUpload(uploadQueue.value, {
-      maxConcurrent: 3, // Configurable concurrency
+    // Get files that are ready for upload (not duplicates)
+    const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
+    
+    if (filesToUpload.length === 0) {
+      showNotification('No files to upload (all are duplicates)', 'info');
+      updateUploadStatus('complete');
+      return;
+    }
+
+    console.log(`Processing ${filesToUpload.length} files for upload...`);
+
+    // Process each file one by one
+    for (const queueFile of filesToUpload) {
+      try {
+        // Calculate hash for the file (on-demand during upload)
+        updateUploadStatus('currentFile', queueFile.name, 'calculating_hash');
+        console.log(`Calculating hash for: ${queueFile.name}`);
+        let fileHash;
+        
+        // Check if file already has a hash (from deduplication process)
+        if (queueFile.hash) {
+          fileHash = queueFile.hash;
+          console.log(`Using existing hash for: ${queueFile.name}`);
+        } else {
+          // Calculate hash now (for files with unique sizes or not previously processed)
+          fileHash = await calculateFileHash(queueFile.file);
+          // Store calculated hash in the queue file for reuse by tooltip system
+          queueFile.hash = fileHash;
+          // Also populate the tooltip cache immediately for instant tooltips
+          populateExistingHash(queueFile.id || queueFile.name, fileHash);
+          console.log(`Calculated new hash for: ${queueFile.name}`);
+        }
+
+        // Check if file already exists in Firebase Storage
+        updateUploadStatus('currentFile', queueFile.name, 'checking_existing');
+        const fileExists = await checkFileExists(fileHash, queueFile.name);
+        
+        if (fileExists) {
+          // File already uploaded previously
+          console.log(`File already exists: ${queueFile.name}`);
+          updateUploadStatus('previouslyUploaded');
+        } else {
+          // File needs to be uploaded
+          updateUploadStatus('currentFile', queueFile.name, 'uploading');
+          console.log(`Uploading file: ${queueFile.name}`);
+          await uploadSingleFile(queueFile.file, fileHash, queueFile.name);
+          updateUploadStatus('successful');
+          console.log(`Successfully uploaded: ${queueFile.name}`);
+        }
+      } catch (error) {
+        console.error(`Failed to upload ${queueFile.name}:`, error);
+        updateUploadStatus('failed');
+      }
+    }
+
+    updateUploadStatus('complete');
+    console.log('Upload process completed:', {
+      successful: uploadStatus.value.successful,
+      failed: uploadStatus.value.failed,
+      previouslyUploaded: uploadStatus.value.previouslyUploaded
     });
 
-    console.log('Upload completed:', results);
-  } catch (error) {
-    console.error('Upload failed:', error);
+    // Show completion notification
+    const totalProcessed = uploadStatus.value.successful + uploadStatus.value.previouslyUploaded;
+    if (uploadStatus.value.failed === 0) {
+      showNotification(`All ${totalProcessed} files processed successfully!`, 'success');
+    } else {
+      showNotification(`${totalProcessed} files processed, ${uploadStatus.value.failed} failed`, 'warning');
+    }
 
-    // Show error notification
+  } catch (error) {
+    console.error('Upload process failed:', error);
     showNotification('Upload failed: ' + (error.message || 'Unknown error'), 'error');
+    updateUploadStatus('complete');
   } finally {
     isStartingUpload.value = false;
   }
 };
 
-const handlePauseUpload = () => {
-  console.log('Pausing upload...');
-  uploadManager.pauseUploads();
-};
-
-const handleResumeUpload = () => {
-  console.log('Resuming upload...');
-  uploadManager.resumeUploads();
-};
-
-const handleCancelUpload = () => {
-  console.log('Cancelling upload...');
-  uploadManager.cancelUploads();
-  showUploadProgress.value = false;
-};
-
-const handleRetryFile = async (fileId) => {
-  console.log('Retrying file:', fileId);
-  // TODO: Implement single file retry
-  showNotification('File retry functionality coming soon', 'info');
-};
-
-const handleRetryAll = async () => {
-  console.log('Retrying all failed uploads...');
-  try {
-    const results = await uploadManager.retryFailedUploads();
-    console.log('Retry completed:', results);
-
-    if (results.successful.length > 0) {
-      showNotification(`Successfully retried ${results.successful.length} files`, 'success');
-    }
-  } catch (error) {
-    console.error('Retry failed:', error);
-    showNotification('Retry failed: ' + (error.message || 'Unknown error'), 'error');
-  }
-};
-
-const handleCloseUploadProgress = () => {
-  showUploadProgress.value = false;
-
-  // Reset upload manager if completed
-  if (uploadManager.isCompleted.value) {
-    uploadManager.resetUpload();
-  }
-};
-
-const handleViewResults = () => {
-  // TODO: Implement detailed results view
-  console.log('Opening detailed results view...');
-  showNotification('Detailed results view coming soon', 'info');
-};
-
-const handleClearQueueFromModal = () => {
-  // Close modal first
-  showUploadProgress.value = false;
-
-  // Then clear queue using existing handler
-  clearQueue();
-};
+// Legacy upload handlers removed - using simple upload system now
 
 // Computed property for total analyzed files count
 // Use directory entry count (File Explorer count) instead of processed files count

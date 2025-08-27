@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 
 // Props
 const props = defineProps({
@@ -149,6 +149,16 @@ const props = defineProps({
   hasUploadStarted: {
     type: Boolean,
     default: false
+  },
+  uploadStatus: {
+    type: Object,
+    default: () => ({
+      successful: 0,
+      failed: 0,
+      previouslyUploaded: 0,
+      isUploading: false,
+      currentFile: null
+    })
   }
 })
 
@@ -189,15 +199,18 @@ const blockedFilesCount = computed(() => {
 })
 
 const previouslyUploadedCount = computed(() => {
-  return props.files.filter(file => file.isPreviousUpload).length
+  // Use uploadStatus if upload has started, otherwise fall back to file-based counting
+  return props.hasUploadStarted ? props.uploadStatus.previouslyUploaded : props.files.filter(file => file.isPreviousUpload).length
 })
 
 const successfulCount = computed(() => {
-  return props.files.filter(file => file.status === 'completed').length
+  // Use uploadStatus if upload has started, otherwise fall back to file-based counting
+  return props.hasUploadStarted ? props.uploadStatus.successful : props.files.filter(file => file.status === 'completed').length
 })
 
 const failedCount = computed(() => {
-  return props.files.filter(file => file.status === 'error').length
+  // Use uploadStatus if upload has started, otherwise fall back to file-based counting
+  return props.hasUploadStarted ? props.uploadStatus.failed : props.files.filter(file => file.status === 'error').length
 })
 
 // Spinner logic for different chip types
@@ -207,10 +220,8 @@ const shouldShowSpinnerForDeduplicationChips = computed(() => {
 })
 
 const shouldShowSpinnerForUploadChips = computed(() => {
-  // Show spinner during deduplication AND awaiting-upload phases
-  // (This will be controlled by the parent component passing appropriate phase values)
-  return props.uiUpdateProgress.phase === 'loading' || 
-         props.uiUpdateProgress.phase === 'awaiting-upload'
+  // Show spinner during upload process
+  return props.uploadStatus.isUploading
 })
 </script>
 

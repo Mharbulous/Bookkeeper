@@ -82,6 +82,7 @@
         :ui-update-progress="uiUpdateProgress"
         :total-analyzed-files="totalAnalyzedFiles"
         :has-upload-started="hasUploadStarted"
+        :upload-status="uploadStatus"
       />
 
       <!-- UI Update Progress Indicator -->
@@ -121,6 +122,31 @@
             rounded
             class="mt-3"
           />
+        </v-card-text>
+      </v-card>
+
+      <!-- Current Upload Progress -->
+      <v-card
+        v-if="uploadStatus.isUploading && uploadStatus.currentFile"
+        class="mb-4 bg-green-lighten-5 border-green-lighten-2"
+        variant="outlined"
+      >
+        <v-card-text class="py-3">
+          <div class="d-flex align-center">
+            <v-progress-circular
+              indeterminate
+              color="green"
+              size="20"
+              width="2"
+              class="me-3"
+            />
+            <div class="flex-grow-1">
+              <div class="text-body-2 font-weight-medium text-green-darken-2">
+                {{ getCurrentActionText() }}
+              </div>
+              <div class="text-body-1">{{ uploadStatus.currentFile }}</div>
+            </div>
+          </div>
         </v-card-text>
       </v-card>
 
@@ -246,6 +272,17 @@ const props = defineProps({
   totalAnalyzedFiles: {
     type: Number,
     default: null
+  },
+  uploadStatus: {
+    type: Object,
+    default: () => ({
+      successful: 0,
+      failed: 0,
+      previouslyUploaded: 0,
+      isUploading: false,
+      currentFile: null,
+      currentAction: null
+    })
   },
 })
 
@@ -390,7 +427,8 @@ const hasErrors = computed(() => {
 })
 
 const hasUploadStarted = computed(() => {
-  return props.isUploading || props.isPaused || props.isStartingUpload
+  return props.isUploading || props.isPaused || props.isStartingUpload || 
+         props.uploadStatus.successful > 0 || props.uploadStatus.failed > 0 || props.uploadStatus.previouslyUploaded > 0
 })
 
 // Methods
@@ -402,6 +440,19 @@ const formatFileSize = (bytes) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
 
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+const getCurrentActionText = () => {
+  switch (props.uploadStatus.currentAction) {
+    case 'calculating_hash':
+      return 'Calculating file hash...'
+    case 'checking_existing':
+      return 'Checking if file exists...'
+    case 'uploading':
+      return 'Uploading file...'
+    default:
+      return 'Processing file...'
+  }
 }
 
 // 2-chunk loading message generator
