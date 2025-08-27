@@ -37,8 +37,11 @@ export function useFileQueue() {
     failed: 0,
     previouslyUploaded: 0,
     isUploading: false,
+    isPaused: false,
+    pauseRequested: false,
     currentFile: null,
-    currentAction: null // 'calculating_hash', 'checking_existing', 'uploading'
+    currentAction: null, // 'calculating_hash', 'checking_existing', 'uploading'
+    currentUploadIndex: 0
   })
 
   // Worker progress update handler
@@ -86,8 +89,11 @@ export function useFileQueue() {
       failed: 0,
       previouslyUploaded: 0,
       isUploading: false,
+      isPaused: false,
+      pauseRequested: false,
       currentFile: null,
-      currentAction: null
+      currentAction: null,
+      currentUploadIndex: 0
     }
   }
 
@@ -95,11 +101,29 @@ export function useFileQueue() {
     switch (type) {
       case 'start':
         uploadStatus.value.isUploading = true
+        uploadStatus.value.isPaused = false
+        uploadStatus.value.pauseRequested = false
         break
       case 'complete':
         uploadStatus.value.isUploading = false
+        uploadStatus.value.isPaused = false
+        uploadStatus.value.pauseRequested = false
         uploadStatus.value.currentFile = null
         uploadStatus.value.currentAction = null
+        uploadStatus.value.currentUploadIndex = 0
+        break
+      case 'pause':
+        uploadStatus.value.isPaused = true
+        uploadStatus.value.isUploading = false
+        uploadStatus.value.pauseRequested = false
+        break
+      case 'resume':
+        uploadStatus.value.isPaused = false
+        uploadStatus.value.isUploading = true
+        uploadStatus.value.pauseRequested = false
+        break
+      case 'requestPause':
+        uploadStatus.value.pauseRequested = true
         break
       case 'successful':
         uploadStatus.value.successful++
@@ -113,6 +137,9 @@ export function useFileQueue() {
       case 'currentFile':
         uploadStatus.value.currentFile = fileName
         uploadStatus.value.currentAction = action
+        break
+      case 'setUploadIndex':
+        uploadStatus.value.currentUploadIndex = fileName // reusing fileName param for index
         break
     }
   }

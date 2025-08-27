@@ -61,10 +61,13 @@
         estimatedDuration: timeWarning.estimatedDuration.value,
       }"
       :is-uploading="uploadStatus.isUploading"
-      :is-paused="false"
+      :is-paused="uploadStatus.isPaused"
       :is-starting-upload="isStartingUpload"
       @remove-file="removeFromQueue"
       @start-upload="handleStartUpload"
+      @pause-upload="handlePauseUpload"
+      @resume-upload="handleResumeUpload"
+      @cancel-upload="handleCancelUpload"
       @clear-queue="clearQueue"
     />
 
@@ -205,6 +208,10 @@ const timeWarning = useTimeBasedWarning();
 
 // Upload state tracking  
 const isStartingUpload = ref(false);
+const isPaused = ref(false);
+const pauseRequested = ref(false);
+const currentUploadIndex = ref(0);
+let uploadAbortController = null;
 
 // Simple hash calculation function (same as worker)
 const calculateFileHash = async (file) => {
@@ -238,7 +245,7 @@ const checkFileExists = async (fileHash, originalFileName) => {
   }
 };
 
-const uploadSingleFile = async (file, fileHash, originalFileName) => {
+const uploadSingleFile = async (file, fileHash, originalFileName, abortSignal = null) => {
     const storagePath = generateStoragePath(fileHash, originalFileName);
     const storageReference = storageRef(storage, storagePath);
     
@@ -252,9 +259,23 @@ const uploadSingleFile = async (file, fileHash, originalFileName) => {
     });
 
     return new Promise((resolve, reject) => {
+      // Handle abort signal
+      if (abortSignal) {
+        abortSignal.addEventListener('abort', () => {
+          uploadTask.cancel();
+          reject(new Error('AbortError'));
+        });
+      }
+
       uploadTask.on(
         'state_changed',
         () => {
+          // Check if aborted during progress
+          if (abortSignal && abortSignal.aborted) {
+            uploadTask.cancel();
+            reject(new Error('AbortError'));
+            return;
+          }
           // Progress updates could be added here if needed
         },
         (error) => {
@@ -600,17 +621,45 @@ const handleCloseWarning = () => {
   timeWarning.dismissWarning();
 };
 
-// Simple upload control handler
-const handleStartUpload = async () => {
-  try {
-    isStartingUpload.value = true;
-    setPhaseComplete();
-    
-    // Reset upload status counters
-    resetUploadStatus();
-    updateUploadStatus('start');
+// Pause/Resume upload handlers
+const handlePauseUpload = () => {
+  console.log('Pause upload requested');
+  pauseRequested.value = true;
+  updateUploadStatus('requestPause');
+};
 
-    console.log('Starting simple upload process...');
+const handleResumeUpload = () => {
+  console.log('Resume upload requested');
+  isPaused.value = false;
+  updateUploadStatus('resume');
+  
+  // Continue upload from where we left off
+  continueUpload();
+};
+
+const handleCancelUpload = () => {
+  console.log('Cancel upload requested');
+  
+  // Abort current upload if in progress
+  if (uploadAbortController) {
+    uploadAbortController.abort();
+    uploadAbortController = null;
+  }
+  
+  // Reset all upload states
+  isPaused.value = false;
+  pauseRequested.value = false;
+  currentUploadIndex.value = 0;
+  isStartingUpload.value = false;
+  updateUploadStatus('complete');
+  
+  showNotification('Upload cancelled', 'info');
+};
+
+// Resumable upload loop function
+const continueUpload = async () => {
+  try {
+    console.log('Continuing upload process...');
 
     // Get files that are ready for upload (not duplicates)
     const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
@@ -621,11 +670,29 @@ const handleStartUpload = async () => {
       return;
     }
 
-    console.log(`Processing ${filesToUpload.length} files for upload...`);
+    // Start from current index or beginning
+    const startIndex = uploadStatus.value.currentUploadIndex || 0;
+    console.log(`Continuing from file ${startIndex + 1} of ${filesToUpload.length}`);
 
-    // Process each file one by one
-    for (const queueFile of filesToUpload) {
+    // Process files from current index
+    for (let i = startIndex; i < filesToUpload.length; i++) {
+      // Check if pause was requested before processing next file
+      if (pauseRequested.value) {
+        console.log(`Pause requested at file ${i + 1}. Pausing...`);
+        updateUploadStatus('setUploadIndex', i); // Save current position
+        updateUploadStatus('pause');
+        isPaused.value = true;
+        pauseRequested.value = false;
+        return;
+      }
+
+      const queueFile = filesToUpload[i];
+      updateUploadStatus('setUploadIndex', i); // Update current position
+      
       try {
+        // Create abort controller for this upload
+        uploadAbortController = new AbortController();
+
         // Calculate hash for the file (on-demand during upload)
         updateUploadStatus('currentFile', queueFile.name, 'calculating_hash');
         console.log(`Calculating hash for: ${queueFile.name}`);
@@ -645,6 +712,12 @@ const handleStartUpload = async () => {
           console.log(`Calculated new hash for: ${queueFile.name}`);
         }
 
+        // Check if upload was aborted during hash calculation
+        if (uploadAbortController.signal.aborted) {
+          console.log(`Upload aborted during hash calculation for: ${queueFile.name}`);
+          break;
+        }
+
         // Check if file already exists in Firebase Storage
         updateUploadStatus('currentFile', queueFile.name, 'checking_existing');
         const fileExists = await checkFileExists(fileHash, queueFile.name);
@@ -654,39 +727,86 @@ const handleStartUpload = async () => {
           console.log(`File already exists: ${queueFile.name}`);
           updateUploadStatus('previouslyUploaded');
         } else {
+          // Check if upload was aborted before uploading
+          if (uploadAbortController.signal.aborted) {
+            console.log(`Upload aborted before uploading: ${queueFile.name}`);
+            break;
+          }
+          
           // File needs to be uploaded
           updateUploadStatus('currentFile', queueFile.name, 'uploading');
           console.log(`Uploading file: ${queueFile.name}`);
-          await uploadSingleFile(queueFile.file, fileHash, queueFile.name);
+          await uploadSingleFile(queueFile.file, fileHash, queueFile.name, uploadAbortController.signal);
           updateUploadStatus('successful');
           console.log(`Successfully uploaded: ${queueFile.name}`);
         }
       } catch (error) {
+        if (error.name === 'AbortError') {
+          console.log(`Upload aborted for: ${queueFile.name}`);
+          break;
+        }
         console.error(`Failed to upload ${queueFile.name}:`, error);
         updateUploadStatus('failed');
+      } finally {
+        uploadAbortController = null;
       }
     }
 
-    updateUploadStatus('complete');
-    console.log('Upload process completed:', {
-      successful: uploadStatus.value.successful,
-      failed: uploadStatus.value.failed,
-      previouslyUploaded: uploadStatus.value.previouslyUploaded
-    });
+    // Check if we completed all files or were paused
+    if (!isPaused.value) {
+      updateUploadStatus('complete');
+      console.log('Upload process completed:', {
+        successful: uploadStatus.value.successful,
+        failed: uploadStatus.value.failed,
+        previouslyUploaded: uploadStatus.value.previouslyUploaded
+      });
 
-    // Show completion notification
-    const totalProcessed = uploadStatus.value.successful + uploadStatus.value.previouslyUploaded;
-    if (uploadStatus.value.failed === 0) {
-      showNotification(`All ${totalProcessed} files processed successfully!`, 'success');
-    } else {
-      showNotification(`${totalProcessed} files processed, ${uploadStatus.value.failed} failed`, 'warning');
+      // Show completion notification
+      const totalProcessed = uploadStatus.value.successful + uploadStatus.value.previouslyUploaded;
+      if (uploadStatus.value.failed === 0) {
+        showNotification(`All ${totalProcessed} files processed successfully!`, 'success');
+      } else {
+        showNotification(`${totalProcessed} files processed, ${uploadStatus.value.failed} failed`, 'warning');
+      }
+      
+      currentUploadIndex.value = 0;
+      isStartingUpload.value = false;
     }
 
   } catch (error) {
     console.error('Upload process failed:', error);
     showNotification('Upload failed: ' + (error.message || 'Unknown error'), 'error');
     updateUploadStatus('complete');
-  } finally {
+    isPaused.value = false;
+    currentUploadIndex.value = 0;
+    isStartingUpload.value = false;
+  }
+};
+
+// Simple upload control handler
+const handleStartUpload = async () => {
+  try {
+    isStartingUpload.value = true;
+    setPhaseComplete();
+    
+    // Reset upload status counters only if not resuming
+    if (!isPaused.value) {
+      resetUploadStatus();
+      currentUploadIndex.value = 0;
+    }
+    
+    updateUploadStatus('start');
+    console.log('Starting upload process...');
+    
+    // Start the upload loop
+    await continueUpload();
+
+  } catch (error) {
+    console.error('Upload process failed:', error);
+    showNotification('Upload failed: ' + (error.message || 'Unknown error'), 'error');
+    updateUploadStatus('complete');
+    isPaused.value = false;
+    currentUploadIndex.value = 0;
     isStartingUpload.value = false;
   }
 };

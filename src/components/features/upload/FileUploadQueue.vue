@@ -21,7 +21,7 @@
 
       <div class="d-flex gap-2">
         <ClearAllButton
-          :disabled="files.length === 0"
+          :disabled="files.length === 0 || isUploading"
           @click="handleClearQueue"
         />
 
@@ -49,26 +49,16 @@
           Pause Upload
         </v-btn>
 
-        <!-- Paused State Buttons -->
-        <template v-if="isPaused">
-          <v-btn
-            color="primary"
-            variant="elevated"
-            prepend-icon="mdi-play"
-            @click="$emit('resume-upload')"
-          >
-            Resume Upload
-          </v-btn>
-          
-          <v-btn
-            color="error"
-            variant="outlined"
-            prepend-icon="mdi-close"
-            @click="$emit('cancel-upload')"
-          >
-            Cancel Upload
-          </v-btn>
-        </template>
+        <!-- Paused State Button -->
+        <v-btn
+          v-if="isPaused"
+          color="primary"
+          variant="elevated"
+          prepend-icon="mdi-play"
+          @click="$emit('resume-upload')"
+        >
+          Resume Upload
+        </v-btn>
       </div>
     </v-card-title>
 
@@ -292,7 +282,6 @@ const emit = defineEmits([
   'start-upload', 
   'pause-upload',
   'resume-upload',
-  'cancel-upload',
   'clear-queue'
 ])
 
