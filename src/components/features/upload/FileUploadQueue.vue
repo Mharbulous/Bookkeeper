@@ -145,7 +145,7 @@
         <div v-for="(group, groupIndex) in groupedFiles" :key="groupIndex">
         <!-- Files in Group -->
         <v-list lines="two" density="comfortable">
-          <template v-for="(file, fileIndex) in group.files" :key="file.id || `${groupIndex}-${fileIndex}`">
+          <template v-for="(file, fileIndex) in group.files" :key="`${file.id || groupIndex + '-' + fileIndex}-${file.status || 'pending'}`">
             <!-- Conditional rendering: Placeholder or Loaded Item -->
             <FileQueuePlaceholder
               v-if="!isItemLoaded(groupIndex, fileIndex)"

@@ -696,7 +696,7 @@ const continueUpload = async () => {
 
         // Calculate hash for the file (on-demand during upload)
         updateUploadStatus('currentFile', queueFile.name, 'calculating_hash');
-        updateFileStatus(queueFile.name, 'uploading');
+        updateFileStatus(queueFile, 'uploading');
         console.log(`Calculating hash for: ${queueFile.name}`);
         let fileHash;
         
@@ -728,7 +728,7 @@ const continueUpload = async () => {
           // File already uploaded previously
           console.log(`File already exists: ${queueFile.name}`);
           updateUploadStatus('previouslyUploaded');
-          updateFileStatus(queueFile.name, 'previouslyUploaded');
+          updateFileStatus(queueFile, 'previouslyUploaded');
           
           // Log individual upload event for skipped file
           try {
@@ -787,7 +787,7 @@ const continueUpload = async () => {
           await uploadSingleFile(queueFile.file, fileHash, queueFile.name, uploadAbortController.signal);
           const uploadDurationMs = Date.now() - uploadStartTime;
           updateUploadStatus('successful');
-          updateFileStatus(queueFile.name, 'completed');
+          updateFileStatus(queueFile, 'completed');
           console.log(`Successfully uploaded: ${queueFile.name}`);
           
           // Overwrite interrupted upload event with successful completion
@@ -827,7 +827,7 @@ const continueUpload = async () => {
         }
         console.error(`Failed to upload ${queueFile.name}:`, error);
         updateUploadStatus('failed');
-        updateFileStatus(queueFile.name, 'error');
+        updateFileStatus(queueFile, 'error');
         
         // Overwrite interrupted upload event with failure
         try {

@@ -98,8 +98,17 @@ export function useFileQueue() {
   }
 
   // Individual file status update function
-  const updateFileStatus = (fileName, status) => {
-    const file = queueCore.uploadQueue.value.find(f => f.name === fileName)
+  const updateFileStatus = (fileReference, status) => {
+    // Support both file object and filename for backward compatibility
+    let file;
+    if (typeof fileReference === 'string') {
+      // Legacy filename-based lookup (less reliable but kept for compatibility)
+      file = queueCore.uploadQueue.value.find(f => f.name === fileReference)
+    } else if (fileReference && typeof fileReference === 'object') {
+      // Direct file object reference (preferred approach)
+      file = fileReference
+    }
+    
     if (file) {
       file.status = status
     }
