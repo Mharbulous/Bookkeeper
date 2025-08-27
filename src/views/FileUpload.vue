@@ -67,7 +67,6 @@
       @start-upload="handleStartUpload"
       @pause-upload="handlePauseUpload"
       @resume-upload="handleResumeUpload"
-      @cancel-upload="handleCancelUpload"
       @clear-queue="clearQueue"
     />
 
@@ -635,25 +634,6 @@ const handleResumeUpload = () => {
   
   // Continue upload from where we left off
   continueUpload();
-};
-
-const handleCancelUpload = () => {
-  console.log('Cancel upload requested');
-  
-  // Abort current upload if in progress
-  if (uploadAbortController) {
-    uploadAbortController.abort();
-    uploadAbortController = null;
-  }
-  
-  // Reset all upload states
-  isPaused.value = false;
-  pauseRequested.value = false;
-  currentUploadIndex.value = 0;
-  isStartingUpload.value = false;
-  updateUploadStatus('complete');
-  
-  showNotification('Upload cancelled', 'info');
 };
 
 // Resumable upload loop function
