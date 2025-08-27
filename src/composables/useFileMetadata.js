@@ -1,6 +1,7 @@
 import { db } from '../services/firebase.js';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../stores/auth.js';
+import { updateFolderPaths } from '../utils/folderPathUtils.js';
 
 export function useFileMetadata() {
   const authStore = useAuthStore();
@@ -60,13 +61,28 @@ export function useFileMetadata() {
       const metadataHash = await generateMetadataHash(originalName, lastModified, fileHash);
 
       // Extract folder path from original path if available
-      let folderPath = '';
+      let currentFolderPath = '';
       if (originalPath) {
         const pathParts = originalPath.split('/');
         if (pathParts.length > 1) {
-          folderPath = pathParts.slice(0, -1).join('/');
+          currentFolderPath = pathParts.slice(0, -1).join('/');
         }
       }
+
+      // Get existing metadata to check for existing folderPaths
+      let existingFolderPaths = '';
+      try {
+        const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'metadata', metadataHash);
+        const existingDoc = await getDoc(docRef);
+        if (existingDoc.exists()) {
+          existingFolderPaths = existingDoc.data().folderPaths || '';
+        }
+      } catch (error) {
+        console.warn('Could not retrieve existing folderPaths, proceeding with new path only:', error);
+      }
+
+      // Update folder paths using pattern recognition
+      const pathUpdate = updateFolderPaths(currentFolderPath, existingFolderPaths);
 
       // Create metadata record
       const metadataRecord = {
@@ -81,7 +97,7 @@ export function useFileMetadata() {
         sessionId: sessionId,
 
         // File path information
-        folderPath: folderPath,
+        folderPaths: pathUpdate.folderPaths,
 
         // Computed fields for convenience
         metadataHash: metadataHash,
@@ -95,7 +111,9 @@ export function useFileMetadata() {
 
       console.log(`[DEBUG] Metadata record created: ${metadataHash}`, {
         originalName,
-        folderPath: folderPath || '(root level)',
+        folderPaths: pathUpdate.folderPaths || '(root level)',
+        pathPattern: pathUpdate.pattern.type,
+        pathChanged: pathUpdate.hasChanged,
         fileHash: fileHash.substring(0, 8) + '...',
       });
 

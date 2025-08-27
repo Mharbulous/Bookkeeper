@@ -172,13 +172,51 @@ This collection logs only the 4 essential upload events with basic information:
   uploadedBy: 'user-john-123',
   sessionId: 'session_uuid_abc123',
   
+  // File path information (from folder uploads)
+  folderPaths: 'Documents/2023',  // Directory paths extracted from webkitRelativePath, supports multiple paths for same file
+  
   // Computed fields for convenience
   metadataHash: 'xyz789abc123',  // SHA-256 of concatenated metadata string
-  storagePath: '/teams/team-abc-123/matters/matter-001/files/abc123def456789abcdef012345.pdf',
   
   createdAt: Timestamp
 }
 ```
+
+### Folder Path Extraction
+
+When users upload folders using the HTML5 `webkitdirectory` feature, the system automatically extracts folder structure information:
+
+**webkitRelativePath Examples**:
+- `"Documents/2023/invoices/invoice.pdf"` → `folderPaths: "Documents/2023/invoices"`
+- `"photos/vacation.jpg"` → `folderPaths: "photos"`  
+- `"readme.txt"` → `folderPaths: ""` (empty for root-level files)
+
+**Key Features**:
+- **Automatic Extraction**: Folder paths extracted from `webkitRelativePath` during upload
+- **Pattern Recognition**: System can detect and consolidate similar folder structures
+- **Multiple Path Support**: Same file can be associated with multiple folder contexts
+- **Cross-Platform**: Uses forward slashes regardless of operating system
+
+**Practical Examples**:
+
+1. **Single File Upload**: User drags `invoice.pdf` directly
+   ```javascript
+   { originalName: "invoice.pdf", folderPaths: "" } // Empty for root level
+   ```
+
+2. **Folder Upload**: User selects folder containing `Contracts/2024/lease.pdf`
+   ```javascript
+   { originalName: "lease.pdf", folderPaths: "Contracts/2024" }
+   ```
+
+3. **Multiple Folder Contexts**: Same file uploaded from different folder structures
+   ```javascript
+   // First upload: Backups/January/document.pdf
+   { originalName: "document.pdf", folderPaths: "Backups/January" }
+   
+   // Later upload: Archive/2024/document.pdf (same file content)
+   { originalName: "document.pdf", folderPaths: "Backups/January|Archive/2024" }
+   ```
 
 ## Firebase Storage Structure
 

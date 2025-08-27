@@ -39,6 +39,23 @@ User drops files/folder → Folder analysis → Time estimation → Queue initia
 - **Background Processing**: Remaining files processed in web workers
 - **Hardware Calibration**: System measures performance for accurate time predictions
 
+#### Folder Upload Support
+
+The system supports uploading entire folder structures using the HTML5 `webkitdirectory` API:
+
+```javascript
+// Folder structure preservation
+"Documents/2023/invoices/invoice.pdf" → folderPaths: "Documents/2023/invoices"
+"photos/2024/vacation.jpg" → folderPaths: "photos/2024"
+"readme.txt" → folderPaths: "" (root level)
+```
+
+**Key Features**:
+- **Automatic Path Extraction**: Folder paths captured from `webkitRelativePath`
+- **Pattern Recognition**: Similar folder structures consolidated intelligently
+- **Cross-Platform**: Consistent forward-slash paths regardless of OS
+- **Multiple Context Support**: Files can be associated with different folder contexts over time
+
 ### 2. Deduplication Processing
 
 #### Size-Based Pre-filtering
@@ -279,6 +296,7 @@ await createMetadataRecord({
   lastModified: timestamp,
   fileHash: 'abc123...',
   sessionId: 'session_123',
+  originalPath: 'Documents/2023/invoice.pdf', // webkitRelativePath from folder uploads (optional)
 });
 ```
 
@@ -352,6 +370,13 @@ console.log(`[UPLOAD] ${action}: ${fileName} (${status})`, {
 - **Missing duplicates**: Verify size-based pre-filtering logic
 - **Metadata conflicts**: Check metadata hash generation
 
+#### Folder Path Issues
+
+- **Missing folder paths**: Check if `webkitdirectory` is supported in browser
+- **Incorrect paths**: Verify `webkitRelativePath` property on File objects
+- **Path truncation**: Check folder path extraction logic in metadata creation
+- **Pattern recognition**: Verify `folderPathUtils.js` pattern consolidation
+
 ### Debug Commands
 
 ```javascript
@@ -366,6 +391,13 @@ console.log('Queue:', uploadQueue.value);
 
 // Check worker status
 console.log('Workers:', workerManager.getStatus());
+
+// Debug folder path extraction
+console.log('File paths:', files.map(f => ({ 
+  name: f.name, 
+  webkitRelativePath: f.webkitRelativePath,
+  extractedFolder: f.webkitRelativePath?.split('/').slice(0, -1).join('/') || '(root)'
+})));
 ```
 
 ## Future Enhancements

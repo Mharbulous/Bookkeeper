@@ -1,6 +1,7 @@
 import { storage, db } from './firebase.js';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { updateFolderPaths } from '../utils/folderPathUtils.js';
 
 /**
  * Upload Service for Firebase Storage with atomic metadata operations
@@ -359,17 +360,30 @@ export class UploadService {
         const downloadURL = await getDownloadURL(storageRef);
 
         // Extract folder path from original file path
-        let folderPath = '';
+        let currentFolderPath = '';
         if (metadata.originalPath) {
           const pathParts = metadata.originalPath.split('/');
           if (pathParts.length > 1) {
-            folderPath = pathParts.slice(0, -1).join('/');
+            currentFolderPath = pathParts.slice(0, -1).join('/');
           }
         }
 
-        // Save metadata to Firestore (hash deduplication)
+        // Get existing metadata to check for existing folderPaths
         const metadataPath = this.generateMetadataPath(hash);
         const metadataRef = doc(db, metadataPath, metadata.id);
+        let existingFolderPaths = '';
+        
+        try {
+          const existingDoc = await getDoc(metadataRef);
+          if (existingDoc.exists()) {
+            existingFolderPaths = existingDoc.data().folderPaths || '';
+          }
+        } catch (error) {
+          console.warn('Could not retrieve existing folderPaths, proceeding with new path only:', error);
+        }
+
+        // Update folder paths using pattern recognition
+        const pathUpdate = updateFolderPaths(currentFolderPath, existingFolderPaths);
 
         const metadataDoc = {
           ...metadata,
@@ -380,9 +394,8 @@ export class UploadService {
           uploadedAt: serverTimestamp(),
           fileExists: false, // File already exists, we didn't upload it
           isDuplicate: true,
-          folderPath: folderPath,
+          folderPaths: pathUpdate.folderPaths,
         };
-
 
         await setDoc(metadataRef, metadataDoc);
 
@@ -477,18 +490,32 @@ export class UploadService {
       }
 
       // Extract folder path from original file path
-      let folderPath = '';
+      let currentFolderPath = '';
       if (metadata.originalPath) {
         const pathParts = metadata.originalPath.split('/');
         if (pathParts.length > 1) {
-          folderPath = pathParts.slice(0, -1).join('/');
+          currentFolderPath = pathParts.slice(0, -1).join('/');
         }
       }
 
-      // Save metadata to Firestore
+      // Get existing metadata to check for existing folderPaths
       const metadataPath = this.generateMetadataPath(hash);
       const metadataRef = doc(db, metadataPath, metadata.id);
+      let existingFolderPaths = '';
+      
+      try {
+        const existingDoc = await getDoc(metadataRef);
+        if (existingDoc.exists()) {
+          existingFolderPaths = existingDoc.data().folderPaths || '';
+        }
+      } catch (error) {
+        console.warn('Could not retrieve existing folderPaths, proceeding with new path only:', error);
+      }
 
+      // Update folder paths using pattern recognition
+      const pathUpdate = updateFolderPaths(currentFolderPath, existingFolderPaths);
+
+      // Save metadata to Firestore
       const metadataDoc = {
         ...metadata,
         hash: hash,
@@ -497,7 +524,7 @@ export class UploadService {
         userId: this.userId,
         uploadedAt: serverTimestamp(),
         fileExists: !fileExists, // true if file was uploaded, false if it already existed
-        folderPath: folderPath,
+        folderPaths: pathUpdate.folderPaths,
       };
 
 
