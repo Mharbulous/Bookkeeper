@@ -146,13 +146,7 @@ const authStore = useAuthStore();
 const { populateExistingHash } = useLazyHashTooltip();
 
 // Upload logging system
-const {
-  startUploadSession,
-  logSessionSummary,
-  getCurrentSessionId,
-  getSessionDuration,
-  logFileUploadEvent
-} = useUploadLogger();
+const { logUploadEvent } = useUploadLogger();
 
 // File metadata system
 const {
@@ -697,14 +691,13 @@ const continueUpload = async () => {
         updateFileStatus(queueFile, 'skipped');
         
         try {
-          // Log individual upload event for duplicate file
-          await logFileUploadEvent({
+          // Log skipped event for duplicate file
+          const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, queueFile.hash);
+          await logUploadEvent({
+            eventType: 'upload_skipped_metadata_recorded',
             fileName: queueFile.name,
             fileHash: queueFile.hash,
-            fileSize: queueFile.size,
-            lastModified: queueFile.lastModified,
-            status: 'skipped',
-            reason: 'duplicate_file'
+            metadataHash: metadataHash
           });
           
           // Create metadata record for duplicate (hash deduplication)
@@ -768,13 +761,12 @@ const continueUpload = async () => {
           
           // Log individual upload event for skipped file
           try {
-            await logFileUploadEvent({
+            const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+            await logUploadEvent({
+              eventType: 'upload_skipped_metadata_recorded',
               fileName: queueFile.name,
               fileHash: fileHash,
-              fileSize: queueFile.size,
-              lastModified: queueFile.lastModified,
-              status: 'skipped',
-              reason: 'already_exists'
+              metadataHash: metadataHash
             });
           } catch (logError) {
             console.error(`Failed to log upload event for existing file ${queueFile.name}:`, logError);
@@ -804,15 +796,14 @@ const continueUpload = async () => {
           updateUploadStatus('currentFile', queueFile.name, 'uploading');
           console.log(`Uploading file: ${queueFile.name}`);
           
-          // Log interrupted upload event before starting (will be overwritten on completion)
+          // Log upload start event
           try {
-            await logFileUploadEvent({
+            const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+            await logUploadEvent({
+              eventType: 'upload_interrupted',
               fileName: queueFile.name,
               fileHash: fileHash,
-              fileSize: queueFile.size,
-              lastModified: queueFile.lastModified,
-              status: 'interrupted',
-              reason: 'upload_started'
+              metadataHash: metadataHash
             });
           } catch (logError) {
             console.error(`Failed to log interrupted upload event for ${queueFile.name}:`, logError);
@@ -826,17 +817,14 @@ const continueUpload = async () => {
           updateFileStatus(queueFile, 'completed');
           console.log(`Successfully uploaded: ${queueFile.name}`);
           
-          // Overwrite interrupted upload event with successful completion
+          // Log successful upload completion
           try {
-            await logFileUploadEvent({
+            const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+            await logUploadEvent({
+              eventType: 'upload_success',
               fileName: queueFile.name,
               fileHash: fileHash,
-              fileSize: queueFile.size,
-              lastModified: queueFile.lastModified,
-              status: 'uploaded',
-              reason: 'upload_complete',
-              uploadDurationMs: uploadDurationMs,
-              allowOverwrite: true
+              metadataHash: metadataHash
             });
           } catch (logError) {
             console.error(`Failed to log upload completion event for ${queueFile.name}:`, logError);
@@ -865,17 +853,14 @@ const continueUpload = async () => {
         updateUploadStatus('failed');
         updateFileStatus(queueFile, 'error');
         
-        // Overwrite interrupted upload event with failure
+        // Log upload failure
         try {
-          await logFileUploadEvent({
+          const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+          await logUploadEvent({
+            eventType: 'upload_failed',
             fileName: queueFile.name,
             fileHash: fileHash,
-            fileSize: queueFile.size,
-            lastModified: queueFile.lastModified,
-            status: 'failed',
-            reason: 'upload_error',
-            error: error.message || error.toString(),
-            allowOverwrite: true
+            metadataHash: metadataHash
           });
         } catch (logError) {
           console.error(`Failed to log upload failure event for ${queueFile.name}:`, logError);
@@ -895,22 +880,6 @@ const continueUpload = async () => {
         skipped: uploadStatus.value.skipped
       });
 
-      // Log upload session completion
-      try {
-        const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
-        const totalSizeMB = filesToUpload.reduce((sum, file) => sum + (file.size / (1024 * 1024)), 0);
-        
-        await logSessionSummary({
-          filesProcessed: filesToUpload.length,
-          successful: uploadStatus.value.successful,
-          failed: uploadStatus.value.failed,
-          duplicatesSkipped: uploadQueue.value.length - filesToUpload.length,
-          totalSizeMB: totalSizeMB
-        });
-      } catch (logError) {
-        console.error('Failed to log upload session:', logError);
-        // Don't fail the upload process for logging errors
-      }
 
       // Show completion notification
       const totalProcessed = uploadStatus.value.successful + uploadStatus.value.skipped;
@@ -945,8 +914,6 @@ const handleStartUpload = async () => {
       resetUploadStatus();
       currentUploadIndex.value = 0;
       
-      // Start upload session logging for new uploads (include duplicates in count)
-      await startUploadSession(uploadQueue.value.length);
     }
     
     updateUploadStatus('start');

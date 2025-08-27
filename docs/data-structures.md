@@ -127,74 +127,31 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ```
 
 #### Upload Events: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
-**Purpose**: Track all upload-related events including individual file uploads and session summaries
+**Purpose**: Track essential upload events with minimal information
 
-This collection contains two types of events:
-
-##### File Upload Events
-**Document ID Strategy for Interrupted Uploads**:
-- **Interrupted uploads**: Use deterministic ID: `{timestamp}_{fileHash16}` 
-- **Completion events**: Overwrite interrupted event using same deterministic ID
-- **Skipped files**: Use auto-generated Firestore IDs (no overwriting needed)
-- **Power outage detection**: Interrupted events remain if never overwritten
+This collection logs only the 4 essential upload events with basic information:
+- **upload_interrupted**: Upload started but not completed
+- **upload_success**: Upload completed successfully
+- **upload_failed**: Upload failed
+- **upload_skipped_metadata_recorded**: File skipped but metadata recorded
 
 ```javascript
 {
-  uploadedAt: Timestamp,
-  uploadedBy: 'user-john-123',
-  sessionId: 'session_uuid_abc123',
-  
-  // Event type identifier
-  eventType: 'file_upload',
-  
-  // File details
-  fileName: 'document.pdf',
-  fileHash: 'abc123def456789abcdef012345...',  // SHA-256 of file content
-  fileSize: 1234567,                          // Bytes
-  lastModified: 1703123456789,                // Original file timestamp
-  
-  // Upload event details
-  status: 'uploaded',           // 'uploaded' | 'skipped' | 'failed' | 'interrupted'
-  reason: 'upload_complete',    // 'upload_complete' | 'already_exists' | 'queue_duplicate' | 'upload_error' | 'upload_started'
-  uploadDurationMs: 2340,       // Only for successful uploads
-  error: null,                  // Only for failed uploads (error message)
-  
-  createdAt: Timestamp
+  eventType: 'upload_success',                    // Event type
+  timestamp: Timestamp,                           // When event occurred
+  fileName: 'document.pdf',                       // Original file name
+  fileHash: 'abc123def456789abcdef012345...',     // SHA-256 of file content
+  metadataHash: 'xyz789abc123def456...',          // SHA-256 of metadata
+  teamId: 'team-abc-123',                         // Team identifier
+  userId: 'user-john-123'                         // User identifier
 }
 ```
 
-##### Session Summary Events
-**Purpose**: Track upload session aggregate statistics
-
-```javascript
-{
-  uploadedAt: Timestamp,
-  uploadedBy: 'user-john-123',
-  sessionId: 'session_uuid_abc123',
-  
-  // Event type identifier
-  eventType: 'session_summary',
-  
-  // Session aggregate statistics
-  filesProcessed: 45,
-  successful: 38,
-  failed: 2,
-  duplicatesSkipped: 5,
-  totalSizeMB: 127.8,
-  uploadDurationMs: 45230,
-  hardwareCalibration: 1.85,  // H-factor for performance tracking
-  
-  createdAt: Timestamp
-}
-```
-
-**Upload Event Flow**:
-1. **Start upload** → Create `interrupted` event with deterministic ID
-2. **Upload succeeds** → Overwrite with `uploaded` event using same ID  
-3. **Upload fails** → Overwrite with `failed` event using same ID
-4. **Power outage/crash** → `interrupted` event remains as evidence
-5. **Skip existing file** → Create `skipped` event (`already_exists`) with auto-generated ID
-6. **Skip queue duplicate** → Create `skipped` event (`queue_duplicate`) with auto-generated ID
+**Event Types**:
+- `upload_interrupted`: Upload started (may remain if process interrupted)
+- `upload_success`: Upload completed successfully
+- `upload_failed`: Upload failed for any reason
+- `upload_skipped_metadata_recorded`: File skipped but metadata was recorded
 
 #### File Metadata Records: `/teams/{teamId}/matters/{matterId}/metadata/{metadataHash}`
 **Purpose**: Store unique combinations of file metadata using metadata hash as document ID

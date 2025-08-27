@@ -65,36 +65,38 @@ for (const file of duplicateCandidates) {
 
 ### 3. Upload Execution
 
-#### Interrupted Upload Detection System
+#### Simple Event Logging
 
-For complete documentation of upload event data structures and the interrupted upload detection system, please refer to: **[docs/data-structures.md](./data-structures.md#individual-upload-events)**
+The system logs only essential upload events with minimal information:
 
-**Flow Summary**:
-
-1. Start upload → Create "interrupted" event (deterministic ID)
-2. Upload completes → Overwrite with success/failure event
-3. Power outage → "interrupted" event remains as evidence
+- **upload_interrupted**: Upload started
+- **upload_success**: Upload completed successfully  
+- **upload_failed**: Upload failed
+- **upload_skipped_metadata_recorded**: File skipped but metadata recorded
 
 #### Upload Loop Process
 
 ```javascript
 for (const file of uploadableFiles) {
-  // 1. Log interrupted event
-  await logInterruptedEvent(file);
+  // 1. Log upload start
+  await logUploadEvent({ eventType: 'upload_interrupted', ... });
 
   // 2. Check if file exists in storage
   if (await checkFileExists(file.hash)) {
     // Skip file, log event, create metadata
-    await logSkippedEvent(file);
+    await logUploadEvent({ eventType: 'upload_skipped_metadata_recorded', ... });
     await createMetadataRecord(file);
     continue;
   }
 
   // 3. Upload file
-  await uploadToFirebase(file);
-
-  // 4. Overwrite interrupted event with success
-  await logSuccessEvent(file);
+  try {
+    await uploadToFirebase(file);
+    await logUploadEvent({ eventType: 'upload_success', ... });
+  } catch (error) {
+    await logUploadEvent({ eventType: 'upload_failed', ... });
+  }
+  
   await createMetadataRecord(file);
 }
 ```
@@ -255,15 +257,14 @@ const { uploadQueue, addFilesToQueue, clearQueue } = useFileQueue();
 #### Upload Event Logging
 
 ```javascript
-const { logFileUploadEvent, startUploadSession } = useUploadLogger();
+const { logUploadEvent } = useUploadLogger();
 
 // See data-structures.md for complete field definitions
-await logFileUploadEvent({
+await logUploadEvent({
+  eventType: 'upload_success',
   fileName: 'document.pdf',
   fileHash: 'abc123...',
-  status: 'uploaded',
-  reason: 'upload_complete',
-  allowOverwrite: true,
+  metadataHash: 'def456...',
 });
 ```
 
