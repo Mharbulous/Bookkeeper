@@ -56,8 +56,14 @@
         formattedTimeRemaining: timeWarning.formattedTimeRemaining.value,
         estimatedDuration: timeWarning.estimatedDuration.value,
       }"
+      :is-uploading="uploadManager.isUploading.value"
+      :is-paused="uploadManager.isPaused.value"
+      :is-starting-upload="isStartingUpload"
       @remove-file="removeFromQueue"
-      @start-upload="startUpload"
+      @start-upload="handleStartUpload"
+      @pause-upload="handlePauseUpload"
+      @resume-upload="handleResumeUpload"
+      @cancel-upload="handleCancelUpload"
       @clear-queue="clearQueue"
     />
 
@@ -94,6 +100,29 @@
       @continue-waiting="handleContinueWaiting"
       @close="handleCloseWarning"
     />
+
+    <!-- Upload Progress Modal -->
+    <UploadProgressModal
+      v-model:show="showUploadProgress"
+      :upload-state="uploadManager.uploadState.value"
+      :overall-progress="uploadManager.overallProgress"
+      :upload-metrics="uploadManager.uploadMetrics"
+      :file-states="uploadManager.fileStates.value"
+      :error-summary="uploadManager.errorSummary"
+      :can-show-pause-button="uploadManager.canShowPauseButton.value"
+      :can-show-resume-button="uploadManager.canShowResumeButton.value"
+      :can-show-cancel-button="uploadManager.canShowCancelButton.value"
+      :can-retry="uploadManager.canRetry.value"
+      :files="uploadQueue"
+      @pause="handlePauseUpload"
+      @resume="handleResumeUpload"
+      @cancel="handleCancelUpload"
+      @retry-file="handleRetryFile"
+      @retry-all="handleRetryAll"
+      @close="handleCloseUploadProgress"
+      @view-results="handleViewResults"
+      @clear-queue="handleClearQueueFromModal"
+    />
   </v-container>
 </template>
 
@@ -104,11 +133,13 @@ import UploadDropzone from '../components/features/upload/UploadDropzone.vue';
 import FolderOptionsDialog from '../components/features/upload/FolderOptionsDialog.vue';
 import ProcessingProgressModal from '../components/features/upload/ProcessingProgressModal.vue';
 import CloudFileWarningModal from '../components/features/upload/CloudFileWarningModal.vue';
+import UploadProgressModal from '../components/features/upload/UploadProgressModal.vue';
 import { useFileQueue } from '../composables/useFileQueue.js';
 import { useFileDragDrop } from '../composables/useFileDragDrop.js';
 import { useQueueDeduplication } from '../composables/useQueueDeduplication.js';
 import { useFolderOptions } from '../composables/useFolderOptions.js';
 import { useTimeBasedWarning } from '../composables/useTimeBasedWarning.js';
+import { useUploadManager } from '../composables/useUploadManager.js';
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
@@ -138,10 +169,7 @@ const {
   addFilesToQueue,
   initializeQueueInstantly,
   updateUploadQueue,
-  resetProgress,
   removeFromQueue,
-  clearQueue: baseClearQueue,
-  startUpload,
   showNotification,
 } = useFileQueue();
 
@@ -182,6 +210,13 @@ const {
 
 const timeWarning = useTimeBasedWarning();
 
+// Upload manager
+const uploadManager = useUploadManager();
+
+// Upload state tracking
+const showUploadProgress = ref(false);
+const isStartingUpload = ref(false);
+
 // Connect time monitoring to deduplication processing
 queueDeduplication.setTimeMonitoringCallback({
   onProcessingStart: () => {
@@ -215,6 +250,8 @@ const clearQueue = () => {
 
 // Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
+  const processId = Math.random().toString(36).substr(2, 9);
+
   // Check if analysis has been aborted before processing
   if (analysisTimedOut.value) {
     console.log('Skipping file processing - analysis was aborted');
@@ -338,7 +375,9 @@ const processFilesWithQueue = async (files) => {
 
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {
-        console.log(`❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`);
+        console.log(
+          `❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`,
+        );
         return;
       }
 
@@ -378,7 +417,9 @@ const processFilesWithQueue = async (files) => {
 
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {
-        console.log(`❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`);
+        console.log(
+          `❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`,
+        );
         return;
       }
 
@@ -401,7 +442,7 @@ const processFilesWithQueue = async (files) => {
       throw error; // Re-throw to maintain error handling
     }
   }
-  
+
   // 🔍 DEBUG: Log AsyncTracker state at successful exit
   console.log(`✅ [${processId}] EXIT SUCCESS: processFilesWithQueue completed normally`);
   if (window.__asyncTracker) {
@@ -500,12 +541,12 @@ const triggerFolderSelectWrapper = () => {
 
 // Handle cancel processing for progress modal
 const handleCancelProcessing = () => {
-  performComprehensiveCleanup('cancel-processing');
+  clearQueue();
 };
 
 // Cloud file warning modal handlers
 const handleClearAll = () => {
-  performComprehensiveCleanup('clear-all');
+  clearQueue();
 };
 
 const handleContinueWaiting = () => {
@@ -516,6 +557,89 @@ const handleContinueWaiting = () => {
 const handleCloseWarning = () => {
   // User closed warning without choosing action
   timeWarning.dismissWarning();
+};
+
+// Upload control handlers
+const handleStartUpload = async () => {
+  try {
+    isStartingUpload.value = true;
+    showUploadProgress.value = true;
+
+    console.log('Starting upload process...');
+
+    const results = await uploadManager.startUpload(uploadQueue.value, {
+      maxConcurrent: 3, // Configurable concurrency
+    });
+
+    console.log('Upload completed:', results);
+  } catch (error) {
+    console.error('Upload failed:', error);
+
+    // Show error notification
+    showNotification('Upload failed: ' + (error.message || 'Unknown error'), 'error');
+  } finally {
+    isStartingUpload.value = false;
+  }
+};
+
+const handlePauseUpload = () => {
+  console.log('Pausing upload...');
+  uploadManager.pauseUploads();
+};
+
+const handleResumeUpload = () => {
+  console.log('Resuming upload...');
+  uploadManager.resumeUploads();
+};
+
+const handleCancelUpload = () => {
+  console.log('Cancelling upload...');
+  uploadManager.cancelUploads();
+  showUploadProgress.value = false;
+};
+
+const handleRetryFile = async (fileId) => {
+  console.log('Retrying file:', fileId);
+  // TODO: Implement single file retry
+  showNotification('File retry functionality coming soon', 'info');
+};
+
+const handleRetryAll = async () => {
+  console.log('Retrying all failed uploads...');
+  try {
+    const results = await uploadManager.retryFailedUploads();
+    console.log('Retry completed:', results);
+
+    if (results.successful.length > 0) {
+      showNotification(`Successfully retried ${results.successful.length} files`, 'success');
+    }
+  } catch (error) {
+    console.error('Retry failed:', error);
+    showNotification('Retry failed: ' + (error.message || 'Unknown error'), 'error');
+  }
+};
+
+const handleCloseUploadProgress = () => {
+  showUploadProgress.value = false;
+
+  // Reset upload manager if completed
+  if (uploadManager.isCompleted.value) {
+    uploadManager.resetUpload();
+  }
+};
+
+const handleViewResults = () => {
+  // TODO: Implement detailed results view
+  console.log('Opening detailed results view...');
+  showNotification('Detailed results view coming soon', 'info');
+};
+
+const handleClearQueueFromModal = () => {
+  // Close modal first
+  showUploadProgress.value = false;
+
+  // Then clear queue using existing handler
+  clearQueue();
 };
 </script>
 

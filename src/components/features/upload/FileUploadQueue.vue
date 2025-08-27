@@ -1,6 +1,6 @@
 <template>
   <v-card variant="outlined" class="upload-queue">
-    <v-card-title class="d-flex align-center justify-space-between">
+    <v-card-title class="d-flex align-center justify-space-between queue-header">
       <div class="d-flex align-center">
         <v-icon icon="mdi-file-multiple" class="me-2" />
         Upload Queue
@@ -25,21 +25,56 @@
           @click="handleClearQueue"
         />
 
+        <!-- Upload Controls -->
         <v-btn
+          v-if="!isUploading && !isPaused"
           color="primary"
           variant="elevated"
           prepend-icon="mdi-upload"
           @click="$emit('start-upload')"
           :disabled="files.length === 0 || hasErrors"
+          :loading="isStartingUpload"
         >
           Start Upload
         </v-btn>
+
+        <!-- Uploading State Button -->
+        <v-btn
+          v-if="isUploading"
+          color="warning"
+          variant="elevated"
+          prepend-icon="mdi-pause"
+          @click="$emit('pause-upload')"
+        >
+          Pause Upload
+        </v-btn>
+
+        <!-- Paused State Buttons -->
+        <template v-if="isPaused">
+          <v-btn
+            color="primary"
+            variant="elevated"
+            prepend-icon="mdi-play"
+            @click="$emit('resume-upload')"
+          >
+            Resume Upload
+          </v-btn>
+          
+          <v-btn
+            color="error"
+            variant="outlined"
+            prepend-icon="mdi-close"
+            @click="$emit('cancel-upload')"
+          >
+            Cancel Upload
+          </v-btn>
+        </template>
       </div>
     </v-card-title>
 
-    <v-divider />
+    <v-divider class="queue-divider" />
 
-    <div class="pa-4">
+    <div class="pa-4 queue-static-content">
       <!-- Status Chips -->
       <FileQueueChips
         :files="files"
@@ -88,7 +123,8 @@
       </v-card>
 
       <!-- Files List - Grouped by duplicates -->
-      <div v-for="(group, groupIndex) in groupedFiles" :key="groupIndex">
+      <div class="scrollable-content">
+        <div v-for="(group, groupIndex) in groupedFiles" :key="groupIndex">
         <!-- Files in Group -->
         <v-list lines="two" density="comfortable">
           <template v-for="(file, fileIndex) in group.files" :key="file.id || `${groupIndex}-${fileIndex}`">
@@ -108,20 +144,21 @@
           </template>
         </v-list>
 
-        <!-- Spacing between groups -->
-        <div v-if="groupIndex < groupedFiles.length - 1" class="my-4"></div>
-      </div>
+          <!-- Spacing between groups -->
+          <div v-if="groupIndex < groupedFiles.length - 1" class="my-4"></div>
+        </div>
 
-      <!-- Empty state -->
-      <div v-if="files.length === 0" class="text-center py-8">
-        <v-icon icon="mdi-file-outline" size="48" color="grey-lighten-1" class="mb-2" />
-        <p class="text-body-1 text-grey-darken-1">No files in queue</p>
-        <p class="text-caption text-grey-darken-2">Drag and drop files or use the upload buttons above</p>
+        <!-- Empty state -->
+        <div v-if="files.length === 0" class="text-center py-8">
+          <v-icon icon="mdi-file-outline" size="48" color="grey-lighten-1" class="mb-2" />
+          <p class="text-body-1 text-grey-darken-1">No files in queue</p>
+          <p class="text-caption text-grey-darken-2">Drag and drop files or use the upload buttons above</p>
+        </div>
       </div>
     </div>
 
     <!-- Upload Summary -->
-    <v-card-actions v-if="files.length > 0" class="bg-grey-lighten-5">
+    <v-card-actions v-if="files.length > 0" class="bg-grey-lighten-5 queue-footer">
       <div class="d-flex w-100 justify-space-between align-center">
         <div class="text-body-2 text-grey-darken-1">
           <strong>{{ uploadableFiles.length }}</strong> files ready for upload
@@ -190,11 +227,31 @@ const props = defineProps({
       formattedTimeRemaining: '0s',
       estimatedDuration: 0
     })
+  },
+  // Upload state props
+  isUploading: {
+    type: Boolean,
+    default: false
+  },
+  isPaused: {
+    type: Boolean,
+    default: false
+  },
+  isStartingUpload: {
+    type: Boolean,
+    default: false
   }
 })
 
 // Emits
-const emit = defineEmits(['remove-file', 'start-upload', 'clear-queue'])
+const emit = defineEmits([
+  'remove-file', 
+  'start-upload', 
+  'pause-upload',
+  'resume-upload',
+  'cancel-upload',
+  'clear-queue'
+])
 
 // Hash tooltip functionality (only for cache management)
 const {
@@ -380,6 +437,71 @@ const getPhaseMessage = () => {
 .upload-queue {
   max-width: 1000px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 600px; /* Set a fixed height for the queue */
+}
+
+/* Static header section */
+.queue-header {
+  flex-shrink: 0;
+}
+
+/* Static divider */
+.queue-divider {
+  flex-shrink: 0;
+}
+
+/* Container for static content and scrollable area */
+.queue-static-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Scrollable file list container */
+.scrollable-content {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox - hide scrollbar by default */
+  -ms-overflow-style: none; /* IE/Edge - hide scrollbar by default */
+}
+
+/* Hide scrollbar by default in Webkit browsers */
+.scrollable-content::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Show scrollbar on hover - entire upload queue container */
+.upload-queue:hover .scrollable-content {
+  scrollbar-width: thin; /* Firefox - show scrollbar on hover */
+  -ms-overflow-style: scrollbar; /* IE/Edge - show scrollbar on hover */
+}
+
+/* Show scrollbar in Webkit browsers on hover */
+.upload-queue:hover .scrollable-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.upload-queue:hover .scrollable-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.upload-queue:hover .scrollable-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.upload-queue:hover .scrollable-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Static footer section */
+.queue-footer {
+  flex-shrink: 0;
 }
 
 .gap-2 {
@@ -390,7 +512,7 @@ const getPhaseMessage = () => {
   cursor: help;
 }
 
-/* Prevent unwanted scrollbars in file list */
+/* Allow scrolling within the scrollable content */
 :deep(.v-list) {
   overflow: visible;
 }
