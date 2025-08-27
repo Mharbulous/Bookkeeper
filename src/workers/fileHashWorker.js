@@ -25,7 +25,7 @@ const MESSAGE_TYPES = {
   HEALTH_CHECK_RESPONSE: 'HEALTH_CHECK_RESPONSE'
 }
 
-// Helper function to generate SHA-256 hash with size suffix
+// Helper function to generate standard SHA-256 hash
 async function generateFileHash(file) {
   try {
     const buffer = await file.arrayBuffer()
@@ -33,8 +33,8 @@ async function generateFileHash(file) {
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     
-    // Add size suffix for collision safety (SHA-256 + size = virtually impossible collision)
-    return `${hash}_${file.size}`
+    // Return standard SHA-256 hash of file content
+    return hash
   } catch (error) {
     throw new Error(`Failed to generate hash for file ${file.name}: ${error.message}`)
   }

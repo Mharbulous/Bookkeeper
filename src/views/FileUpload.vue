@@ -165,6 +165,8 @@ const {
   setPhaseComplete,
   resetUploadStatus,
   updateUploadStatus,
+  updateFileStatus,
+  updateAllFilesToReady,
 } = useFileQueue();
 
 const {
@@ -220,8 +222,8 @@ const calculateFileHash = async (file) => {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     
-    // Add size suffix for collision safety (SHA-256 + size = virtually impossible collision)
-    return `${hash}_${file.size}`;
+    // Return standard SHA-256 hash of file content
+    return hash;
   } catch (error) {
     throw new Error(`Failed to generate hash for file ${file.name}: ${error.message}`);
   }
@@ -446,6 +448,7 @@ const processFilesWithQueue = async (files) => {
       }
 
       // Processing completed successfully - perform cleanup
+      updateAllFilesToReady(); // Update all ready files to show blue dots
       timeWarning.resetMonitoring();
       queueDeduplication.clearTimeMonitoringCallback();
     } catch (error) {
@@ -487,6 +490,7 @@ const processFilesWithQueue = async (files) => {
       }
 
       // Processing completed successfully - perform cleanup
+      updateAllFilesToReady(); // Update all ready files to show blue dots
       timeWarning.resetMonitoring();
       queueDeduplication.clearTimeMonitoringCallback();
     } catch (error) {
@@ -675,6 +679,7 @@ const continueUpload = async () => {
 
         // Calculate hash for the file (on-demand during upload)
         updateUploadStatus('currentFile', queueFile.name, 'calculating_hash');
+        updateFileStatus(queueFile.name, 'uploading');
         console.log(`Calculating hash for: ${queueFile.name}`);
         let fileHash;
         
@@ -706,6 +711,7 @@ const continueUpload = async () => {
           // File already uploaded previously
           console.log(`File already exists: ${queueFile.name}`);
           updateUploadStatus('previouslyUploaded');
+          updateFileStatus(queueFile.name, 'previouslyUploaded');
         } else {
           // Check if upload was aborted before uploading
           if (uploadAbortController.signal.aborted) {
@@ -718,6 +724,7 @@ const continueUpload = async () => {
           console.log(`Uploading file: ${queueFile.name}`);
           await uploadSingleFile(queueFile.file, fileHash, queueFile.name, uploadAbortController.signal);
           updateUploadStatus('successful');
+          updateFileStatus(queueFile.name, 'completed');
           console.log(`Successfully uploaded: ${queueFile.name}`);
         }
       } catch (error) {
@@ -727,6 +734,7 @@ const continueUpload = async () => {
         }
         console.error(`Failed to upload ${queueFile.name}:`, error);
         updateUploadStatus('failed');
+        updateFileStatus(queueFile.name, 'error');
       } finally {
         uploadAbortController = null;
       }

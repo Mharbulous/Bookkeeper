@@ -19,8 +19,8 @@ export function useQueueCore() {
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     
-    // Add size suffix for collision safety (SHA-256 + size = virtually impossible collision)
-    return `${hash}_${file.size}`
+    // Return standard SHA-256 hash of file content
+    return hash
   }
 
   // Legacy chooseBestFile (kept for fallback compatibility)

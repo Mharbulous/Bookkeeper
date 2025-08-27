@@ -58,7 +58,7 @@
           class="me-1"
         />
         <template v-else>{{ distinctFilesCount }}</template>
-        ready
+        ready to upload
       </v-chip>
 
       <!-- Previous uploads chip (fourth) -->
@@ -69,15 +69,8 @@
         color="orange"
         class="text-white"
       >
-        <v-progress-circular
-          v-if="shouldShowSpinnerForUploadChips"
-          indeterminate
-          size="16"
-          width="2"
-          class="me-1"
-        />
-        <template v-else>{{ previouslyUploadedCount }}</template>
-        previous uploads
+        {{ previouslyUploadedCount }}
+        skipped
       </v-chip>
 
       <!-- Failed uploads chip (sixth) -->
@@ -87,15 +80,8 @@
         variant="flat"
         color="red"
       >
-        <v-progress-circular
-          v-if="shouldShowSpinnerForUploadChips"
-          indeterminate
-          size="16"
-          width="2"
-          class="me-1"
-        />
-        <template v-else>{{ failedCount }}</template>
-        failed uploads
+        {{ failedCount }}
+        failed
       </v-chip>
 
       <!-- Successful uploads chip (seventh) -->
@@ -105,15 +91,8 @@
         variant="flat"
         color="green"
       >
-        <v-progress-circular
-          v-if="shouldShowSpinnerForUploadChips"
-          indeterminate
-          size="16"
-          width="2"
-          class="me-1"
-        />
-        <template v-else>{{ successfulCount }}</template>
-        successful uploads
+        {{ successfulCount }}
+        successful
       </v-chip>
     </div>
   </div>
@@ -189,13 +168,23 @@ const queueDuplicatesCount = computed(() => {
 })
 
 const distinctFilesCount = computed(() => {
-  // Distinct files = actual count of non-duplicate files in current queue
-  return props.files.filter(file => !file.isDuplicate).length
+  const totalUploadableFiles = props.files.filter(file => !file.isDuplicate).length
+  
+  // If upload has started, show remaining files by subtracting processed files
+  if (props.hasUploadStarted) {
+    const processedFiles = props.uploadStatus.successful + props.uploadStatus.failed + props.uploadStatus.previouslyUploaded
+    return Math.max(0, totalUploadableFiles - processedFiles)
+  }
+  
+  // Before upload starts, show total uploadable files
+  return totalUploadableFiles
 })
 
 const blockedFilesCount = computed(() => {
-  // Blocked files = Total - Distinct - Duplicates
-  return totalCount.value - distinctFilesCount.value - queueDuplicatesCount.value
+  // Blocked files = Total - Original Uploadable Files - Duplicates
+  // Use the original count of uploadable files (not the decreasing ready count)
+  const originalUploadableFiles = props.files.filter(file => !file.isDuplicate).length
+  return totalCount.value - originalUploadableFiles - queueDuplicatesCount.value
 })
 
 const previouslyUploadedCount = computed(() => {
@@ -213,15 +202,10 @@ const failedCount = computed(() => {
   return props.hasUploadStarted ? props.uploadStatus.failed : props.files.filter(file => file.status === 'error').length
 })
 
-// Spinner logic for different chip types
+// Spinner logic for deduplication chips
 const shouldShowSpinnerForDeduplicationChips = computed(() => {
   // Only show spinner during deduplication (loading phase)
   return props.uiUpdateProgress.phase === 'loading'
-})
-
-const shouldShowSpinnerForUploadChips = computed(() => {
-  // Show spinner during upload process
-  return props.uploadStatus.isUploading
 })
 </script>
 

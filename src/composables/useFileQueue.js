@@ -97,6 +97,23 @@ export function useFileQueue() {
     }
   }
 
+  // Individual file status update function
+  const updateFileStatus = (fileName, status) => {
+    const file = queueCore.uploadQueue.value.find(f => f.name === fileName)
+    if (file) {
+      file.status = status
+    }
+  }
+
+  // Update all ready files to "ready" status after deduplication completes
+  const updateAllFilesToReady = () => {
+    queueCore.uploadQueue.value.forEach(file => {
+      if (!file.isDuplicate && (!file.status || file.status === 'pending')) {
+        file.status = 'ready'
+      }
+    })
+  }
+
   const updateUploadStatus = (type, fileName = null, action = null) => {
     switch (type) {
       case 'start':
@@ -438,6 +455,8 @@ export function useFileQueue() {
 
     // Upload status methods
     resetUploadStatus,
-    updateUploadStatus
+    updateUploadStatus,
+    updateFileStatus,
+    updateAllFilesToReady
   }
 }

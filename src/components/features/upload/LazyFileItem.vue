@@ -87,21 +87,66 @@
             </template>
           </v-tooltip>
           <v-tooltip 
-            v-else-if="(file.status === 'ready' || file.status === 'pending') && !file.isDuplicate"
-            text="Ready"
+            v-else-if="file.status === 'uploading'"
+            text="Uploading..."
             location="bottom"
           >
             <template #activator="{ props }">
-              <span v-bind="props">⚪</span>
+              <span v-bind="props">⏳</span>
+            </template>
+          </v-tooltip>
+          <v-tooltip 
+            v-else-if="file.status === 'completed'"
+            text="Successfully uploaded"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <span v-bind="props">🟢</span>
+            </template>
+          </v-tooltip>
+          <v-tooltip 
+            v-else-if="file.status === 'error'"
+            text="Failed upload"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <span v-bind="props">🔴</span>
+            </template>
+          </v-tooltip>
+          <v-tooltip 
+            v-else-if="file.status === 'previouslyUploaded'"
+            text="Already exists, skipped"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <span v-bind="props">🟠</span>
+            </template>
+          </v-tooltip>
+          <v-tooltip 
+            v-else-if="file.status === 'ready' && !file.isDuplicate"
+            text="Ready for upload"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <span v-bind="props">🔵</span>
             </template>
           </v-tooltip>
           <v-tooltip 
             v-else-if="file.isDuplicate" 
-            text="Skip"
+            text="Duplicate, will be skipped"
             location="bottom"
           >
             <template #activator="{ props }">
               <span v-bind="props">🟣</span>
+            </template>
+          </v-tooltip>
+          <v-tooltip 
+            v-else
+            text="Pending"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <span v-bind="props">⚪</span>
             </template>
           </v-tooltip>
         </div>

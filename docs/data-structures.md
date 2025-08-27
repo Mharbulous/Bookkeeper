@@ -107,11 +107,14 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ```
 
 #### Matters Collection: `/teams/{teamId}/matters/{matterId}`
+
+**Reserved Matter ID**: Every team has a reserved `matterId` called **"general"** where the firm stores general information about the firm, company policies, and non-client-specific documents.
+
 ```javascript
 {
   title: 'ABC Corp - Contract Review',
   description: 'Software licensing agreement review',
-  clientId: 'client-abc-123',  // Reference to client
+  clientId: 'client-abc-123',  // Reference to client (null for 'general' matter)
   matterNumber: '2024-001',
   status: 'active',  // 'active' | 'closed' | 'on-hold'
   priority: 'high',  // 'high' | 'medium' | 'low'
@@ -122,6 +125,77 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   createdBy: 'user-john-123'
 }
 ```
+
+#### File Upload Logs: `/teams/{teamId}/matters/{matterId}/logs/{documentId}`
+**Purpose**: Track file upload events chronologically as distinct records
+
+```javascript
+{
+  uploadedAt: Timestamp,
+  uploadedBy: 'user-john-123',
+  sessionId: 'session_uuid_abc123',  // Groups files uploaded in same batch
+  filesProcessed: 45,
+  duplicatesSkipped: 12,
+  totalSizeMB: 127.8,
+  uploadDurationMs: 45230,
+  hardwareCalibration: 1.85,  // H-factor for performance tracking
+  createdAt: Timestamp
+}
+```
+
+#### File Metadata Records: `/teams/{teamId}/matters/{matterId}/metadata/{metadataHash}`
+**Purpose**: Store unique combinations of file metadata using metadata hash as document ID
+
+**Hash Generation**: 
+- **File Hash**: Standard SHA-256 of file content only (`abc123def456789...`)
+- **Metadata Hash**: SHA-256 of concatenated string: `originalName|lastModified|fileHash`
+
+```javascript
+{
+  // Core metadata (only what varies between identical files)
+  originalName: 'document.pdf',
+  lastModified: 1703123456789,  // File's original timestamp
+  fileHash: 'abc123def456789abcdef012345...',  // Standard SHA-256 reference to actual file content
+  
+  // Upload context
+  uploadedAt: Timestamp,
+  uploadedBy: 'user-john-123',
+  sessionId: 'session_uuid_abc123',
+  
+  // Computed fields for convenience
+  metadataHash: 'xyz789abc123',  // SHA-256 of concatenated metadata string
+  storagePath: '/teams/team-abc-123/matters/matter-001/files/abc123def456789abcdef012345.pdf',
+  
+  createdAt: Timestamp
+}
+```
+
+## Firebase Storage Structure
+
+### File Storage Paths
+**Purpose**: Store actual file content with automatic deduplication based on file hash
+
+```
+/teams/{teamId}/matters/{matterId}/files/{fileHash}.{extension}
+```
+
+**Key Features**:
+- **Content Deduplication**: Identical files (same hash) stored only once
+- **Multi-Reference**: Single storage file can be referenced by multiple metadata records
+- **Matter-Scoped**: Files organized under specific matters for proper access control
+- **Extension Preservation**: Original file extensions maintained for proper file handling
+
+**Examples**:
+```
+/teams/team-abc-123/matters/general/files/abc123def456789abcdef012345.pdf
+/teams/team-abc-123/matters/matter-001/files/xyz789ghi012345fedcba678901.docx
+/teams/solo-user-789/matters/general/files/def456abc123789012345abcdef.jpg
+```
+
+**Storage Efficiency**:
+- Same file uploaded to multiple matters = single storage file + multiple metadata records
+- Same file with different original names = single storage file + multiple metadata records
+- Perfect deduplication while preserving all metadata variations
 
 ## Custom Claims (Firebase Auth)
 
@@ -295,8 +369,8 @@ async function migrateSoloUserToTeam(userId, newTeamId, role) {
 }
 
 async function migrateTeamData(fromTeamId, toTeamId) {
-  // Migrate all subcollections: clients, matters, documents, etc.
-  const collections = ['clients', 'matters', 'documents', 'upload_logs']
+  // Migrate all subcollections: clients, matters, logs, metadata, etc.
+  const collections = ['clients', 'matters', 'logs', 'metadata']
   
   for (const collectionName of collections) {
     const docs = await db

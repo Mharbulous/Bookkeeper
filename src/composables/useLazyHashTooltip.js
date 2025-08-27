@@ -21,8 +21,8 @@ export function useLazyHashTooltip() {
       const hashArray = Array.from(new Uint8Array(hashBuffer))
       const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
       
-      // Add size suffix for collision safety (SHA-256 + size = virtually impossible collision)
-      return `${hash}_${file.size}`
+      // Return standard SHA-256 hash of file content
+      return hash
     } catch (error) {
       console.error('Error generating hash for tooltip:', error)
       return 'Error calculating hash'
@@ -70,8 +70,7 @@ export function useLazyHashTooltip() {
     if (hashCache.has(fileId)) {
       const fullHash = hashCache.get(fileId)
       // Show truncated hash (first 8 characters + ...)
-      const cleanHash = fullHash.split('_')[0] // Remove size suffix for display
-      return cleanHash.length > 8 ? `${cleanHash.substring(0, 8)}...` : cleanHash
+      return fullHash.length > 8 ? `${fullHash.substring(0, 8)}...` : fullHash
     }
     
     if (loadingStates.get(fileId)) {
