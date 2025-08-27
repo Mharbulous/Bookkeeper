@@ -54,9 +54,9 @@
 
     <template #append>
       <div class="d-flex align-center">
-        <!-- Status indicator for existing files and processing only -->
+        <!-- Status indicator for processing only -->
         <v-chip
-          v-if="file.isDuplicate || file.status === 'processing'"
+          v-if="file.status === 'processing'"
           :color="getStatusColor(file.status, file)"
           size="small"
           variant="flat"
