@@ -39,22 +39,154 @@ User drops files/folder → Folder analysis → Time estimation → Queue initia
 - **Background Processing**: Remaining files processed in web workers
 - **Hardware Calibration**: System measures performance for accurate time predictions
 
-#### Folder Upload Support
+#### Folder Upload Support & Smart Metadata Capturing
 
-The system supports uploading entire folder structures using the HTML5 `webkitdirectory` API:
+The system supports uploading entire folder structures using the HTML5 `webkitdirectory` API with an intelligent metadata capturing algorithm that preserves and enhances folder path information across multiple uploads.
 
+**For folder path data structure schema and field definitions, see:** **[docs/data-structures.md - Folder Path System](./data-structures.md#folder-path-system)**
+
+##### Smart Metadata Capturing Algorithm
+
+When processing files during upload, the system implements a sophisticated pattern recognition algorithm to intelligently manage folder path information:
+
+**Algorithm Overview**:
+1. **Path Extraction**: Extract folder path from `webkitRelativePath`
+2. **Existing Data Retrieval**: Check for existing metadata records with same file hash
+3. **Pattern Recognition**: Analyze relationship between new path and existing paths
+4. **Intelligent Update**: Apply appropriate update strategy based on pattern detected
+
+##### Pattern Recognition Logic
+
+The algorithm identifies four distinct patterns when comparing folder paths:
+
+**Pattern 1: Extension (Information Enhancement)**
 ```javascript
-// Folder structure preservation
-"Documents/2023/invoices/invoice.pdf" → folderPaths: "Documents/2023/invoices"
-"photos/2024/vacation.jpg" → folderPaths: "photos/2024"
-"readme.txt" → folderPaths: "" (root level)
+// Scenario: New upload provides more specific context
+// Existing: "/2025"  
+// New: "/General Account/2025"
+// Decision: Update existing path with more detailed information
+// Result: folderPaths = "/General Account/2025"
+
+// Detection Logic: newPath.endsWith(existingPath) && newPath.length > existingPath.length
 ```
 
-**Key Features**:
-- **Automatic Path Extraction**: Folder paths captured from `webkitRelativePath`
-- **Pattern Recognition**: Similar folder structures consolidated intelligently
-- **Cross-Platform**: Consistent forward-slash paths regardless of OS
-- **Multiple Context Support**: Files can be associated with different folder contexts over time
+**Pattern 2: Reduction (Information Preservation)**  
+```javascript
+// Scenario: New upload has less specific context
+// Existing: "/General Account/2025"
+// New: "/" (root level)
+// Decision: Preserve existing path with more information
+// Result: folderPaths = "/General Account/2025" (unchanged)
+
+// Detection Logic: existingPath.endsWith(newPath) && existingPath.length > newPath.length
+```
+
+**Pattern 3: Different Paths (Multi-Context Support)**
+```javascript
+// Scenario: File appears in completely different organizational contexts
+// Existing: "/2025"
+// New: "/Bank Statements" 
+// Decision: Store both contexts using pipe delimiter
+// Result: folderPaths = "/2025|/Bank Statements"
+
+// Detection Logic: No containment relationship between paths
+```
+
+**Pattern 4: Exact Match (No Action)**
+```javascript
+// Scenario: Identical folder context in repeat upload
+// Existing: "/2025"
+// New: "/2025"
+// Decision: No change needed
+// Result: folderPaths = "/2025" (unchanged)
+
+// Detection Logic: newPath === existingPath
+```
+
+##### Implementation Flow
+
+```javascript
+// Smart metadata capturing workflow
+async function processFileMetadata(file, existingMetadata) {
+  // 1. Extract current folder path
+  const currentPath = extractFolderPath(file.webkitRelativePath);
+  
+  // 2. Get existing folder paths for this file hash
+  const existingPaths = parseExistingPaths(existingMetadata.folderPaths);
+  
+  // 3. Run pattern recognition
+  const pattern = identifyFolderPathPattern(currentPath, existingPaths);
+  
+  // 4. Apply appropriate update strategy
+  switch (pattern.type) {
+    case 'EXTENSION':
+      // Replace existing path with extended version
+      updatedPaths[pattern.targetIndex] = pattern.newValue;
+      break;
+      
+    case 'REDUCTION':  
+      // Keep existing path, ignore new one
+      break;
+      
+    case 'DIFFERENT_PATH':
+      // Append new path to collection
+      updatedPaths.push(pattern.newValue);
+      break;
+      
+    case 'EXACT_MATCH':
+      // No change needed
+      break;
+  }
+  
+  // 5. Save updated metadata
+  return { folderPaths: serializePaths(updatedPaths) };
+}
+```
+
+##### Key Algorithm Features
+
+**Information Preservation**: The algorithm never loses folder path information. Even when a file is uploaded from a less specific context (e.g., root level), existing detailed paths are preserved.
+
+**Context Enhancement**: When new uploads provide more specific folder context, the system automatically updates to the more detailed information.
+
+**Multi-Context Support**: Files can exist in multiple organizational contexts simultaneously, with all contexts preserved and accessible.
+
+**Boundary Detection**: Uses proper path boundary checking to avoid partial matches (prevents `/2025` from matching `/12025`).
+
+**Normalization**: All paths are normalized for consistent comparison (forward slashes, proper leading/trailing slash handling).
+
+##### Real-World Scenarios
+
+**Scenario A: Progressive Enhancement**
+```
+Upload 1: User uploads from "Documents/invoice.pdf"
+→ folderPaths: "Documents"
+
+Upload 2: Same file uploaded from "Client Files/ABC Corp/Documents/invoice.pdf"  
+→ folderPaths: "Client Files/ABC Corp/Documents" (enhanced context)
+
+Upload 3: Same file uploaded from root level "invoice.pdf"
+→ folderPaths: "Client Files/ABC Corp/Documents" (preserved, not reduced)
+```
+
+**Scenario B: Multiple Organizational Systems**
+```
+Upload 1: "2024 Files/Q1/report.pdf"
+→ folderPaths: "2024 Files/Q1"
+
+Upload 2: "Financial Reports/January/report.pdf" (same file content)
+→ folderPaths: "2024 Files/Q1|Financial Reports/January"
+
+Upload 3: "Archive/Quarterly Reports/Q1/report.pdf" (same file)
+→ folderPaths: "2024 Files/Q1|Financial Reports/January|Archive/Quarterly Reports/Q1"
+```
+
+##### Performance Considerations
+
+- **Efficient Pattern Detection**: Uses string operations (`endsWith()`) for fast path comparison
+- **Single Database Query**: Retrieves existing metadata once per file hash
+- **Minimal Storage Impact**: Multiple paths stored in single field using delimiter
+- **Client-Side Processing**: Pattern recognition runs locally to minimize server load
 
 ### 2. Deduplication Processing
 
@@ -297,6 +429,8 @@ await createMetadataRecord({
   fileHash: 'abc123...',
   sessionId: 'session_123',
   originalPath: 'Documents/2023/invoice.pdf', // webkitRelativePath from folder uploads (optional)
+  // Note: folderPaths field is automatically generated with pattern recognition
+  // See data-structures.md#folder-path-system for complete documentation
 });
 ```
 
@@ -375,7 +509,9 @@ console.log(`[UPLOAD] ${action}: ${fileName} (${status})`, {
 - **Missing folder paths**: Check if `webkitdirectory` is supported in browser
 - **Incorrect paths**: Verify `webkitRelativePath` property on File objects
 - **Path truncation**: Check folder path extraction logic in metadata creation
-- **Pattern recognition**: Verify `folderPathUtils.js` pattern consolidation
+- **Pattern recognition failures**: Check `src/utils/folderPathUtils.js` pattern detection logic
+- **Multi-context issues**: Verify pipe-delimited path parsing and storage
+- **Data format issues**: Check field schema requirements in **[docs/data-structures.md - Folder Path System](./data-structures.md#folder-path-system)**
 
 ### Debug Commands
 

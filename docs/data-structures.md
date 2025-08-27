@@ -173,7 +173,7 @@ This collection logs only the 4 essential upload events with basic information:
   sessionId: 'session_uuid_abc123',
   
   // File path information (from folder uploads)
-  folderPaths: 'Documents/2023',  // Directory paths extracted from webkitRelativePath, supports multiple paths for same file
+  folderPaths: 'Documents/2023|Archive/Backup',  // Pipe-delimited paths, supports multiple contexts via pattern recognition
   
   // Computed fields for convenience
   metadataHash: 'xyz789abc123',  // SHA-256 of concatenated metadata string
@@ -182,41 +182,51 @@ This collection logs only the 4 essential upload events with basic information:
 }
 ```
 
-### Folder Path Extraction
+### Folder Path System
 
-When users upload folders using the HTML5 `webkitdirectory` feature, the system automatically extracts folder structure information:
+The `folderPaths` field stores folder path information for files uploaded through folder selection, supporting multiple organizational contexts for the same file content.
 
-**webkitRelativePath Examples**:
+**For complete documentation of the smart metadata capturing algorithm and pattern recognition logic, see:** **[docs/uploading.md - Smart Metadata Capturing](./uploading.md#smart-metadata-capturing-algorithm)**
+
+#### Field Schema
+
+**Field Name**: `folderPaths`  
+**Type**: `string`  
+**Format**: Pipe-delimited paths using `"|"` separator  
+**Purpose**: Store multiple folder contexts for files uploaded via `webkitdirectory`
+
+#### Data Format Examples
+
+**Single Path**: 
+```javascript
+folderPaths: "Documents/2023"
+```
+
+**Multiple Paths**: 
+```javascript
+folderPaths: "Documents/2023|Archive/Backup|Legal/Contracts"
+```
+
+**Root Level Files**: 
+```javascript
+folderPaths: ""  // Empty string for files uploaded without folder context
+```
+
+#### Path Extraction Rules
+
+Folder paths are automatically extracted from the HTML5 `webkitRelativePath` property:
+
 - `"Documents/2023/invoices/invoice.pdf"` → `folderPaths: "Documents/2023/invoices"`
 - `"photos/vacation.jpg"` → `folderPaths: "photos"`  
-- `"readme.txt"` → `folderPaths: ""` (empty for root-level files)
+- `"readme.txt"` → `folderPaths: ""` (root level)
 
-**Key Features**:
-- **Automatic Extraction**: Folder paths extracted from `webkitRelativePath` during upload
-- **Pattern Recognition**: System can detect and consolidate similar folder structures
-- **Multiple Path Support**: Same file can be associated with multiple folder contexts
-- **Cross-Platform**: Uses forward slashes regardless of operating system
+#### Field Properties
 
-**Practical Examples**:
-
-1. **Single File Upload**: User drags `invoice.pdf` directly
-   ```javascript
-   { originalName: "invoice.pdf", folderPaths: "" } // Empty for root level
-   ```
-
-2. **Folder Upload**: User selects folder containing `Contracts/2024/lease.pdf`
-   ```javascript
-   { originalName: "lease.pdf", folderPaths: "Contracts/2024" }
-   ```
-
-3. **Multiple Folder Contexts**: Same file uploaded from different folder structures
-   ```javascript
-   // First upload: Backups/January/document.pdf
-   { originalName: "document.pdf", folderPaths: "Backups/January" }
-   
-   // Later upload: Archive/2024/document.pdf (same file content)
-   { originalName: "document.pdf", folderPaths: "Backups/January|Archive/2024" }
-   ```
+- **Delimiter**: `"|"` character (invalid in most file systems, safe for separation)
+- **Path Format**: Forward slashes (`/`) regardless of operating system
+- **Normalization**: Leading slashes present, no trailing slashes (except root `"/"`)
+- **Empty Values**: Empty string `""` represents root-level files
+- **Multiple Contexts**: Same file content can have multiple folder contexts stored
 
 ## Firebase Storage Structure
 
@@ -446,6 +456,35 @@ async function migrateTeamData(fromTeamId, toTeamId) {
   // or create a background job for this
 }
 ```
+
+### Folder Path Querying
+
+The `folderPaths` field supports various query patterns for finding files by their organizational context:
+
+**Query Examples**:
+```javascript
+// Find all files in a specific folder path
+const docs = await db
+  .collection('teams').doc(teamId)
+  .collection('matters').doc(matterId)
+  .collection('metadata')
+  .where('folderPaths', '==', 'Documents/2023')
+  .get();
+
+// Find files that contain a specific path (requires client-side filtering)
+const docs = await db
+  .collection('teams').doc(teamId)
+  .collection('matters').doc(matterId)  
+  .collection('metadata')
+  .get();
+  
+const filtered = docs.docs.filter(doc => {
+  const paths = doc.data().folderPaths.split('|');
+  return paths.some(path => path.includes('2023'));
+});
+```
+
+**Note**: Complex folder path queries may require client-side filtering due to Firestore's limited string matching capabilities. For high-performance folder-based queries, consider adding specific indexes or denormalized fields based on actual usage patterns.
 
 ## Required Firestore Indexes
 
