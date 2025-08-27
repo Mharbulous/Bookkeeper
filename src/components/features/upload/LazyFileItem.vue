@@ -99,7 +99,7 @@
           </v-tooltip>
           <v-tooltip
             v-else-if="file.status === 'skipped'"
-            text="Skipped"
+            :text="file.isDuplicate ? 'Duplicate file - skipped' : 'Skipped'"
             location="bottom"
           >
             <template #activator="{ props }">

@@ -351,6 +351,39 @@ export class UploadService {
     let metadataSaved = false;
 
     try {
+      // Check if this is a duplicate file identified during deduplication
+      if (metadata.isDuplicate) {
+        // Skip file upload but still save metadata for this specific instance
+        const storagePath = this.generateStoragePath(hash, file.name);
+        const storageRef = ref(storage, storagePath);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        // Save metadata to Firestore (hash deduplication)
+        const metadataPath = this.generateMetadataPath(hash);
+        const metadataRef = doc(db, metadataPath, metadata.id);
+
+        const metadataDoc = {
+          ...metadata,
+          hash: hash,
+          downloadURL: downloadURL,
+          teamId: this.teamId,
+          userId: this.userId,
+          uploadedAt: serverTimestamp(),
+          fileExists: false, // File already exists, we didn't upload it
+          isDuplicate: true,
+        };
+
+        await setDoc(metadataRef, metadataDoc);
+        
+        return {
+          success: true,
+          skipped: true,
+          reason: 'Duplicate file - metadata saved',
+          downloadURL: downloadURL,
+          metadata: metadataDoc,
+        };
+      }
+
       // Check if this exact metadata already exists
       const metadataExists = await this.checkMetadataExists(hash, metadata);
       if (metadataExists) {

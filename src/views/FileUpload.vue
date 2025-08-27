@@ -662,21 +662,21 @@ const continueUpload = async () => {
   try {
     console.log('Continuing upload process...');
 
-    // Get files that are ready for upload (not duplicates)
-    const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
+    // Get all files from upload queue (including duplicates for processing)
+    const filesToProcess = uploadQueue.value;
     
-    if (filesToUpload.length === 0) {
-      showNotification('No files to upload (all are duplicates)', 'info');
+    if (filesToProcess.length === 0) {
+      showNotification('No files to process', 'info');
       updateUploadStatus('complete');
       return;
     }
 
     // Start from current index or beginning
     const startIndex = uploadStatus.value.currentUploadIndex || 0;
-    console.log(`Continuing from file ${startIndex + 1} of ${filesToUpload.length}`);
+    console.log(`Continuing from file ${startIndex + 1} of ${filesToProcess.length}`);
 
     // Process files from current index
-    for (let i = startIndex; i < filesToUpload.length; i++) {
+    for (let i = startIndex; i < filesToProcess.length; i++) {
       // Check if pause was requested before processing next file
       if (pauseRequested.value) {
         console.log(`Pause requested at file ${i + 1}. Pausing...`);
@@ -687,8 +687,44 @@ const continueUpload = async () => {
         return;
       }
 
-      const queueFile = filesToUpload[i];
+      const queueFile = filesToProcess[i];
       updateUploadStatus('setUploadIndex', i); // Update current position
+      
+      // Handle duplicate files - skip upload but log and save metadata
+      if (queueFile.isDuplicate) {
+        console.log(`Processing duplicate file: ${queueFile.name}`);
+        updateUploadStatus('currentFile', queueFile.name, 'processing_duplicate');
+        updateFileStatus(queueFile, 'skipped');
+        
+        try {
+          // Log individual upload event for duplicate file
+          await logFileUploadEvent({
+            fileName: queueFile.name,
+            fileHash: queueFile.hash,
+            fileSize: queueFile.size,
+            lastModified: queueFile.lastModified,
+            status: 'skipped',
+            reason: 'duplicate_file'
+          });
+          
+          // Create metadata record for duplicate (hash deduplication)
+          await createMetadataRecord({
+            originalName: queueFile.name,
+            lastModified: queueFile.lastModified,
+            fileHash: queueFile.hash,
+            sessionId: getCurrentSessionId()
+          });
+          
+          updateUploadStatus('skipped');
+          console.log(`Duplicate file processed: ${queueFile.name}`);
+        } catch (error) {
+          console.error(`Failed to process duplicate file ${queueFile.name}:`, error);
+          updateFileStatus(queueFile, 'failed');
+          updateUploadStatus('failed');
+        }
+        
+        continue; // Skip to next file
+      }
       
       try {
         // Create abort controller for this upload
@@ -909,9 +945,8 @@ const handleStartUpload = async () => {
       resetUploadStatus();
       currentUploadIndex.value = 0;
       
-      // Start upload session logging for new uploads
-      const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
-      await startUploadSession(filesToUpload.length);
+      // Start upload session logging for new uploads (include duplicates in count)
+      await startUploadSession(uploadQueue.value.length);
     }
     
     updateUploadStatus('start');

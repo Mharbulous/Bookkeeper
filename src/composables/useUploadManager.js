@@ -262,7 +262,6 @@ export function useUploadManager() {
     }
 
     const preparedFiles = queueFiles
-      .filter((queueFile) => !queueFile.isDuplicate) // Only upload non-duplicates
       .map((queueFile) => {
         // Validate that file has required hash (should be set by deduplication process)
         if (!queueFile.hash) {
