@@ -13,7 +13,19 @@
         total
       </v-chip>
 
-      <!-- Duplicates chip (second) -->
+      <!-- Blocked chip (second, conditional) -->
+      <v-chip
+        v-if="props.blockedCount > 0"
+        size="large"
+        variant="flat"
+        color="black"
+        class="text-white"
+      >
+        {{ props.blockedCount }}
+        blocked
+      </v-chip>
+
+      <!-- Duplicates chip (third) -->
       <v-chip
         size="large"
         variant="flat"
@@ -29,18 +41,6 @@
         />
         <template v-else>{{ queueDuplicatesCount }}</template>
         duplicates
-      </v-chip>
-
-      <!-- Blocked chip (third, conditional) -->
-      <v-chip
-        v-if="blockedCount > 0"
-        size="large"
-        variant="flat"
-        color="black"
-        class="text-white"
-      >
-        {{ blockedCount }}
-        blocked
       </v-chip>
 
       <!-- New files chip (fourth) -->
@@ -146,6 +146,10 @@ const props = defineProps({
     type: Number,
     default: null
   },
+  blockedCount: {
+    type: Number,
+    default: 0
+  },
   hasUploadStarted: {
     type: Boolean,
     default: false
@@ -193,10 +197,6 @@ const successfulCount = computed(() => {
 
 const failedCount = computed(() => {
   return props.files.filter(file => file.status === 'error').length
-})
-
-const blockedCount = computed(() => {
-  return props.files.filter(file => file.status === 'blocked').length
 })
 
 // Spinner logic for different chip types

@@ -44,9 +44,9 @@
                     {{ currentProgressMessage || 'Analyzing files...' }}
                   </template>
                   <template v-else>
-                    <strong>{{ formatNumber(mainFolderAnalysis.totalFiles) }}</strong> files in this folder totalling 
-                    <strong>{{ mainFolderAnalysis.totalSizeMB }}</strong>MB 
-                    (<strong>{{ mainFolderAnalysis.duplicateCandidatesSizeMB }}</strong>MB possible duplicates).
+                    <strong>{{ formatNumber(mainFolderDisplayData.totalFiles) }}</strong> files in this folder totalling 
+                    <strong>{{ mainFolderDisplayData.totalSizeMB }}</strong>MB 
+                    (<strong>{{ mainFolderDisplayData.duplicateCandidatesSizeMB }}</strong>MB possible duplicates).
                   </template>
                 </div>
               </div>
@@ -75,10 +75,10 @@
                     {{ currentProgressMessage || 'Analyzing files...' }}
                   </template>
                   <template v-else>
-                    <strong>{{ formatNumber(allFilesAnalysis.totalFiles) }}</strong> files in 
-                    <strong>{{ formatNumber(allFilesAnalysis.totalDirectoryCount) }}</strong> folders totalling 
-                    <strong>{{ allFilesAnalysis.totalSizeMB }}</strong>MB 
-                    (<strong>{{ allFilesAnalysis.duplicateCandidatesSizeMB }}</strong>MB possible duplicates).
+                    <strong>{{ formatNumber(allFilesDisplayData.totalFiles) }}</strong> files in 
+                    <strong>{{ formatNumber(allFilesDisplayData.totalDirectoryCount) }}</strong> folders totalling 
+                    <strong>{{ allFilesDisplayData.totalSizeMB }}</strong>MB 
+                    (<strong>{{ allFilesDisplayData.duplicateCandidatesSizeMB }}</strong>MB possible duplicates).
                   </template>
                 </div>
               </div>
@@ -184,6 +184,10 @@ const props = defineProps({
   currentProgressMessage: {
     type: String,
     default: ''
+  },
+  totalDirectoryEntryCount: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -210,6 +214,26 @@ const getSelectedAnalysis = computed(() => {
     return props.allFilesAnalysis
   } else {
     return props.mainFolderAnalysis
+  }
+})
+
+// Computed properties that use directory entry count for totals
+// but preserve analysis data for other metrics
+const mainFolderDisplayData = computed(() => {
+  if (!props.mainFolderAnalysis) return null
+  
+  return {
+    ...props.mainFolderAnalysis,
+    totalFiles: props.totalDirectoryEntryCount // Use File Explorer count for display
+  }
+})
+
+const allFilesDisplayData = computed(() => {
+  if (!props.allFilesAnalysis) return null
+  
+  return {
+    ...props.allFilesAnalysis,
+    totalFiles: props.totalDirectoryEntryCount // Use File Explorer count for display
   }
 })
 

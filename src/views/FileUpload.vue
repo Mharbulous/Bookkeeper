@@ -31,6 +31,7 @@
       :analysis-timed-out="analysisTimedOut"
       :timeout-error="timeoutError"
       :current-progress-message="currentProgressMessage"
+      :total-directory-entry-count="totalDirectoryEntryCount"
       @update:show="showFolderOptions = $event"
       @update:include-subfolders="includeSubfolders = $event"
       @confirm="confirmFolderOptions"
@@ -44,6 +45,7 @@
       :is-processing-ui-update="isProcessingUIUpdate"
       :ui-update-progress="uiUpdateProgress"
       :total-analyzed-files="totalAnalyzedFiles"
+      :blocked-count="blockedCount"
       :show-time-progress="
         timeWarning.startTime.value !== null && (uploadQueue.length === 0 || isProcessingUIUpdate)
       "
@@ -189,9 +191,11 @@ const {
   showFolderOptions,
   includeSubfolders,
   subfolderCount,
+  blockedCount,
   isAnalyzing,
   mainFolderAnalysis,
   allFilesAnalysis,
+  totalDirectoryEntryCount,
   // Timeout state
   analysisTimedOut,
   timeoutError,
@@ -648,13 +652,10 @@ const handleClearQueueFromModal = () => {
 };
 
 // Computed property for total analyzed files count
+// Use directory entry count (File Explorer count) instead of processed files count
 const totalAnalyzedFiles = computed(() => {
-  if (includeSubfolders.value && allFilesAnalysis.value) {
-    return allFilesAnalysis.value.totalFiles;
-  } else if (mainFolderAnalysis.value) {
-    return mainFolderAnalysis.value.totalFiles;
-  }
-  return null; // No analysis data available yet
+  // Return the directory entry count if available (shows what File Explorer sees)
+  return totalDirectoryEntryCount.value > 0 ? totalDirectoryEntryCount.value : null;
 });
 </script>
 
