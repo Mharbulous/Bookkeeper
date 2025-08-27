@@ -123,8 +123,8 @@ Large batches (>100 files):
 | 🟢 | `completed` | Successfully uploaded | "Successfully uploaded" |
 | 🟠 | `previouslyUploaded` | Already exists, skipped | "Already exists, skipped" |
 | 🔴 | `error` | Upload failed | "Failed upload" |
-| 🟣 | `isDuplicate` | Queue duplicate, will skip | "Duplicate, will be skipped" |
-| ⚪ | `pending` | Processing/analyzing | "Pending" |
+| ⚪ | `isDuplicate` | Upload metadata only | "Upload metadata only" |
+| ⚪ | `unknown` | Unknown status (fallback) | "Unknown status" |
 
 ### Real-Time Updates
 - **Status changes**: Dots update immediately when status changes
