@@ -133,16 +133,16 @@
           </v-tooltip>
           <v-tooltip 
             v-else-if="file.isDuplicate" 
-            text="Duplicate, will be skipped"
+            text="Upload metadata only"
             location="bottom"
           >
             <template #activator="{ props }">
-              <span v-bind="props">🟣</span>
+              <span v-bind="props">⚪</span>
             </template>
           </v-tooltip>
           <v-tooltip 
             v-else
-            text="Pending"
+            text="Unknown status"
             location="bottom"
           >
             <template #activator="{ props }">
