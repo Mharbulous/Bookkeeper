@@ -172,8 +172,7 @@ defineEmits(['retry-failed', 'view-details', 'clear-queue']);
 
 // Computed properties
 const totalFiles = computed(
-  () =>
-    props.results.successful.length + props.results.failed.length + props.results.skipped.length,
+  () => props.results.successful.length + props.results.failed.length + props.results.skipped.length
 );
 
 const hasErrors = computed(() => props.results.failed.length > 0);

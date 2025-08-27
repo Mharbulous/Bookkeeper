@@ -1,45 +1,45 @@
-import './styles/main.css'
+import './styles/main.css';
 
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
-import App from './App.vue'
-import router from './router'
-import vuetify from './plugins/vuetify'
-import { useAuthStore } from './stores/auth'
-import { useGlobalAsyncRegistry } from './composables/useAsyncRegistry'
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
+import router from './router';
+import vuetify from './plugins/vuetify';
+import { useAuthStore } from './stores/auth';
+import { useGlobalAsyncRegistry } from './composables/useAsyncRegistry';
 
-const app = createApp(App)
-const pinia = createPinia()
+const app = createApp(App);
+const pinia = createPinia();
 
-app.use(pinia)
-app.use(router)
-app.use(vuetify)
+app.use(pinia);
+app.use(router);
+app.use(vuetify);
 
 // Initialize auth store after Pinia is set up
-const authStore = useAuthStore()
-authStore.initialize()
+const authStore = useAuthStore();
+authStore.initialize();
 
 // Setup global async process cleanup handlers
-const { cleanupAll } = useGlobalAsyncRegistry()
+const { cleanupAll } = useGlobalAsyncRegistry();
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
-  cleanupAll()
-})
+  cleanupAll();
+});
 
 // Cleanup on router navigation (optional - prevents process accumulation)
 router.beforeEach((to, from) => {
   if (from.path !== to.path) {
-    cleanupAll()
+    cleanupAll();
   }
-})
+});
 
 // Error boundary cleanup for emergency situations
 window.addEventListener('error', () => {
   if (import.meta.env.DEV) {
-    console.warn('[AsyncTracker] Error detected, performing emergency cleanup')
+    console.warn('[AsyncTracker] Error detected, performing emergency cleanup');
   }
-  cleanupAll()
-})
+  cleanupAll();
+});
 
-app.mount('#app')
+app.mount('#app');

@@ -374,7 +374,7 @@ export class UploadService {
         };
 
         await setDoc(metadataRef, metadataDoc);
-        
+
         return {
           success: true,
           skipped: true,
@@ -452,7 +452,7 @@ export class UploadService {
           (error) => {
             // Upload failed - will be handled in the catch block
             throw error;
-          },
+          }
         );
 
         // Wait for upload to complete
@@ -675,7 +675,7 @@ export class UploadService {
           lastError = retryError;
           console.warn(
             `Retry attempt ${attempt} failed for file ${fileInfo.metadata.originalName}:`,
-            retryError,
+            retryError
           );
         }
       }

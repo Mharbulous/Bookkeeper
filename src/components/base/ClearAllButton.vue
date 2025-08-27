@@ -15,13 +15,13 @@
 const props = defineProps({
   disabled: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const emit = defineEmits(['click'])
+const emit = defineEmits(['click']);
 
 const handleClick = () => {
-  window.location.reload()
-}
+  window.location.reload();
+};
 </script>

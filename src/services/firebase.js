@@ -1,7 +1,7 @@
-import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -11,7 +11,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-}
+};
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -20,19 +20,19 @@ const requiredEnvVars = [
   'VITE_FIREBASE_PROJECT_ID',
   'VITE_FIREBASE_STORAGE_BUCKET',
   'VITE_FIREBASE_MESSAGING_SENDER_ID',
-  'VITE_FIREBASE_APP_ID'
-]
+  'VITE_FIREBASE_APP_ID',
+];
 
 for (const envVar of requiredEnvVars) {
   if (!import.meta.env[envVar]) {
-    throw new Error(`Missing required Firebase environment variable: ${envVar}`)
+    throw new Error(`Missing required Firebase environment variable: ${envVar}`);
   }
 }
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
-const db = getFirestore(app)
-const storage = getStorage(app)
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-export { app, auth, db, storage }
+export { app, auth, db, storage };

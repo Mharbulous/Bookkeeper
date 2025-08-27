@@ -1,6 +1,6 @@
-import { createRouter, createWebHashHistory } from 'vue-router'
-import { createAuthGuard } from './guards/auth' // Import the auth guard
-import { registerDemoRoutes } from '../dev-demos/utils/demoRoutes' // Import demo routes
+import { createRouter, createWebHashHistory } from 'vue-router';
+import { createAuthGuard } from './guards/auth'; // Import the auth guard
+import { registerDemoRoutes } from '../dev-demos/utils/demoRoutes'; // Import demo routes
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -65,12 +65,12 @@ const router = createRouter({
       redirect: '/404',
     },
   ],
-})
+});
 
 // Register demo routes (development only)
-registerDemoRoutes(router)
+registerDemoRoutes(router);
 
 // Apply the global beforeEach guard
-router.beforeEach(createAuthGuard())
+router.beforeEach(createAuthGuard());
 
-export default router
+export default router;

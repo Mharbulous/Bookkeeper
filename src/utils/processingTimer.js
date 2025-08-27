@@ -3,15 +3,15 @@
  * Tracks all times relative to T=0 (processing start)
  */
 
-let processingStartTime = null
+let processingStartTime = null;
 
 /**
  * Initialize the timing system and set T=0
  */
 export function startProcessingTimer() {
-  processingStartTime = Date.now()
-  console.log('PROCESSING_START: 0')
-  return processingStartTime
+  processingStartTime = Date.now();
+  console.log('PROCESSING_START: 0');
+  return processingStartTime;
 }
 
 /**
@@ -20,12 +20,12 @@ export function startProcessingTimer() {
  */
 export function logProcessingTime(eventName) {
   if (processingStartTime === null) {
-    console.warn(`⚠️  ProcessingTimer: ${eventName} logged before timer started`)
-    return
+    console.warn(`⚠️  ProcessingTimer: ${eventName} logged before timer started`);
+    return;
   }
-  
-  const relativeTime = Date.now() - processingStartTime
-  console.log(`${eventName}: ${relativeTime}`)
+
+  const relativeTime = Date.now() - processingStartTime;
+  console.log(`${eventName}: ${relativeTime}`);
 }
 
 /**
@@ -34,14 +34,14 @@ export function logProcessingTime(eventName) {
  */
 export function getRelativeTime() {
   if (processingStartTime === null) {
-    return 0
+    return 0;
   }
-  return Date.now() - processingStartTime
+  return Date.now() - processingStartTime;
 }
 
 /**
  * Reset the timing system (for cleanup)
  */
 export function resetProcessingTimer() {
-  processingStartTime = null
+  processingStartTime = null;
 }

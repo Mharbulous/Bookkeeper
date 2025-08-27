@@ -1,26 +1,22 @@
 <template>
-  <div 
-    ref="placeholder"
-    class="placeholder-item"
-    :class="{ 'bg-purple-lighten-5': isDuplicate }"
-  />
+  <div ref="placeholder" class="placeholder-item" :class="{ 'bg-purple-lighten-5': isDuplicate }" />
 </template>
 
 <script setup>
-import { ref, nextTick, onUnmounted } from 'vue'
-import { useIntersectionObserver } from '@vueuse/core'
+import { ref, nextTick, onUnmounted } from 'vue';
+import { useIntersectionObserver } from '@vueuse/core';
 
 const props = defineProps({
   isDuplicate: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const emit = defineEmits(['load'])
+const emit = defineEmits(['load']);
 
-const placeholder = ref(null)
-let stopObserver = null
+const placeholder = ref(null);
+let stopObserver = null;
 
 // Defer observer setup to avoid impacting initial render performance
 const setupObserver = () => {
@@ -29,33 +25,33 @@ const setupObserver = () => {
       placeholder.value,
       ([{ isIntersecting }]) => {
         if (isIntersecting) {
-          emit('load')
-          stop()
+          emit('load');
+          stop();
         }
       },
       {
-        rootMargin: '50px 0px'
+        rootMargin: '50px 0px',
       }
-    )
-    stopObserver = stop
+    );
+    stopObserver = stop;
   }
-}
+};
 
 // Setup observer after render is complete
 nextTick(() => {
   // Use requestIdleCallback if available, otherwise setTimeout
   if (typeof requestIdleCallback !== 'undefined') {
-    requestIdleCallback(setupObserver)
+    requestIdleCallback(setupObserver);
   } else {
-    setTimeout(setupObserver, 0)
+    setTimeout(setupObserver, 0);
   }
-})
+});
 
 onUnmounted(() => {
   if (stopObserver) {
-    stopObserver()
+    stopObserver();
   }
-})
+});
 </script>
 
 <style scoped>

@@ -1,11 +1,11 @@
 // Vuetify
-import 'vuetify/styles'
-import { createVuetify } from 'vuetify'
-import * as components from 'vuetify/components'
-import * as directives from 'vuetify/directives'
+import 'vuetify/styles';
+import { createVuetify } from 'vuetify';
+import * as components from 'vuetify/components';
+import * as directives from 'vuetify/directives';
 
 // Material Design Icons
-import '@mdi/font/css/materialdesignicons.css'
+import '@mdi/font/css/materialdesignicons.css';
 
 const vuetify = createVuetify({
   components,
@@ -47,6 +47,6 @@ const vuetify = createVuetify({
       },
     },
   },
-})
+});
 
-export default vuetify
+export default vuetify;

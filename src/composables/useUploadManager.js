@@ -178,7 +178,7 @@ export function useUploadManager() {
     updateMetrics(
       speed,
       uploadMetrics.totalBytesToTransfer,
-      uploadMetrics.totalBytesTransferred + bytesTransferred,
+      uploadMetrics.totalBytesTransferred + bytesTransferred
     );
   };
 
@@ -261,31 +261,38 @@ export function useUploadManager() {
       throw new Error('No files provided for upload');
     }
 
-    const preparedFiles = queueFiles
-      .map((queueFile) => {
-        // Validate that file has required hash (should be set by deduplication process)
-        if (!queueFile.hash) {
-          console.error('File missing hash:', queueFile);
-          throw new Error(`File "${queueFile.name}" is missing hash. Files must be processed through deduplication before upload.`);
-        }
+    const preparedFiles = queueFiles.map((queueFile) => {
+      // Validate that file has required hash (should be set by deduplication process)
+      if (!queueFile.hash) {
+        console.error('File missing hash:', queueFile);
+        throw new Error(
+          `File "${queueFile.name}" is missing hash. Files must be processed through deduplication before upload.`
+        );
+      }
 
-        return {
-          file: queueFile.file,
-          hash: queueFile.hash,
-          metadata: {
-            id: queueFile.id,
-            originalName: queueFile.name,
-            originalPath: queueFile.path,
-            size: queueFile.size,
-            type: queueFile.type,
-            lastModified: queueFile.lastModified,
-            isDuplicate: queueFile.isDuplicate,
-          },
-        };
-      });
+      return {
+        file: queueFile.file,
+        hash: queueFile.hash,
+        metadata: {
+          id: queueFile.id,
+          originalName: queueFile.name,
+          originalPath: queueFile.path,
+          size: queueFile.size,
+          type: queueFile.type,
+          lastModified: queueFile.lastModified,
+          isDuplicate: queueFile.isDuplicate,
+        },
+      };
+    });
 
-    console.log(`Prepared ${preparedFiles.length} files for upload:`, preparedFiles.map(f => ({ name: f.metadata.originalName, hash: f.hash?.substring(0, 8) + '...' })));
-    
+    console.log(
+      `Prepared ${preparedFiles.length} files for upload:`,
+      preparedFiles.map((f) => ({
+        name: f.metadata.originalName,
+        hash: f.hash?.substring(0, 8) + '...',
+      }))
+    );
+
     return preparedFiles;
   };
 
@@ -336,7 +343,7 @@ export function useUploadManager() {
       // Calculate total bytes to transfer
       uploadMetrics.totalBytesToTransfer = filesToUpload.reduce(
         (total, fileInfo) => total + fileInfo.file.size,
-        0,
+        0
       );
       uploadMetrics.totalBytesTransferred = 0;
 
@@ -390,7 +397,7 @@ export function useUploadManager() {
       canRetry.value = retryQueue.value.length > 0;
 
       console.log(
-        `Upload completed: ${overallProgress.completedFiles + overallProgress.skippedFiles} successful, ${overallProgress.failedFiles} failed`,
+        `Upload completed: ${overallProgress.completedFiles + overallProgress.skippedFiles} successful, ${overallProgress.failedFiles} failed`
       );
 
       return {
@@ -442,7 +449,7 @@ export function useUploadManager() {
       retryQueue.value = retryResults.failed;
 
       console.log(
-        `Retry completed: ${retryResults.successful.length} recovered, ${retryResults.failed.length} still failed`,
+        `Retry completed: ${retryResults.successful.length} recovered, ${retryResults.failed.length} still failed`
       );
 
       return retryResults;
@@ -576,7 +583,7 @@ export function useUploadManager() {
   const canShowPauseButton = computed(() => isUploading.value && canPause.value);
   const canShowResumeButton = computed(() => isPaused.value && canResume.value);
   const canShowCancelButton = computed(
-    () => (isUploading.value || isPaused.value) && canCancel.value,
+    () => (isUploading.value || isPaused.value) && canCancel.value
   );
 
   // Cleanup on unmount

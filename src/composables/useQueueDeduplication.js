@@ -16,7 +16,7 @@ export function useQueueDeduplication() {
     files,
     updateUploadQueue,
     onProgress = null,
-    skippedFolders = [],
+    skippedFolders = []
   ) => {
     return queueProgress.processFilesMainThread(
       files,
@@ -24,7 +24,7 @@ export function useQueueDeduplication() {
       queueCore.processMainThreadDeduplication,
       queueCore.processDuplicateGroups,
       onProgress,
-      skippedFolders,
+      skippedFolders
     );
   };
 
@@ -41,7 +41,7 @@ export function useQueueDeduplication() {
         updateUploadQueue,
         queueWorkers.processFilesWithWorker,
         processFilesMainThread,
-        onProgress,
+        onProgress
       );
 
       // Stop time monitoring on successful completion
@@ -58,7 +58,7 @@ export function useQueueDeduplication() {
       } else {
         if (import.meta.env.DEV) {
           console.warn(
-            '[QueueDeduplication] No timeMonitoringCallback available for onProcessingComplete',
+            '[QueueDeduplication] No timeMonitoringCallback available for onProcessingComplete'
           );
         }
       }
@@ -108,7 +108,7 @@ export function useQueueDeduplication() {
         updateUploadQueue,
         (files, updateUploadQueue, onProgress) =>
           processFilesMainThread(files, updateUploadQueue, onProgress, skippedFolders),
-        onProgress,
+        onProgress
       ),
 
     // Status and management (from useQueueWorkers)

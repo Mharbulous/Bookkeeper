@@ -14,11 +14,13 @@
           <v-btn @click="runPerformanceTest" color="primary" class="me-2">
             Run Performance Test
           </v-btn>
-          <v-btn @click="clearTest" color="secondary">
-            Clear Test
-          </v-btn>
-          
-          <v-alert v-if="testResults" :color="testResults.success ? 'success' : 'warning'" class="mt-4">
+          <v-btn @click="clearTest" color="secondary"> Clear Test </v-btn>
+
+          <v-alert
+            v-if="testResults"
+            :color="testResults.success ? 'success' : 'warning'"
+            class="mt-4"
+          >
             <div><strong>Results:</strong></div>
             <div>Placeholders rendered: {{ testResults.count }}</div>
             <div>Total time: {{ testResults.time }}ms</div>
@@ -61,16 +63,10 @@
           <v-btn @click="toggleFileItemTest" color="secondary" class="mb-4">
             {{ showFileItemTest ? 'Hide' : 'Show' }} LazyFileItem Test
           </v-btn>
-          
+
           <v-list v-if="showFileItemTest" lines="two" density="comfortable">
-            <LazyFileItem 
-              :file="mockFile" 
-              :group="mockGroup"
-            />
-            <LazyFileItem 
-              :file="mockDuplicateFile" 
-              :group="mockDuplicateGroup"
-            />
+            <LazyFileItem :file="mockFile" :group="mockGroup" />
+            <LazyFileItem :file="mockDuplicateFile" :group="mockDuplicateGroup" />
           </v-list>
         </v-card-text>
       </v-card>
@@ -83,38 +79,39 @@
             <v-btn @click="generateLargeFileList" color="primary">
               Generate Large File List ({{ fileCount }} files)
             </v-btn>
-            <v-btn @click="clearFileTest" color="secondary">
-              Clear Test
-            </v-btn>
+            <v-btn @click="clearFileTest" color="secondary"> Clear Test </v-btn>
           </div>
 
-          <v-text-field 
-            v-model.number="fileCount" 
-            label="File Count" 
-            type="number" 
-            min="100" 
-            max="5000" 
+          <v-text-field
+            v-model.number="fileCount"
+            label="File Count"
+            type="number"
+            min="100"
+            max="5000"
             class="mb-4"
             style="max-width: 200px"
           />
-          
+
           <!-- File List with Lazy Loading -->
-          <div v-if="showLazyFileList" class="border rounded" style="max-height: 400px; overflow-y: auto;">
+          <div
+            v-if="showLazyFileList"
+            class="border rounded"
+            style="max-height: 400px; overflow-y: auto"
+          >
             <div v-for="(group, groupIndex) in groupedTestFiles" :key="groupIndex">
               <v-list lines="two" density="comfortable">
-                <template v-for="(file, fileIndex) in group.files" :key="file.id || `${groupIndex}-${fileIndex}`">
+                <template
+                  v-for="(file, fileIndex) in group.files"
+                  :key="file.id || `${groupIndex}-${fileIndex}`"
+                >
                   <!-- Conditional rendering: Placeholder or Loaded Item -->
-                  <FileQueuePlaceholder 
+                  <FileQueuePlaceholder
                     v-if="!isItemLoaded(groupIndex, fileIndex)"
                     :is-duplicate="file.isDuplicate"
                     @load="loadItem(groupIndex, fileIndex)"
                   />
-                  <LazyFileItem 
-                    v-else
-                    :file="file" 
-                    :group="group"
-                  />
-                  
+                  <LazyFileItem v-else :file="file" :group="group" />
+
                   <v-divider v-if="fileIndex < group.files.length - 1" />
                 </template>
               </v-list>
@@ -128,45 +125,41 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import DemoContainer from '../components/DemoContainer.vue'
-import FileQueuePlaceholder from '../../components/features/upload/FileQueuePlaceholder.vue'
-import LazyFileItem from '../../components/features/upload/LazyFileItem.vue'
-import { useLazyFileList } from '../../composables/useLazyFileList.js'
+import { ref, computed } from 'vue';
+import DemoContainer from '../components/DemoContainer.vue';
+import FileQueuePlaceholder from '../../components/features/upload/FileQueuePlaceholder.vue';
+import LazyFileItem from '../../components/features/upload/LazyFileItem.vue';
+import { useLazyFileList } from '../../composables/useLazyFileList.js';
 
-const showPlaceholders = ref(false)
-const placeholderCount = ref(100)
-const testResults = ref(null)
-const loadedCount = ref(0)
-const showFileItemTest = ref(false)
+const showPlaceholders = ref(false);
+const placeholderCount = ref(100);
+const testResults = ref(null);
+const loadedCount = ref(0);
+const showFileItemTest = ref(false);
 
 // Lazy loading integration test
-const showLazyFileList = ref(false)
-const fileCount = ref(1000)
-const testFiles = ref([])
+const showLazyFileList = ref(false);
+const fileCount = ref(1000);
+const testFiles = ref([]);
 
 // Group test files (simple grouping for testing)
 const groupedTestFiles = computed(() => {
-  if (!testFiles.value.length) return []
-  
+  if (!testFiles.value.length) return [];
+
   // Simple grouping: every 10 files in a group
-  const groups = []
+  const groups = [];
   for (let i = 0; i < testFiles.value.length; i += 10) {
     groups.push({
       isDuplicateGroup: false,
-      files: testFiles.value.slice(i, i + 10)
-    })
+      files: testFiles.value.slice(i, i + 10),
+    });
   }
-  return groups
-})
+  return groups;
+});
 
 // Lazy file list composable
-const {
-  loadItem,
-  isItemLoaded,
-  preloadInitialItems,
-  resetLoadedItems
-} = useLazyFileList(groupedTestFiles)
+const { loadItem, isItemLoaded, preloadInitialItems, resetLoadedItems } =
+  useLazyFileList(groupedTestFiles);
 
 // Mock data for LazyFileItem testing
 const mockFile = ref({
@@ -178,13 +171,13 @@ const mockFile = ref({
   path: '/documents/project/document.pdf',
   status: 'ready',
   isDuplicate: false,
-  file: new File(['mock content'], 'document.pdf', { type: 'application/pdf' })
-})
+  file: new File(['mock content'], 'document.pdf', { type: 'application/pdf' }),
+});
 
 const mockGroup = ref({
   isDuplicateGroup: false,
-  files: [mockFile.value]
-})
+  files: [mockFile.value],
+});
 
 const mockDuplicateFile = ref({
   id: 'mock-file-2',
@@ -197,67 +190,67 @@ const mockDuplicateFile = ref({
   isDuplicate: true,
   isPreviousUpload: false,
   duplicateMessage: 'This file already exists in your storage',
-  file: new File(['mock image data'], 'image.jpg', { type: 'image/jpeg' })
-})
+  file: new File(['mock image data'], 'image.jpg', { type: 'image/jpeg' }),
+});
 
 const mockDuplicateGroup = ref({
   isDuplicateGroup: true,
-  files: [mockDuplicateFile.value]
-})
+  files: [mockDuplicateFile.value],
+});
 
 const runPerformanceTest = () => {
-  loadedCount.value = 0
-  
+  loadedCount.value = 0;
+
   // Test 1: Pure DOM creation (what we actually want to measure)
-  const startTime = performance.now()
-  
+  const startTime = performance.now();
+
   // Create elements directly to test pure rendering performance
-  const container = document.createElement('div')
+  const container = document.createElement('div');
   for (let i = 0; i < placeholderCount.value; i++) {
-    const div = document.createElement('div')
-    div.className = 'placeholder-item'
-    div.style.height = '76px'
-    container.appendChild(div)
+    const div = document.createElement('div');
+    div.className = 'placeholder-item';
+    div.style.height = '76px';
+    container.appendChild(div);
   }
-  
-  const endTime = performance.now()
-  const totalTime = endTime - startTime
-  const averageTime = totalTime / placeholderCount.value
-  
+
+  const endTime = performance.now();
+  const totalTime = endTime - startTime;
+  const averageTime = totalTime / placeholderCount.value;
+
   testResults.value = {
     count: placeholderCount.value,
     time: Math.round(totalTime * 100) / 100,
     average: Math.round(averageTime * 10000) / 10000,
     success: averageTime < 0.01,
-    testType: 'Pure DOM Creation'
-  }
-  
+    testType: 'Pure DOM Creation',
+  };
+
   // Clean up test elements
-  container.remove()
-  
+  container.remove();
+
   // Now show Vue components for visual testing
-  showPlaceholders.value = true
-}
+  showPlaceholders.value = true;
+};
 
 const clearTest = () => {
-  showPlaceholders.value = false
-  testResults.value = null
-  loadedCount.value = 0
-}
+  showPlaceholders.value = false;
+  testResults.value = null;
+  loadedCount.value = 0;
+};
 
 const onPlaceholderLoad = (index) => {
-  loadedCount.value++
-  console.log(`Placeholder ${index} intersected and loaded`)
-}
+  loadedCount.value++;
+  console.log(`Placeholder ${index} intersected and loaded`);
+};
 
 const toggleFileItemTest = () => {
-  showFileItemTest.value = !showFileItemTest.value
-}
+  showFileItemTest.value = !showFileItemTest.value;
+};
 
 // Generate large file list for lazy loading test
 const generateLargeFileList = () => {
-  console.time('File List Generation')
-  
+  console.time('File List Generation');
+
   const fileTypes = [
     { type: 'application/pdf', ext: 'pdf', name: 'document' },
     { type: 'image/jpeg', ext: 'jpg', name: 'photo' },
@@ -265,28 +258,28 @@ const generateLargeFileList = () => {
     { type: 'application/msword', ext: 'doc', name: 'report' },
     { type: 'text/plain', ext: 'txt', name: 'notes' },
     { type: 'video/mp4', ext: 'mp4', name: 'video' },
-    { type: 'audio/mp3', ext: 'mp3', name: 'audio' }
-  ]
+    { type: 'audio/mp3', ext: 'mp3', name: 'audio' },
+  ];
 
   const folders = [
     '/documents/projects',
-    '/images/photos', 
+    '/images/photos',
     '/videos/recordings',
     '/audio/music',
     '/archives/backup',
-    '/downloads/temp'
-  ]
+    '/downloads/temp',
+  ];
 
-  const statusOptions = ['ready', 'pending', 'processing', 'completed', 'error']
-  
-  testFiles.value = []
-  
+  const statusOptions = ['ready', 'pending', 'processing', 'completed', 'error'];
+
+  testFiles.value = [];
+
   for (let i = 0; i < fileCount.value; i++) {
-    const fileType = fileTypes[i % fileTypes.length]
-    const folder = folders[i % folders.length]
-    const isDuplicate = Math.random() < 0.15 // 15% duplicates
-    const isPreviousUpload = Math.random() < 0.1 // 10% previous uploads
-    
+    const fileType = fileTypes[i % fileTypes.length];
+    const folder = folders[i % folders.length];
+    const isDuplicate = Math.random() < 0.15; // 15% duplicates
+    const isPreviousUpload = Math.random() < 0.1; // 10% previous uploads
+
     const file = {
       id: `test-file-${i}`,
       name: `${fileType.name}_${i}.${fileType.ext}`,
@@ -297,36 +290,38 @@ const generateLargeFileList = () => {
       status: statusOptions[Math.floor(Math.random() * statusOptions.length)],
       isDuplicate,
       isPreviousUpload,
-      file: new File([`mock content ${i}`], `${fileType.name}_${i}.${fileType.ext}`, { type: fileType.type })
-    }
-    
+      file: new File([`mock content ${i}`], `${fileType.name}_${i}.${fileType.ext}`, {
+        type: fileType.type,
+      }),
+    };
+
     if (isDuplicate) {
-      file.duplicateMessage = 'This file already exists in your storage'
+      file.duplicateMessage = 'This file already exists in your storage';
     }
-    
-    testFiles.value.push(file)
+
+    testFiles.value.push(file);
   }
-  
-  console.timeEnd('File List Generation')
-  console.log(`Generated ${fileCount.value} test files`)
-  
+
+  console.timeEnd('File List Generation');
+  console.log(`Generated ${fileCount.value} test files`);
+
   // Reset lazy loading state
-  resetLoadedItems()
-  
+  resetLoadedItems();
+
   // Show the list and preload initial items
-  showLazyFileList.value = true
-  
+  showLazyFileList.value = true;
+
   // Preload initial items after Vue updates
   setTimeout(() => {
-    preloadInitialItems(20) // Preload more items for testing
-    console.log('Preloaded initial items for lazy loading test')
-  }, 0)
-}
+    preloadInitialItems(20); // Preload more items for testing
+    console.log('Preloaded initial items for lazy loading test');
+  }, 0);
+};
 
 const clearFileTest = () => {
-  showLazyFileList.value = false
-  testFiles.value = []
-  resetLoadedItems()
-  console.log('Cleared lazy loading test')
-}
+  showLazyFileList.value = false;
+  testFiles.value = [];
+  resetLoadedItems();
+  console.log('Cleared lazy loading test');
+};
 </script>

@@ -14,14 +14,12 @@
         :color="isDragOver ? 'primary' : 'grey-lighten-1'"
         class="mb-4"
       />
-      
+
       <h3 class="text-h5 mb-2" :class="isDragOver ? 'text-primary' : 'text-grey-darken-2'">
         {{ isDragOver ? 'Drop files or folders here!' : 'Drag and drop files or folders here' }}
       </h3>
-      
-      <p class="text-body-1 text-grey-darken-1 mb-4">
-        or choose files using the buttons below
-      </p>
+
+      <p class="text-body-1 text-grey-darken-1 mb-4">or choose files using the buttons below</p>
 
       <!-- Upload Buttons -->
       <div class="d-flex flex-wrap gap-3 justify-center">
@@ -57,7 +55,7 @@
       @change="$emit('file-select', $event)"
       style="display: none"
     />
-    
+
     <input
       ref="folderInput"
       type="file"
@@ -70,46 +68,46 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref } from 'vue';
 
 defineProps({
   isDragOver: {
     type: Boolean,
-    required: true
-  }
-})
+    required: true,
+  },
+});
 
 // Template refs (exposed for parent component to access)
-const fileInput = ref(null)
-const folderInput = ref(null)
+const fileInput = ref(null);
+const folderInput = ref(null);
 
 defineExpose({
   fileInput,
-  folderInput
-})
+  folderInput,
+});
 
 const emit = defineEmits([
   'drag-over',
-  'drag-leave', 
+  'drag-leave',
   'drop',
   'trigger-file-select',
   'trigger-folder-select',
   'file-select',
-  'folder-select'
-])
+  'folder-select',
+]);
 
 // Event handlers that emit to parent
 const handleDragOver = () => {
-  emit('drag-over')
-}
+  emit('drag-over');
+};
 
 const handleDragLeave = (event) => {
-  emit('drag-leave', event)
-}
+  emit('drag-leave', event);
+};
 
 const handleDrop = (event) => {
-  emit('drop', event)
-}
+  emit('drop', event);
+};
 </script>
 
 <style scoped>

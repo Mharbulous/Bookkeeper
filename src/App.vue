@@ -7,33 +7,43 @@
         <p class="text-gray-600">Initializing...</p>
       </div>
     </div>
-    
+
     <!-- Normal app content -->
     <template v-else>
       <template v-if="$route.path !== '/login'">
         <AppSidebar />
       </template>
-      <div class="flex-grow flex flex-col" :class="{ 'justify-center items-center': $route.path === '/login', 'ml-[60px]': $route.path !== '/login' }">
+      <div
+        class="flex-grow flex flex-col"
+        :class="{
+          'justify-center items-center': $route.path === '/login',
+          'ml-[60px]': $route.path !== '/login',
+        }"
+      >
         <template v-if="$route.path !== '/login'">
           <AppHeader />
         </template>
         <router-view />
       </div>
       <template v-if="$route.path !== '/login'">
-        <div class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 z-[99]" :class="{ 'hidden': !isMobileMenuOpen, 'block': isMobileMenuOpen }" @click="closeMobileMenu"></div>
+        <div
+          class="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 z-[99]"
+          :class="{ hidden: !isMobileMenuOpen, block: isMobileMenuOpen }"
+          @click="closeMobileMenu"
+        ></div>
       </template>
     </template>
   </div>
 </template>
 
 <script>
-import { onUnmounted } from 'vue'
-import { useAuthStore } from './stores/auth'
-import AppSidebar from './components/layout/AppSidebar.vue'
-import AppHeader from './components/layout/AppHeader.vue'
-import { useFavicon } from './composables/useFavicon'
-import { useAsyncInspector } from './composables/useAsyncInspector'
-import { useAsyncRegistry } from './composables/useAsyncRegistry'
+import { onUnmounted } from 'vue';
+import { useAuthStore } from './stores/auth';
+import AppSidebar from './components/layout/AppSidebar.vue';
+import AppHeader from './components/layout/AppHeader.vue';
+import { useFavicon } from './composables/useFavicon';
+import { useAsyncInspector } from './composables/useAsyncInspector';
+import { useAsyncRegistry } from './composables/useAsyncRegistry';
 
 export default {
   name: 'App',
@@ -42,58 +52,58 @@ export default {
     AppHeader,
   },
   setup() {
-    const authStore = useAuthStore()
-    const registry = useAsyncRegistry()
-    
+    const authStore = useAuthStore();
+    const registry = useAsyncRegistry();
+
     // Initialize favicon switching
-    useFavicon()
-    
+    useFavicon();
+
     // Development inspector integration
-    const inspector = useAsyncInspector()
-    
+    const inspector = useAsyncInspector();
+
     // Optional: Auto-log stats every 30 seconds in development
-    let statsIntervalId = null
+    let statsIntervalId = null;
     if (inspector.isEnabled) {
       const intervalId = setInterval(() => {
         if (inspector.stats.value.total > 0) {
-          inspector.logStats()
+          inspector.logStats();
         }
-      }, 30000)
-      
+      }, 30000);
+
       // Register the monitoring interval with the async registry
       statsIntervalId = registry.register(
         registry.generateId('async-monitoring'),
         'async-monitoring',
         () => {
-          clearInterval(intervalId)
+          clearInterval(intervalId);
         },
         {
           component: 'App',
           purpose: 'stats-logging',
-          interval: 30000
+          interval: 30000,
         }
-      )
+      );
     }
-    
+
     onUnmounted(() => {
       if (statsIntervalId) {
-        registry.unregister(statsIntervalId)
+        registry.unregister(statsIntervalId);
       }
-    })
-    
-    return { authStore, inspector }
+    });
+
+    return { authStore, inspector };
   },
   data() {
     return {
       isMobileMenuOpen: false,
-    }
+    };
   },
   methods: {
     closeMobileMenu() {
-      this.isMobileMenuOpen = false
+      this.isMobileMenuOpen = false;
     },
   },
-}
+};
 </script>
 
 <style scoped>
@@ -112,4 +122,3 @@ export default {
   }
 }
 </style>
-

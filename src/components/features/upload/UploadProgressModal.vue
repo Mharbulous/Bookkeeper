@@ -639,7 +639,7 @@ watch(
         emit('update:show', false);
       }, 2000); // Close after 2 seconds
     }
-  },
+  }
 );
 </script>
 

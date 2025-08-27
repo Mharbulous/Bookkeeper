@@ -10,21 +10,22 @@
       aria-haspopup="true"
       :aria-controls="dropdownId"
       class="app-switcher-trigger"
-      :class="{ 'bg-brand-blue text-white': $route.path === '/' || $route.path === '' || $route.name === 'home' || $route.name === 'Home' }"
+      :class="{
+        'bg-brand-blue text-white':
+          $route.path === '/' ||
+          $route.path === '' ||
+          $route.name === 'home' ||
+          $route.name === 'Home',
+      }"
     >
       <div class="min-w-[30px] h-[30px] mr-3 flex items-center justify-center">📚</div>
-      <span 
+      <span
         class="whitespace-nowrap transition-opacity duration-300 ease-in-out"
         :class="{ 'opacity-100': props.isHovered, 'opacity-0': !props.isHovered }"
       >
         Book Keeper
       </span>
-      <div 
-        class="dropdown-arrow"
-        :class="{ 'rotate-180': isOpen }"
-      >
-        ▼
-      </div>
+      <div class="dropdown-arrow" :class="{ 'rotate-180': isOpen }">▼</div>
     </button>
 
     <!-- Dropdown Menu -->
@@ -48,11 +49,11 @@
         <div class="app-switcher-header">
           <h3 class="text-sm font-medium text-slate-200">Switch Apps</h3>
         </div>
-        
+
         <!-- App List -->
         <div class="app-list" role="none">
-          <a 
-            v-for="(app, index) in availableApps" 
+          <a
+            v-for="(app, index) in availableApps"
             :key="app.name"
             :href="getAppUrl(app.subdomain)"
             class="app-item"
@@ -60,7 +61,11 @@
             :tabindex="isOpen ? 0 : -1"
             @click="handleAppSwitch(app)"
             @keydown="handleItemKeydown($event, index)"
-            :ref="el => { if (el) menuItems[index] = el }"
+            :ref="
+              (el) => {
+                if (el) menuItems[index] = el;
+              }
+            "
           >
             <div class="app-icon">{{ app.icon }}</div>
             <div class="app-details">
@@ -69,12 +74,10 @@
             </div>
           </a>
         </div>
-        
+
         <!-- Team Info -->
         <div v-if="authStore.currentTeam" class="team-info">
-          <div class="text-xs text-slate-400">
-            Team: {{ authStore.currentTeam }}
-          </div>
+          <div class="text-xs text-slate-400">Team: {{ authStore.currentTeam }}</div>
         </div>
       </div>
     </Transition>
@@ -90,42 +93,45 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, reactive, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { ref, onMounted, onUnmounted, nextTick, reactive, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 
 // Props
 const props = defineProps({
   isHovered: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
 // Watch for sidebar collapse and close dropdown
-watch(() => props.isHovered, (newValue, oldValue) => {
-  // If sidebar goes from hovered to not hovered, close dropdown and blur button
-  if (oldValue === true && newValue === false && isOpen.value) {
-    closeDropdown()
-    // Also blur the trigger button to ensure it loses focus
-    nextTick(() => {
-      triggerButton.value?.blur()
-    })
+watch(
+  () => props.isHovered,
+  (newValue, oldValue) => {
+    // If sidebar goes from hovered to not hovered, close dropdown and blur button
+    if (oldValue === true && newValue === false && isOpen.value) {
+      closeDropdown();
+      // Also blur the trigger button to ensure it loses focus
+      nextTick(() => {
+        triggerButton.value?.blur();
+      });
+    }
   }
-})
+);
 
-const $route = useRoute()
-const authStore = useAuthStore()
+const $route = useRoute();
+const authStore = useAuthStore();
 
 // Component state
-const isOpen = ref(false)
-const triggerButton = ref(null)
-const dropdown = ref(null)
-const menuItems = reactive([])
-const focusedIndex = ref(-1)
+const isOpen = ref(false);
+const triggerButton = ref(null);
+const dropdown = ref(null);
+const menuItems = reactive([]);
+const focusedIndex = ref(-1);
 
 // Generate unique ID for accessibility
-const dropdownId = `app-switcher-${Math.random().toString(36).substr(2, 9)}`
+const dropdownId = `app-switcher-${Math.random().toString(36).substr(2, 9)}`;
 
 // Available apps configuration - matches the roadmap specs
 const availableApps = [
@@ -134,44 +140,44 @@ const availableApps = [
     subdomain: 'bookkeeping',
     description: 'Bookkeeping and accounting',
     icon: '📚',
-    port: '3001'
+    port: '3001',
   },
   {
     name: 'Intranet',
     subdomain: 'intranet',
     description: 'Internal portal and resources',
     icon: '📇',
-    port: '3000'
-  }
-]
+    port: '3000',
+  },
+];
 
 // Get the base domain from environment
-const baseDomain = import.meta.env.VITE_APP_DOMAIN || 'localhost:3000'
+const baseDomain = import.meta.env.VITE_APP_DOMAIN || 'localhost:3000';
 
 /**
  * Toggle dropdown open/closed state
  */
 const toggleDropdown = () => {
-  isOpen.value = !isOpen.value
+  isOpen.value = !isOpen.value;
   if (isOpen.value) {
     nextTick(() => {
-      focusedIndex.value = -1
-    })
+      focusedIndex.value = -1;
+    });
   } else {
-    focusedIndex.value = -1
+    focusedIndex.value = -1;
   }
-}
+};
 
 /**
  * Close dropdown and return focus to trigger
  */
 const closeDropdown = () => {
-  isOpen.value = false
-  focusedIndex.value = -1
+  isOpen.value = false;
+  focusedIndex.value = -1;
   nextTick(() => {
-    triggerButton.value?.focus()
-  })
-}
+    triggerButton.value?.focus();
+  });
+};
 
 /**
  * Handle blur event to close dropdown when focus leaves button
@@ -180,10 +186,10 @@ const handleBlur = () => {
   // Small delay to allow click events to register
   setTimeout(() => {
     if (isOpen.value) {
-      closeDropdown()
+      closeDropdown();
     }
-  }, 150)
-}
+  }, 150);
+};
 
 /**
  * Handle keyboard navigation on trigger button
@@ -192,46 +198,46 @@ const handleTriggerKeydown = (event) => {
   switch (event.key) {
     case 'Enter':
     case ' ':
-      event.preventDefault()
+      event.preventDefault();
       if (!isOpen.value) {
-        toggleDropdown()
+        toggleDropdown();
         nextTick(() => {
-          focusFirstItem()
-        })
+          focusFirstItem();
+        });
       } else {
-        closeDropdown()
+        closeDropdown();
       }
-      break
+      break;
     case 'ArrowDown':
-      event.preventDefault()
+      event.preventDefault();
       if (!isOpen.value) {
-        toggleDropdown()
+        toggleDropdown();
         nextTick(() => {
-          focusFirstItem()
-        })
+          focusFirstItem();
+        });
       } else {
-        focusFirstItem()
+        focusFirstItem();
       }
-      break
+      break;
     case 'ArrowUp':
-      event.preventDefault()
+      event.preventDefault();
       if (!isOpen.value) {
-        toggleDropdown()
+        toggleDropdown();
         nextTick(() => {
-          focusLastItem()
-        })
+          focusLastItem();
+        });
       } else {
-        focusLastItem()
+        focusLastItem();
       }
-      break
+      break;
     case 'Escape':
       if (isOpen.value) {
-        event.preventDefault()
-        closeDropdown()
+        event.preventDefault();
+        closeDropdown();
       }
-      break
+      break;
   }
-}
+};
 
 /**
  * Handle keyboard navigation within menu items
@@ -239,112 +245,114 @@ const handleTriggerKeydown = (event) => {
 const handleItemKeydown = (event, index) => {
   switch (event.key) {
     case 'ArrowDown':
-      event.preventDefault()
-      focusNextItem(index)
-      break
+      event.preventDefault();
+      focusNextItem(index);
+      break;
     case 'ArrowUp':
-      event.preventDefault()
-      focusPreviousItem(index)
-      break
+      event.preventDefault();
+      focusPreviousItem(index);
+      break;
     case 'Escape':
-      event.preventDefault()
-      closeDropdown()
-      break
+      event.preventDefault();
+      closeDropdown();
+      break;
     case 'Home':
-      event.preventDefault()
-      focusFirstItem()
-      break
+      event.preventDefault();
+      focusFirstItem();
+      break;
     case 'End':
-      event.preventDefault()
-      focusLastItem()
-      break
+      event.preventDefault();
+      focusLastItem();
+      break;
     case 'Tab':
       // Allow natural tab flow, but close dropdown
-      closeDropdown()
-      break
+      closeDropdown();
+      break;
     case 'Enter':
     case ' ':
       // Let the default link behavior handle navigation
-      break
+      break;
   }
-}
+};
 
 /**
  * Focus management helpers
  */
 const focusFirstItem = () => {
   if (availableApps.length > 0) {
-    focusedIndex.value = 0
-    menuItems[0]?.focus()
+    focusedIndex.value = 0;
+    menuItems[0]?.focus();
   }
-}
+};
 
 const focusLastItem = () => {
   if (availableApps.length > 0) {
-    focusedIndex.value = availableApps.length - 1
-    menuItems[availableApps.length - 1]?.focus()
+    focusedIndex.value = availableApps.length - 1;
+    menuItems[availableApps.length - 1]?.focus();
   }
-}
+};
 
 const focusNextItem = (currentIndex) => {
-  const nextIndex = currentIndex < availableApps.length - 1 ? currentIndex + 1 : 0
-  focusedIndex.value = nextIndex
-  menuItems[nextIndex]?.focus()
-}
+  const nextIndex = currentIndex < availableApps.length - 1 ? currentIndex + 1 : 0;
+  focusedIndex.value = nextIndex;
+  menuItems[nextIndex]?.focus();
+};
 
 const focusPreviousItem = (currentIndex) => {
-  const prevIndex = currentIndex > 0 ? currentIndex - 1 : availableApps.length - 1
-  focusedIndex.value = prevIndex
-  menuItems[prevIndex]?.focus()
-}
+  const prevIndex = currentIndex > 0 ? currentIndex - 1 : availableApps.length - 1;
+  focusedIndex.value = prevIndex;
+  menuItems[prevIndex]?.focus();
+};
 
 /**
  * Handle clicks outside the dropdown
  */
 const handleClickOutside = (event) => {
-  if (isOpen.value && 
-      !triggerButton.value?.contains(event.target) && 
-      !dropdown.value?.contains(event.target)) {
-    closeDropdown()
+  if (
+    isOpen.value &&
+    !triggerButton.value?.contains(event.target) &&
+    !dropdown.value?.contains(event.target)
+  ) {
+    closeDropdown();
   }
-}
+};
 
 /**
  * Generate URL for an app subdomain
  */
 const getAppUrl = (subdomain) => {
   // Find the app configuration for the subdomain
-  const app = availableApps.find(a => a.subdomain === subdomain)
-  
+  const app = availableApps.find((a) => a.subdomain === subdomain);
+
   // For local development - use specific ports
   if (baseDomain.includes('localhost')) {
-    const port = app?.port || '5173'
-    return `http://localhost:${port}`
+    const port = app?.port || '5173';
+    return `http://localhost:${port}`;
   }
-  
+
   // For production
-  return `https://${subdomain}.${baseDomain}`
-}
+  return `https://${subdomain}.${baseDomain}`;
+};
 
 /**
  * Handle app switching with analytics/logging
  */
 const handleAppSwitch = (app) => {
-  console.log(`Switching to app: ${app.name}`)
-  closeDropdown()
-  
+  console.log(`Switching to app: ${app.name}`);
+  closeDropdown();
+
   // In the future, you could add analytics tracking here
   // analytics.track('app_switch', { from: getCurrentApp(), to: app.name })
-}
+};
 
 // Lifecycle hooks
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside, true)
-})
+  document.addEventListener('click', handleClickOutside, true);
+});
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside, true)
-})
+  document.removeEventListener('click', handleClickOutside, true);
+});
 </script>
 
 <style scoped>
@@ -360,7 +368,7 @@ onUnmounted(() => {
   @apply fixed top-20 z-[2000] bg-slate-800 border border-slate-600 rounded-lg shadow-lg min-w-[280px] max-w-[320px] transition-all duration-300 ease-in-out;
   left: 60px; /* Default collapsed state */
   /* Material Design elevation styles */
-  box-shadow: 
+  box-shadow:
     0px 5px 5px -3px rgba(0, 0, 0, 0.2),
     0px 8px 10px 1px rgba(0, 0, 0, 0.14),
     0px 3px 14px 2px rgba(0, 0, 0, 0.12);

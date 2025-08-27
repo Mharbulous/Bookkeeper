@@ -36,16 +36,26 @@
           />
         </div>
 
-        <button type="submit" class="bg-brand-blue text-white border-none py-3.5 px-5 rounded-lg text-base font-medium cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 mt-2.5 hover:bg-brand-blue-dark hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-blue/20 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none" :disabled="isLoading || !email || !password">
+        <button
+          type="submit"
+          class="bg-brand-blue text-white border-none py-3.5 px-5 rounded-lg text-base font-medium cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 mt-2.5 hover:bg-brand-blue-dark hover:-translate-y-0.5 hover:shadow-lg hover:shadow-brand-blue/20 disabled:bg-gray-300 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+          :disabled="isLoading || !email || !password"
+        >
           <span v-if="isLoading" class="animate-spin">⏳</span>
           <span v-else>Sign In</span>
         </button>
 
-        <div v-if="errorMessage" class="bg-red-50 text-red-600 py-3 px-4 rounded-lg border border-red-200 text-sm text-center">
+        <div
+          v-if="errorMessage"
+          class="bg-red-50 text-red-600 py-3 px-4 rounded-lg border border-red-200 text-sm text-center"
+        >
           {{ errorMessage }}
         </div>
 
-        <div v-if="successMessage" class="bg-green-50 text-green-600 py-3 px-4 rounded-lg border border-green-200 text-sm text-center">
+        <div
+          v-if="successMessage"
+          class="bg-green-50 text-green-600 py-3 px-4 rounded-lg border border-green-200 text-sm text-center"
+        >
           {{ successMessage }}
         </div>
       </form>
@@ -54,21 +64,21 @@
 </template>
 
 <script>
-import { useAuthStore } from '@/stores/auth'
-import { useRouter, useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth';
+import { useRouter, useRoute } from 'vue-router';
 
 export default {
   name: 'LoginForm',
   setup() {
-    const router = useRouter()
-    const route = useRoute()
-    const authStore = useAuthStore()
+    const router = useRouter();
+    const route = useRoute();
+    const authStore = useAuthStore();
 
     return {
       router,
       route,
-      authStore
-    }
+      authStore,
+    };
   },
   data() {
     return {
@@ -77,66 +87,66 @@ export default {
       isLoading: false,
       errorMessage: '',
       successMessage: '',
-    }
+    };
   },
   methods: {
     async handleLogin() {
       if (!this.email || !this.password) {
-        this.errorMessage = 'Please enter both email and password'
-        return
+        this.errorMessage = 'Please enter both email and password';
+        return;
       }
 
-      this.isLoading = true
-      this.errorMessage = ''
-      this.successMessage = ''
+      this.isLoading = true;
+      this.errorMessage = '';
+      this.successMessage = '';
 
       try {
         // Use the auth store login method
-        await this.authStore.login(this.email, this.password)
-        this.successMessage = 'Login successful! Welcome to the Coryphaeus Vue Template.'
+        await this.authStore.login(this.email, this.password);
+        this.successMessage = 'Login successful! Welcome to the Coryphaeus Vue Template.';
 
         // Clear form data
-        this.email = ''
-        this.password = ''
+        this.email = '';
+        this.password = '';
 
         // Handle redirect after successful login
         const redirectPath = this.route.query.redirect
           ? decodeURIComponent(this.route.query.redirect)
-          : '/'
+          : '/';
 
         // Navigate to intended destination
         setTimeout(() => {
-          this.router.push(redirectPath)
-        }, 1000) // Small delay to show success message
+          this.router.push(redirectPath);
+        }, 1000); // Small delay to show success message
       } catch (error) {
-        console.error('Login error:', error)
+        console.error('Login error:', error);
 
         // Map Firebase error codes to user-friendly messages
         switch (error.code) {
           case 'auth/user-not-found':
-            this.errorMessage = 'No account found with this email address'
-            break
+            this.errorMessage = 'No account found with this email address';
+            break;
           case 'auth/wrong-password':
-            this.errorMessage = 'Incorrect password'
-            break
+            this.errorMessage = 'Incorrect password';
+            break;
           case 'auth/invalid-email':
-            this.errorMessage = 'Please enter a valid email address'
-            break
+            this.errorMessage = 'Please enter a valid email address';
+            break;
           case 'auth/too-many-requests':
-            this.errorMessage = 'Too many failed attempts. Please try again later'
-            break
+            this.errorMessage = 'Too many failed attempts. Please try again later';
+            break;
           default:
-            this.errorMessage = 'Login failed. Please check your credentials and try again'
+            this.errorMessage = 'Login failed. Please check your credentials and try again';
         }
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
 
     clearError() {
-      this.errorMessage = ''
-      this.successMessage = ''
+      this.errorMessage = '';
+      this.successMessage = '';
     },
   },
-}
+};
 </script>

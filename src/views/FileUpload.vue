@@ -149,10 +149,7 @@ const { populateExistingHash } = useLazyHashTooltip();
 const { logUploadEvent } = useUploadLogger();
 
 // File metadata system
-const {
-  createMetadataRecord,
-  generateMetadataHash
-} = useFileMetadata();
+const { createMetadataRecord, generateMetadataHash } = useFileMetadata();
 
 // Composables
 const {
@@ -218,12 +215,21 @@ const {
 
 const timeWarning = useTimeBasedWarning();
 
-// Upload state tracking  
+// Upload state tracking
 const isStartingUpload = ref(false);
 const isPaused = ref(false);
 const pauseRequested = ref(false);
 const currentUploadIndex = ref(0);
 let uploadAbortController = null;
+
+// Session ID management
+const currentSessionId = ref(null);
+const getCurrentSessionId = () => {
+  if (!currentSessionId.value) {
+    currentSessionId.value = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  return currentSessionId.value;
+};
 
 // Simple hash calculation function (same as worker)
 const calculateFileHash = async (file) => {
@@ -231,8 +237,8 @@ const calculateFileHash = async (file) => {
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    
+    const hash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+
     // Return standard SHA-256 hash of file content
     return hash;
   } catch (error) {
@@ -258,52 +264,52 @@ const checkFileExists = async (fileHash, originalFileName) => {
 };
 
 const uploadSingleFile = async (file, fileHash, originalFileName, abortSignal = null) => {
-    const storagePath = generateStoragePath(fileHash, originalFileName);
-    const storageReference = storageRef(storage, storagePath);
-    
-    const uploadTask = uploadBytesResumable(storageReference, file, {
-      customMetadata: {
-        teamId: authStore.currentTeam,
-        userId: authStore.user.uid,
-        originalName: originalFileName,
-        hash: fileHash,
-      },
-    });
+  const storagePath = generateStoragePath(fileHash, originalFileName);
+  const storageReference = storageRef(storage, storagePath);
 
-    return new Promise((resolve, reject) => {
-      // Handle abort signal
-      if (abortSignal) {
-        abortSignal.addEventListener('abort', () => {
+  const uploadTask = uploadBytesResumable(storageReference, file, {
+    customMetadata: {
+      teamId: authStore.currentTeam,
+      userId: authStore.user.uid,
+      originalName: originalFileName,
+      hash: fileHash,
+    },
+  });
+
+  return new Promise((resolve, reject) => {
+    // Handle abort signal
+    if (abortSignal) {
+      abortSignal.addEventListener('abort', () => {
+        uploadTask.cancel();
+        reject(new Error('AbortError'));
+      });
+    }
+
+    uploadTask.on(
+      'state_changed',
+      () => {
+        // Check if aborted during progress
+        if (abortSignal && abortSignal.aborted) {
           uploadTask.cancel();
           reject(new Error('AbortError'));
-        });
-      }
-
-      uploadTask.on(
-        'state_changed',
-        () => {
-          // Check if aborted during progress
-          if (abortSignal && abortSignal.aborted) {
-            uploadTask.cancel();
-            reject(new Error('AbortError'));
-            return;
-          }
-          // Progress updates could be added here if needed
-        },
-        (error) => {
-          reject(error);
-        },
-        async () => {
-          // Upload completed successfully
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve({ success: true, downloadURL });
-          } catch (error) {
-            reject(error);
-          }
+          return;
         }
-      );
-    });
+        // Progress updates could be added here if needed
+      },
+      (error) => {
+        reject(error);
+      },
+      async () => {
+        // Upload completed successfully
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve({ success: true, downloadURL });
+        } catch (error) {
+          reject(error);
+        }
+      }
+    );
+  });
 };
 
 // Connect time monitoring to deduplication processing
@@ -334,7 +340,6 @@ const clearQueue = () => {
   console.log('🔄 Clear All: Refreshing page to reset all state');
   window.location.reload();
 };
-
 
 // Integrate processFiles with updateUploadQueue with safety filtering
 const processFilesWithQueue = async (files) => {
@@ -392,10 +397,9 @@ const processFilesWithQueue = async (files) => {
       // Generate hardware-calibrated estimate
       const calibratedPrediction = calculateCalibratedProcessingTime(
         folderData,
-        hardwarePerformanceFactor,
+        hardwarePerformanceFactor
       );
       estimatedTime = calibratedPrediction.totalTimeMs;
-
     }
 
     if (estimatedTime > 0) {
@@ -431,7 +435,7 @@ const processFilesWithQueue = async (files) => {
 
     if (safeFiles.length !== originalCount) {
       console.log(
-        `Upload safety filter: excluded ${originalCount - safeFiles.length} files from ${skippedFolders.value.length} skipped folders`,
+        `Upload safety filter: excluded ${originalCount - safeFiles.length} files from ${skippedFolders.value.length} skipped folders`
       );
     }
 
@@ -453,7 +457,7 @@ const processFilesWithQueue = async (files) => {
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {
         console.log(
-          `❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`,
+          `❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`
         );
         return;
       }
@@ -495,7 +499,7 @@ const processFilesWithQueue = async (files) => {
       // Check if processing was aborted after processFiles completed
       if (analysisTimedOut.value) {
         console.log(
-          `❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`,
+          `❌ [${processId}] EXIT ABORT: processing aborted after completion - skipping cleanup`
         );
         return;
       }
@@ -646,7 +650,7 @@ const handleResumeUpload = () => {
   console.log('Resume upload requested');
   isPaused.value = false;
   updateUploadStatus('resume');
-  
+
   // Continue upload from where we left off
   continueUpload();
 };
@@ -658,7 +662,7 @@ const continueUpload = async () => {
 
     // Get all files from upload queue (including duplicates for processing)
     const filesToProcess = uploadQueue.value;
-    
+
     if (filesToProcess.length === 0) {
       showNotification('No files to process', 'info');
       updateUploadStatus('complete');
@@ -683,31 +687,35 @@ const continueUpload = async () => {
 
       const queueFile = filesToProcess[i];
       updateUploadStatus('setUploadIndex', i); // Update current position
-      
+
       // Handle duplicate files - skip upload but log and save metadata
       if (queueFile.isDuplicate) {
         console.log(`Processing duplicate file: ${queueFile.name}`);
         updateUploadStatus('currentFile', queueFile.name, 'processing_duplicate');
         updateFileStatus(queueFile, 'skipped');
-        
+
         try {
           // Log skipped event for duplicate file
-          const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, queueFile.hash);
+          const metadataHash = await generateMetadataHash(
+            queueFile.name,
+            queueFile.lastModified,
+            queueFile.hash
+          );
           await logUploadEvent({
             eventType: 'upload_skipped_metadata_recorded',
             fileName: queueFile.name,
             fileHash: queueFile.hash,
-            metadataHash: metadataHash
+            metadataHash: metadataHash,
           });
-          
+
           // Create metadata record for duplicate (hash deduplication)
           await createMetadataRecord({
             originalName: queueFile.name,
             lastModified: queueFile.lastModified,
             fileHash: queueFile.hash,
-            sessionId: getCurrentSessionId()
+            sessionId: getCurrentSessionId(),
           });
-          
+
           updateUploadStatus('skipped');
           console.log(`Duplicate file processed: ${queueFile.name}`);
         } catch (error) {
@@ -715,10 +723,10 @@ const continueUpload = async () => {
           updateFileStatus(queueFile, 'failed');
           updateUploadStatus('failed');
         }
-        
+
         continue; // Skip to next file
       }
-      
+
       try {
         // Create abort controller for this upload
         uploadAbortController = new AbortController();
@@ -728,7 +736,7 @@ const continueUpload = async () => {
         updateFileStatus(queueFile, 'uploading');
         console.log(`Calculating hash for: ${queueFile.name}`);
         let fileHash;
-        
+
         // Check if file already has a hash (from deduplication process)
         if (queueFile.hash) {
           fileHash = queueFile.hash;
@@ -752,37 +760,47 @@ const continueUpload = async () => {
         // Check if file already exists in Firebase Storage
         updateUploadStatus('currentFile', queueFile.name, 'checking_existing');
         const fileExists = await checkFileExists(fileHash, queueFile.name);
-        
+
         if (fileExists) {
           // File already exists, skipping
           console.log(`File skipped (already exists): ${queueFile.name}`);
           updateUploadStatus('skipped');
           updateFileStatus(queueFile, 'skipped');
-          
+
           // Log individual upload event for skipped file
           try {
-            const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+            const metadataHash = await generateMetadataHash(
+              queueFile.name,
+              queueFile.lastModified,
+              fileHash
+            );
             await logUploadEvent({
               eventType: 'upload_skipped_metadata_recorded',
               fileName: queueFile.name,
               fileHash: fileHash,
-              metadataHash: metadataHash
+              metadataHash: metadataHash,
             });
           } catch (logError) {
-            console.error(`Failed to log upload event for existing file ${queueFile.name}:`, logError);
+            console.error(
+              `Failed to log upload event for existing file ${queueFile.name}:`,
+              logError
+            );
             // Don't fail the upload process for logging errors
           }
-          
+
           // Create metadata record even for existing files (metadata may be different)
           try {
             await createMetadataRecord({
               originalName: queueFile.name,
               lastModified: queueFile.lastModified,
               fileHash: fileHash,
-              sessionId: getCurrentSessionId()
+              sessionId: getCurrentSessionId(),
             });
           } catch (metadataError) {
-            console.error(`Failed to create metadata record for existing file ${queueFile.name}:`, metadataError);
+            console.error(
+              `Failed to create metadata record for existing file ${queueFile.name}:`,
+              metadataError
+            );
             // Don't fail the upload process for metadata errors
           }
         } else {
@@ -791,53 +809,70 @@ const continueUpload = async () => {
             console.log(`Upload aborted before uploading: ${queueFile.name}`);
             break;
           }
-          
+
           // File needs to be uploaded
           updateUploadStatus('currentFile', queueFile.name, 'uploading');
           console.log(`Uploading file: ${queueFile.name}`);
-          
+
           // Log upload start event
           try {
-            const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+            const metadataHash = await generateMetadataHash(
+              queueFile.name,
+              queueFile.lastModified,
+              fileHash
+            );
             await logUploadEvent({
               eventType: 'upload_interrupted',
               fileName: queueFile.name,
               fileHash: fileHash,
-              metadataHash: metadataHash
+              metadataHash: metadataHash,
             });
           } catch (logError) {
-            console.error(`Failed to log interrupted upload event for ${queueFile.name}:`, logError);
+            console.error(
+              `Failed to log interrupted upload event for ${queueFile.name}:`,
+              logError
+            );
             // Don't fail the upload process for logging errors
           }
-          
+
           const uploadStartTime = Date.now();
-          await uploadSingleFile(queueFile.file, fileHash, queueFile.name, uploadAbortController.signal);
+          await uploadSingleFile(
+            queueFile.file,
+            fileHash,
+            queueFile.name,
+            uploadAbortController.signal
+          );
           const uploadDurationMs = Date.now() - uploadStartTime;
+          console.log(`Upload duration for ${queueFile.name}: ${uploadDurationMs}ms`);
           updateUploadStatus('successful');
           updateFileStatus(queueFile, 'completed');
           console.log(`Successfully uploaded: ${queueFile.name}`);
-          
+
           // Log successful upload completion
           try {
-            const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+            const metadataHash = await generateMetadataHash(
+              queueFile.name,
+              queueFile.lastModified,
+              fileHash
+            );
             await logUploadEvent({
               eventType: 'upload_success',
               fileName: queueFile.name,
               fileHash: fileHash,
-              metadataHash: metadataHash
+              metadataHash: metadataHash,
             });
           } catch (logError) {
             console.error(`Failed to log upload completion event for ${queueFile.name}:`, logError);
             // Don't fail the upload process for logging errors
           }
-          
+
           // Create metadata record for successfully uploaded file
           try {
             await createMetadataRecord({
               originalName: queueFile.name,
               lastModified: queueFile.lastModified,
               fileHash: fileHash,
-              sessionId: getCurrentSessionId()
+              sessionId: getCurrentSessionId(),
             });
           } catch (metadataError) {
             console.error(`Failed to create metadata record for ${queueFile.name}:`, metadataError);
@@ -852,15 +887,28 @@ const continueUpload = async () => {
         console.error(`Failed to upload ${queueFile.name}:`, error);
         updateUploadStatus('failed');
         updateFileStatus(queueFile, 'error');
-        
+
         // Log upload failure
         try {
-          const metadataHash = generateMetadataHash(queueFile.name, queueFile.lastModified, fileHash);
+          let currentFileHash = queueFile.hash || 'unknown_hash';
+          if (currentFileHash === 'unknown_hash') {
+            try {
+              currentFileHash = await calculateFileHash(queueFile.file);
+            } catch (hashError) {
+              console.warn(`Could not calculate hash for failed upload: ${queueFile.name}`, hashError);
+              currentFileHash = 'unknown_hash';
+            }
+          }
+          const metadataHash = await generateMetadataHash(
+            queueFile.name,
+            queueFile.lastModified,
+            currentFileHash
+          );
           await logUploadEvent({
             eventType: 'upload_failed',
             fileName: queueFile.name,
-            fileHash: fileHash,
-            metadataHash: metadataHash
+            fileHash: currentFileHash,
+            metadataHash: metadataHash,
           });
         } catch (logError) {
           console.error(`Failed to log upload failure event for ${queueFile.name}:`, logError);
@@ -877,22 +925,23 @@ const continueUpload = async () => {
       console.log('Upload process completed:', {
         successful: uploadStatus.value.successful,
         failed: uploadStatus.value.failed,
-        skipped: uploadStatus.value.skipped
+        skipped: uploadStatus.value.skipped,
       });
-
 
       // Show completion notification
       const totalProcessed = uploadStatus.value.successful + uploadStatus.value.skipped;
       if (uploadStatus.value.failed === 0) {
         showNotification(`All ${totalProcessed} files processed successfully!`, 'success');
       } else {
-        showNotification(`${totalProcessed} files processed, ${uploadStatus.value.failed} failed`, 'warning');
+        showNotification(
+          `${totalProcessed} files processed, ${uploadStatus.value.failed} failed`,
+          'warning'
+        );
       }
-      
+
       currentUploadIndex.value = 0;
       isStartingUpload.value = false;
     }
-
   } catch (error) {
     console.error('Upload process failed:', error);
     showNotification('Upload failed: ' + (error.message || 'Unknown error'), 'error');
@@ -908,20 +957,21 @@ const handleStartUpload = async () => {
   try {
     isStartingUpload.value = true;
     setPhaseComplete();
-    
+
     // Reset upload status counters only if not resuming
     if (!isPaused.value) {
       resetUploadStatus();
       currentUploadIndex.value = 0;
-      
+      // Generate new session ID for this upload batch
+      currentSessionId.value = null;
+      getCurrentSessionId(); // This will generate a new ID
     }
-    
+
     updateUploadStatus('start');
     console.log('Starting upload process...');
-    
+
     // Start the upload loop
     await continueUpload();
-
   } catch (error) {
     console.error('Upload process failed:', error);
     showNotification('Upload failed: ' + (error.message || 'Unknown error'), 'error');

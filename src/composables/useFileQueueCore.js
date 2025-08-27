@@ -1,50 +1,55 @@
-import { ref, shallowRef } from 'vue'
+import { ref, shallowRef } from 'vue';
 
 export function useFileQueueCore() {
-  
   // Reactive data - Use shallowRef for better performance with large file arrays
-  const uploadQueue = shallowRef([])
+  const uploadQueue = shallowRef([]);
 
   // Template refs
-  const fileInput = ref(null)
-  const folderInput = ref(null)
+  const fileInput = ref(null);
+  const folderInput = ref(null);
 
   // Helper function to get file path consistently
   const getFilePath = (fileRef) => {
     // Handle direct file objects
     if (fileRef instanceof File) {
-      return fileRef.path || fileRef.webkitRelativePath || fileRef.name
+      return fileRef.path || fileRef.webkitRelativePath || fileRef.name;
     }
     // Handle file reference objects
-    return fileRef.path || fileRef.file?.webkitRelativePath || fileRef.file?.path || fileRef.file?.name || fileRef.name
-  }
+    return (
+      fileRef.path ||
+      fileRef.file?.webkitRelativePath ||
+      fileRef.file?.path ||
+      fileRef.file?.name ||
+      fileRef.name
+    );
+  };
 
   // File input handlers
   const triggerFileSelect = () => {
-    fileInput.value.click()
-  }
+    fileInput.value.click();
+  };
 
   const triggerFolderSelect = () => {
-    folderInput.value.click()
-  }
+    folderInput.value.click();
+  };
 
   // File processing functions
   const processSingleFile = async (file, processFiles) => {
     // For single files, add to queue
-    await addFilesToQueue([file], processFiles)
-  }
+    await addFilesToQueue([file], processFiles);
+  };
 
   const addFilesToQueue = async (files, processFiles) => {
-    if (files.length === 0) return
-    const startTime = Date.now()
-    await processFiles(files)
+    if (files.length === 0) return;
+    const startTime = Date.now();
+    await processFiles(files);
     // Note: Total time will be logged when UI update completes
-    window.endToEndStartTime = startTime
-  }
+    window.endToEndStartTime = startTime;
+  };
 
   // Helper function to process a chunk of files into queue format
   const processFileChunk = (files) => {
-    return files.map(fileRef => {
+    return files.map((fileRef) => {
       const queueItem = {
         id: crypto.randomUUID(),
         file: fileRef.file,
@@ -55,34 +60,34 @@ export function useFileQueueCore() {
         type: fileRef.file.type,
         lastModified: fileRef.file.lastModified,
         path: fileRef.path || getFilePath(fileRef),
-        isDuplicate: fileRef.status === 'uploadMetadataOnly'
-      }
-      
+        isDuplicate: fileRef.status === 'uploadMetadataOnly',
+      };
+
       // Only include hash if it was calculated during deduplication process
       if (fileRef.hash) {
-        queueItem.hash = fileRef.hash
+        queueItem.hash = fileRef.hash;
       }
-      
-      return queueItem
-    })
-  }
+
+      return queueItem;
+    });
+  };
 
   // Queue management
   const removeFromQueue = (fileId) => {
-    const index = uploadQueue.value.findIndex(f => f.id === fileId)
+    const index = uploadQueue.value.findIndex((f) => f.id === fileId);
     if (index > -1) {
-      uploadQueue.value.splice(index, 1)
+      uploadQueue.value.splice(index, 1);
     }
-  }
+  };
 
   const clearQueue = () => {
-    uploadQueue.value = []
-  }
+    uploadQueue.value = [];
+  };
 
   const startUpload = () => {
     // Placeholder for actual upload implementation
     // TODO: Implement file upload logic
-  }
+  };
 
   return {
     // Reactive data
@@ -99,6 +104,6 @@ export function useFileQueueCore() {
     processFileChunk,
     removeFromQueue,
     clearQueue,
-    startUpload
-  }
+    startUpload,
+  };
 }

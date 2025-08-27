@@ -9,7 +9,7 @@ export function useQueueProgress() {
     processMainThreadDeduplication,
     processDuplicateGroups,
     onProgress = null,
-    skippedFolders = [],
+    skippedFolders = []
   ) => {
     logProcessingTime('DEDUPLICATION_START');
 
@@ -17,7 +17,7 @@ export function useQueueProgress() {
     const { uniqueFiles, hashGroups, skippedFiles } = await processMainThreadDeduplication(
       files,
       onProgress,
-      skippedFolders,
+      skippedFolders
     );
 
     if (skippedFiles && skippedFiles.length > 0) {
@@ -57,7 +57,7 @@ export function useQueueProgress() {
     updateUploadQueue,
     processFilesWithWorker,
     processFilesMainThread,
-    onProgress = null,
+    onProgress = null
   ) => {
     // Check if files array is valid
     if (!files || !Array.isArray(files) || files.length === 0) {
@@ -97,7 +97,7 @@ export function useQueueProgress() {
     files,
     updateUploadQueue,
     processFilesMainThread,
-    onProgress = null,
+    onProgress = null
   ) => {
     console.info('Force fallback: Processing files on main thread');
     return processFilesMainThread(files, updateUploadQueue, onProgress);

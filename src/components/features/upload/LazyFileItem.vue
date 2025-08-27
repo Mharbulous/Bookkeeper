@@ -136,7 +136,6 @@ import { useLazyHashTooltip } from '../../../composables/useLazyHashTooltip.js';
 
 // Props
 const props = defineProps({
-  // eslint-disable-line no-unused-vars
   file: {
     type: Object,
     required: true,

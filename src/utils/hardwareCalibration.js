@@ -32,22 +32,24 @@ export function calculateCalibratedProcessingTime(folderData, hardwarePerformanc
     duplicateCandidates,
     duplicateCandidatesSizeMB,
     avgDirectoryDepth = 2.5,
-    totalDirectoryCount = 0
+    totalDirectoryCount = 0,
   } = folderData;
 
   // Validate and normalize hardware performance factor
   if (hardwarePerformanceFactor <= 0) {
-    console.warn(`Invalid hardwarePerformanceFactor: ${hardwarePerformanceFactor}, using baseline 1.61`)
+    console.warn(
+      `Invalid hardwarePerformanceFactor: ${hardwarePerformanceFactor}, using baseline 1.61`
+    );
     hardwarePerformanceFactor = 1.61; // Use baseline instead of failing
   }
-  
+
   // Validate and normalize folder data
   const safeData = {
     totalFiles: Math.max(1, totalFiles || 1), // Ensure at least 1 file
     duplicateCandidates: Math.max(0, duplicateCandidates || 0),
     duplicateCandidatesSizeMB: Math.max(0, duplicateCandidatesSizeMB || 0),
     avgDirectoryDepth: Math.max(1, avgDirectoryDepth || 2.5),
-    totalDirectoryCount: Math.max(1, totalDirectoryCount || 1)
+    totalDirectoryCount: Math.max(1, totalDirectoryCount || 1),
   };
 
   // Phase 1: Filtering (size-based duplicate detection)
@@ -61,27 +63,29 @@ export function calculateCalibratedProcessingTime(folderData, hardwarePerformanc
   // This accounts for both computational overhead and I/O overhead
   const PHASE2_BASE_MS = 35;
   const PHASE2_CANDIDATE_FACTOR = 6.5; // ms per duplicate candidate
-  const PHASE2_SIZE_FACTOR = 0.8;      // ms per MB of duplicate data
-  
-  const phase2BaseTime = PHASE2_BASE_MS + 
-                        (safeData.duplicateCandidates * PHASE2_CANDIDATE_FACTOR) + 
-                        (safeData.duplicateCandidatesSizeMB * PHASE2_SIZE_FACTOR);
+  const PHASE2_SIZE_FACTOR = 0.8; // ms per MB of duplicate data
+
+  const phase2BaseTime =
+    PHASE2_BASE_MS +
+    safeData.duplicateCandidates * PHASE2_CANDIDATE_FACTOR +
+    safeData.duplicateCandidatesSizeMB * PHASE2_SIZE_FACTOR;
 
   // Phase 3: UI Rendering (hardware and complexity calibrated)
   // Scales with file count and directory complexity
   const PHASE3_BASE_MS = 50;
-  const PHASE3_FILE_FACTOR = 0.52;     // ms per file for UI rendering
-  const PHASE3_DEPTH_FACTOR = 45;      // ms per average directory depth level
-  
-  const phase3BaseTime = PHASE3_BASE_MS + 
-                        (safeData.totalFiles * PHASE3_FILE_FACTOR) + 
-                        (safeData.avgDirectoryDepth * PHASE3_DEPTH_FACTOR);
+  const PHASE3_FILE_FACTOR = 0.52; // ms per file for UI rendering
+  const PHASE3_DEPTH_FACTOR = 45; // ms per average directory depth level
+
+  const phase3BaseTime =
+    PHASE3_BASE_MS +
+    safeData.totalFiles * PHASE3_FILE_FACTOR +
+    safeData.avgDirectoryDepth * PHASE3_DEPTH_FACTOR;
 
   // Apply hardware calibration factor
   // H represents the relationship between hardware speed and actual performance
   // Higher H = faster hardware = faster processing
   const hardwareCalibrationMultiplier = 1.61 / hardwarePerformanceFactor; // 1.61 is baseline H
-  
+
   const calibratedPhase2 = phase2BaseTime * hardwareCalibrationMultiplier;
   const calibratedPhase3 = phase3BaseTime * hardwareCalibrationMultiplier;
 
@@ -93,22 +97,21 @@ export function calculateCalibratedProcessingTime(folderData, hardwarePerformanc
     phases: {
       phase1FilteringMs: Math.round(phase1TimeMs),
       phase2HashingMs: Math.round(calibratedPhase2),
-      phase3RenderingMs: Math.round(calibratedPhase3)
+      phase3RenderingMs: Math.round(calibratedPhase3),
     },
     calibration: {
       hardwarePerformanceFactor,
       baselineH: 1.61,
       calibrationMultiplier: hardwareCalibrationMultiplier,
-      isCalibrated: true
+      isCalibrated: true,
     },
     breakdown: {
       phase1Description: 'Size-based filtering to identify duplicate candidates',
       phase2Description: `Hash calculation for ${safeData.duplicateCandidates} duplicate candidates (${safeData.duplicateCandidatesSizeMB.toFixed(1)} MB)`,
-      phase3Description: `UI rendering for ${safeData.totalFiles} files with ${safeData.avgDirectoryDepth.toFixed(1)} avg depth`
-    }
+      phase3Description: `UI rendering for ${safeData.totalFiles} files with ${safeData.avgDirectoryDepth.toFixed(1)} avg depth`,
+    },
   };
 }
-
 
 /**
  * Get stored hardware performance factor from localStorage
@@ -123,51 +126,55 @@ export function getStoredHardwarePerformanceFactor() {
     }
 
     const data = JSON.parse(stored);
-    
+
     // Validate data structure
     if (!data || typeof data !== 'object') {
       console.warn('Invalid stored hardware performance data structure, clearing corrupt data');
       localStorage.removeItem('hardwarePerformanceFactor');
       return null;
     }
-    
+
     // Validate measurements array
     if (!Array.isArray(data.measurements) || data.measurements.length === 0) {
       console.warn('No valid measurements found in stored data');
       return null;
     }
-    
+
     // Use recent measurements (within last 10 measurements) for better accuracy
     const recentMeasurements = data.measurements.slice(-10);
-    
+
     // Validate and filter measurements
-    const validMeasurements = recentMeasurements.filter(m => {
-      return m && 
-             typeof m.H === 'number' && 
-             m.H > 0 && 
-             m.H < 100 && // Sanity check: H should be reasonable
-             !isNaN(m.H)
+    const validMeasurements = recentMeasurements.filter((m) => {
+      return (
+        m &&
+        typeof m.H === 'number' &&
+        m.H > 0 &&
+        m.H < 100 && // Sanity check: H should be reasonable
+        !isNaN(m.H)
+      );
     });
-    
+
     if (validMeasurements.length === 0) {
       console.warn('No valid measurements found, clearing corrupt calibration data');
       localStorage.removeItem('hardwarePerformanceFactor');
       return null;
     }
-    
+
     const avgH = validMeasurements.reduce((sum, m) => sum + m.H, 0) / validMeasurements.length;
-    
+
     // Final validation of calculated average
     if (!avgH || avgH <= 0 || isNaN(avgH)) {
       console.warn(`Invalid calculated H-factor: ${avgH}, clearing calibration data`);
       localStorage.removeItem('hardwarePerformanceFactor');
       return null;
     }
-    
+
     return avgH;
-    
   } catch (error) {
-    console.warn('Error retrieving stored hardware performance factor, clearing potentially corrupt data:', error);
+    console.warn(
+      'Error retrieving stored hardware performance factor, clearing potentially corrupt data:',
+      error
+    );
     try {
       localStorage.removeItem('hardwarePerformanceFactor');
     } catch (clearError) {
@@ -183,24 +190,34 @@ export function getStoredHardwarePerformanceFactor() {
  * @param {number} folderAnalysisTimeMs - Folder analysis time
  * @param {Object} additionalData - Additional context data
  */
-export function storeHardwarePerformanceFactor(totalFiles, folderAnalysisTimeMs, additionalData = {}) {
+export function storeHardwarePerformanceFactor(
+  totalFiles,
+  folderAnalysisTimeMs,
+  additionalData = {}
+) {
   try {
     // Validate input parameters
     if (!totalFiles || totalFiles <= 0 || !Number.isInteger(totalFiles)) {
       console.warn(`Invalid totalFiles for calibration: ${totalFiles}`);
       return;
     }
-    
-    if (!folderAnalysisTimeMs || folderAnalysisTimeMs <= 0 || !Number.isFinite(folderAnalysisTimeMs)) {
+
+    if (
+      !folderAnalysisTimeMs ||
+      folderAnalysisTimeMs <= 0 ||
+      !Number.isFinite(folderAnalysisTimeMs)
+    ) {
       console.warn(`Invalid folderAnalysisTimeMs for calibration: ${folderAnalysisTimeMs}`);
       return;
     }
-    
+
     const H = calculateHardwarePerformanceFactor(totalFiles, folderAnalysisTimeMs);
-    
+
     // Enhanced validation for H-factor
     if (!H || H <= 0 || !Number.isFinite(H) || H > 100) {
-      console.warn(`Invalid calculated H-factor: ${H} (files: ${totalFiles}, time: ${folderAnalysisTimeMs}ms)`);
+      console.warn(
+        `Invalid calculated H-factor: ${H} (files: ${totalFiles}, time: ${folderAnalysisTimeMs}ms)`
+      );
       return;
     }
 
@@ -209,7 +226,7 @@ export function storeHardwarePerformanceFactor(totalFiles, folderAnalysisTimeMs,
       totalFiles,
       folderAnalysisTimeMs,
       H: Math.round(H * 1000) / 1000, // Round to 3 decimal places
-      ...additionalData
+      ...additionalData,
     };
 
     let stored = { measurements: [] };
@@ -240,13 +257,16 @@ export function storeHardwarePerformanceFactor(totalFiles, folderAnalysisTimeMs,
     // Update statistics
     stored.lastUpdated = Date.now();
     stored.totalMeasurements = stored.measurements.length;
-    stored.currentAvgH = stored.measurements.reduce((sum, m) => sum + m.H, 0) / stored.measurements.length;
+    stored.currentAvgH =
+      stored.measurements.reduce((sum, m) => sum + m.H, 0) / stored.measurements.length;
 
     // Attempt to store with error handling
     try {
       const serialized = JSON.stringify(stored);
       localStorage.setItem('hardwarePerformanceFactor', serialized);
-      console.log(`📊 Hardware Performance Factor stored: H = ${H.toFixed(3)} files/ms (${stored.totalMeasurements} measurements, avg: ${stored.currentAvgH.toFixed(3)})`);
+      console.log(
+        `📊 Hardware Performance Factor stored: H = ${H.toFixed(3)} files/ms (${stored.totalMeasurements} measurements, avg: ${stored.currentAvgH.toFixed(3)})`
+      );
     } catch (storageError) {
       console.error('Failed to save hardware performance factor to localStorage:', storageError);
       // Check if it's a storage quota error
@@ -256,10 +276,13 @@ export function storeHardwarePerformanceFactor(totalFiles, folderAnalysisTimeMs,
           // Keep only last 10 measurements and try again
           stored.measurements = stored.measurements.slice(-10);
           stored.totalMeasurements = stored.measurements.length;
-          stored.currentAvgH = stored.measurements.reduce((sum, m) => sum + m.H, 0) / stored.measurements.length;
+          stored.currentAvgH =
+            stored.measurements.reduce((sum, m) => sum + m.H, 0) / stored.measurements.length;
           const compactSerialized = JSON.stringify(stored);
           localStorage.setItem('hardwarePerformanceFactor', compactSerialized);
-          console.log(`📊 Hardware Performance Factor stored (compact): H = ${H.toFixed(3)} files/ms (${stored.totalMeasurements} measurements)`);
+          console.log(
+            `📊 Hardware Performance Factor stored (compact): H = ${H.toFixed(3)} files/ms (${stored.totalMeasurements} measurements)`
+          );
         } catch (retryError) {
           console.error('Failed to store even compact calibration data:', retryError);
         }
@@ -282,12 +305,13 @@ export function getHardwareCalibrationStats() {
       if (data.measurements && data.measurements.length > 0) {
         const measurements = data.measurements;
         const recentMeasurements = measurements.slice(-10);
-        
+
         const avgH = measurements.reduce((sum, m) => sum + m.H, 0) / measurements.length;
-        const recentAvgH = recentMeasurements.reduce((sum, m) => sum + m.H, 0) / recentMeasurements.length;
-        const minH = Math.min(...measurements.map(m => m.H));
-        const maxH = Math.max(...measurements.map(m => m.H));
-        
+        const recentAvgH =
+          recentMeasurements.reduce((sum, m) => sum + m.H, 0) / recentMeasurements.length;
+        const minH = Math.min(...measurements.map((m) => m.H));
+        const maxH = Math.max(...measurements.map((m) => m.H));
+
         return {
           isCalibrated: true,
           totalMeasurements: measurements.length,
@@ -297,14 +321,14 @@ export function getHardwareCalibrationStats() {
           maxH: parseFloat(maxH.toFixed(3)),
           lastMeasurement: measurements[measurements.length - 1],
           calibrationAge: Date.now() - data.lastUpdated,
-          measurements: measurements
+          measurements: measurements,
         };
       }
     }
   } catch (error) {
     console.warn('Error getting hardware calibration stats:', error);
   }
-  
+
   return {
     isCalibrated: false,
     totalMeasurements: 0,
@@ -314,7 +338,7 @@ export function getHardwareCalibrationStats() {
     maxH: 0,
     lastMeasurement: null,
     calibrationAge: Infinity,
-    measurements: []
+    measurements: [],
   };
 }
 

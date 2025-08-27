@@ -1,12 +1,12 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { db, auth } from './firebase.js'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from './firebase.js';
 
 /**
  * UserService - Manages user information and display names
  */
 export class UserService {
   // Cache to prevent repeated lookups for the same user
-  static userCache = new Map()
+  static userCache = new Map();
 
   /**
    * Get display name for a user ID
@@ -15,49 +15,48 @@ export class UserService {
    */
   static async getUserDisplayName(userId) {
     if (!userId) {
-      return 'Unknown User'
+      return 'Unknown User';
     }
 
     // Check cache first
     if (this.userCache.has(userId)) {
-      return this.userCache.get(userId)
+      return this.userCache.get(userId);
     }
-
 
     try {
       // Try to get basic info from current Firebase Auth user if it's the same user
       if (auth.currentUser && auth.currentUser.uid === userId) {
         const displayName =
-          auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Current User'
-        this.userCache.set(userId, displayName)
-        return displayName
+          auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Current User';
+        this.userCache.set(userId, displayName);
+        return displayName;
       }
 
       // For other users, we can't get display names from Firebase Auth (security restriction)
       // and we no longer store identity data in Firestore (single source of truth)
       // So we fall back to UID-based display names
 
-      let displayName = 'Unknown User'
-      
+      let displayName = 'Unknown User';
+
       if (userId.includes('@')) {
         // If userId looks like an email, use the part before @
-        displayName = userId.split('@')[0]
+        displayName = userId.split('@')[0];
       } else if (userId.length > 10) {
         // For long UIDs, show a shortened version
-        displayName = `User-${userId.substring(0, 8)}`
+        displayName = `User-${userId.substring(0, 8)}`;
       } else {
-        displayName = 'Unknown User'
+        displayName = 'Unknown User';
       }
 
       // Cache the result
-      this.userCache.set(userId, displayName)
-      return displayName
+      this.userCache.set(userId, displayName);
+      return displayName;
     } catch (error) {
-      console.error('Error fetching user display name:', error)
+      console.error('Error fetching user display name:', error);
 
       // Cache the fallback to prevent repeated failed lookups
-      this.userCache.set(userId, 'Unknown User')
-      return 'Unknown User'
+      this.userCache.set(userId, 'Unknown User');
+      return 'Unknown User';
     }
   }
 
@@ -70,12 +69,11 @@ export class UserService {
    */
   static async createOrUpdateUserDocument(firebaseUser, additionalData = {}) {
     if (!firebaseUser || !firebaseUser.uid) {
-      throw new Error('Valid Firebase user required')
+      throw new Error('Valid Firebase user required');
     }
 
-
     try {
-      const userDocRef = doc(db, 'users', firebaseUser.uid)
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
 
       // Only store application-specific data, not identity data
       const userData = {
@@ -88,21 +86,21 @@ export class UserService {
         // Activity timestamps
         updatedAt: serverTimestamp(),
         lastLogin: serverTimestamp(),
-      }
+      };
 
       // Check if document already exists
-      const existingDoc = await getDoc(userDocRef)
+      const existingDoc = await getDoc(userDocRef);
       if (!existingDoc.exists()) {
-        userData.createdAt = serverTimestamp()
+        userData.createdAt = serverTimestamp();
       }
 
-      await setDoc(userDocRef, userData, { merge: true })
+      await setDoc(userDocRef, userData, { merge: true });
 
       // Clear cache to force refresh of user data
-      this.userCache.delete(firebaseUser.uid)
+      this.userCache.delete(firebaseUser.uid);
     } catch (error) {
-      console.error('Error creating/updating user document:', error)
-      throw error
+      console.error('Error creating/updating user document:', error);
+      throw error;
     }
   }
 
@@ -110,7 +108,7 @@ export class UserService {
    * Clear the user cache (useful for testing or when user data changes)
    */
   static clearCache() {
-    this.userCache.clear()
+    this.userCache.clear();
   }
 
   /**
@@ -119,15 +117,15 @@ export class UserService {
    * @returns {Promise<Map>} Map of userId -> displayName
    */
   static async preloadUserDisplayNames(userIds) {
-    const results = new Map()
+    const results = new Map();
     const promises = userIds.map(async (userId) => {
-      const displayName = await this.getUserDisplayName(userId)
-      results.set(userId, displayName)
-    })
+      const displayName = await this.getUserDisplayName(userId);
+      results.set(userId, displayName);
+    });
 
-    await Promise.all(promises)
-    return results
+    await Promise.all(promises);
+    return results;
   }
 }
 
-export default UserService
+export default UserService;

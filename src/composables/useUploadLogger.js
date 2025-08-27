@@ -1,10 +1,9 @@
-import { db } from '../services/firebase.js'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
-import { useAuthStore } from '../stores/auth.js'
+import { db } from '../services/firebase.js';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuthStore } from '../stores/auth.js';
 
 export function useUploadLogger() {
-  const authStore = useAuthStore()
-  
+  const authStore = useAuthStore();
 
   /**
    * Log a simple upload event with minimal essential information
@@ -16,11 +15,11 @@ export function useUploadLogger() {
    */
   const logUploadEvent = async (event) => {
     try {
-      const teamId = authStore.currentTeam
+      const teamId = authStore.currentTeam;
       if (!teamId) {
-        throw new Error('No team ID available for logging')
+        throw new Error('No team ID available for logging');
       }
-      
+
       // Create minimal upload event with only essential fields
       const eventData = {
         eventType: event.eventType,
@@ -29,25 +28,32 @@ export function useUploadLogger() {
         fileHash: event.fileHash,
         metadataHash: event.metadataHash,
         teamId: teamId,
-        userId: authStore.user.uid
-      }
-      
-      const eventsCollection = collection(db, 'teams', teamId, 'matters', 'general', 'uploadEvents')
-      const docRef = await addDoc(eventsCollection, eventData)
-      
+        userId: authStore.user.uid,
+      };
+
+      const eventsCollection = collection(
+        db,
+        'teams',
+        teamId,
+        'matters',
+        'general',
+        'uploadEvents'
+      );
+      const docRef = await addDoc(eventsCollection, eventData);
+
       console.log(`Upload event logged: ${event.eventType} - ${event.fileName}`, {
         eventId: docRef.id,
-        fileHash: event.fileHash
-      })
-      
-      return docRef.id
+        fileHash: event.fileHash,
+      });
+
+      return docRef.id;
     } catch (error) {
-      console.error('Failed to log upload event:', error)
-      throw error
+      console.error('Failed to log upload event:', error);
+      throw error;
     }
-  }
-  
+  };
+
   return {
-    logUploadEvent
-  }
+    logUploadEvent,
+  };
 }

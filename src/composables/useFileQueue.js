@@ -1,35 +1,35 @@
-import { ref, nextTick } from 'vue'
-import { logProcessingTime } from '../utils/processingTimer.js'
-import { useFileQueueCore } from './useFileQueueCore'
+import { ref, nextTick } from 'vue';
+import { logProcessingTime } from '../utils/processingTimer.js';
+import { useFileQueueCore } from './useFileQueueCore';
 
 export function useFileQueue() {
   // Initialize core queue management
-  const queueCore = useFileQueueCore()
+  const queueCore = useFileQueueCore();
 
   // Time monitoring for cloud file detection
-  let timeWarningInstance = null
+  let timeWarningInstance = null;
 
   // UI-specific reactive data
-  const showSingleFileNotification = ref(false)
-  const singleFileNotification = ref({ message: '', color: 'info' })
-  
+  const showSingleFileNotification = ref(false);
+  const singleFileNotification = ref({ message: '', color: 'info' });
+
   // Progress state tracking
   const processingProgress = ref({
     current: 0,
     total: 0,
     percentage: 0,
     currentFile: '',
-    isProcessing: false
-  })
-  
+    isProcessing: false,
+  });
+
   // UI update progress tracking
-  const isProcessingUIUpdate = ref(false)
+  const isProcessingUIUpdate = ref(false);
   const uiUpdateProgress = ref({
     current: 0,
     total: 0,
     percentage: 0,
-    phase: 'loading' // 'loading', 'awaiting-upload', 'complete'
-  })
+    phase: 'loading', // 'loading', 'awaiting-upload', 'complete'
+  });
 
   // Upload status tracking
   const uploadStatus = ref({
@@ -41,8 +41,8 @@ export function useFileQueue() {
     pauseRequested: false,
     currentFile: null,
     currentAction: null, // 'calculating_hash', 'checking_existing', 'uploading'
-    currentUploadIndex: 0
-  })
+    currentUploadIndex: 0,
+  });
 
   // Worker progress update handler
   const updateProgress = (progressData) => {
@@ -51,9 +51,9 @@ export function useFileQueue() {
       total: progressData.total || 0,
       percentage: progressData.percentage || 0,
       currentFile: progressData.currentFile || '',
-      isProcessing: true
-    }
-  }
+      isProcessing: true,
+    };
+  };
 
   // Reset progress when processing completes
   const resetProgress = () => {
@@ -62,25 +62,25 @@ export function useFileQueue() {
       total: 0,
       percentage: 0,
       currentFile: '',
-      isProcessing: false
-    }
-  }
-  
+      isProcessing: false,
+    };
+  };
+
   // Reset UI update progress
   const resetUIProgress = () => {
-    isProcessingUIUpdate.value = false
+    isProcessingUIUpdate.value = false;
     uiUpdateProgress.value = {
       current: 0,
       total: 0,
       percentage: 0,
-      phase: 'loading'
-    }
-  }
+      phase: 'loading',
+    };
+  };
 
   // Set phase to complete (called when upload actually starts)
   const setPhaseComplete = () => {
-    uiUpdateProgress.value.phase = 'complete'
-  }
+    uiUpdateProgress.value.phase = 'complete';
+  };
 
   // Upload status management
   const resetUploadStatus = () => {
@@ -93,9 +93,9 @@ export function useFileQueue() {
       pauseRequested: false,
       currentFile: null,
       currentAction: null,
-      currentUploadIndex: 0
-    }
-  }
+      currentUploadIndex: 0,
+    };
+  };
 
   // Individual file status update function
   const updateFileStatus = (fileReference, status) => {
@@ -103,91 +103,91 @@ export function useFileQueue() {
     let file;
     if (typeof fileReference === 'string') {
       // Legacy filename-based lookup (less reliable but kept for compatibility)
-      file = queueCore.uploadQueue.value.find(f => f.name === fileReference)
+      file = queueCore.uploadQueue.value.find((f) => f.name === fileReference);
     } else if (fileReference && typeof fileReference === 'object') {
       // Direct file object reference (preferred approach)
-      file = fileReference
+      file = fileReference;
     }
-    
+
     if (file) {
-      file.status = status
+      file.status = status;
     }
-  }
+  };
 
   // Update all ready files to "ready" status after deduplication completes
   const updateAllFilesToReady = () => {
-    queueCore.uploadQueue.value.forEach(file => {
+    queueCore.uploadQueue.value.forEach((file) => {
       if (!file.isDuplicate && (!file.status || file.status === 'pending')) {
-        file.status = 'ready'
+        file.status = 'ready';
       }
-    })
-  }
+    });
+  };
 
   const updateUploadStatus = (type, fileName = null, action = null) => {
     switch (type) {
       case 'start':
-        uploadStatus.value.isUploading = true
-        uploadStatus.value.isPaused = false
-        uploadStatus.value.pauseRequested = false
-        break
+        uploadStatus.value.isUploading = true;
+        uploadStatus.value.isPaused = false;
+        uploadStatus.value.pauseRequested = false;
+        break;
       case 'complete':
-        uploadStatus.value.isUploading = false
-        uploadStatus.value.isPaused = false
-        uploadStatus.value.pauseRequested = false
-        uploadStatus.value.currentFile = null
-        uploadStatus.value.currentAction = null
-        uploadStatus.value.currentUploadIndex = 0
-        break
+        uploadStatus.value.isUploading = false;
+        uploadStatus.value.isPaused = false;
+        uploadStatus.value.pauseRequested = false;
+        uploadStatus.value.currentFile = null;
+        uploadStatus.value.currentAction = null;
+        uploadStatus.value.currentUploadIndex = 0;
+        break;
       case 'pause':
-        uploadStatus.value.isPaused = true
-        uploadStatus.value.isUploading = false
-        uploadStatus.value.pauseRequested = false
-        break
+        uploadStatus.value.isPaused = true;
+        uploadStatus.value.isUploading = false;
+        uploadStatus.value.pauseRequested = false;
+        break;
       case 'resume':
-        uploadStatus.value.isPaused = false
-        uploadStatus.value.isUploading = true
-        uploadStatus.value.pauseRequested = false
-        break
+        uploadStatus.value.isPaused = false;
+        uploadStatus.value.isUploading = true;
+        uploadStatus.value.pauseRequested = false;
+        break;
       case 'requestPause':
-        uploadStatus.value.pauseRequested = true
-        break
+        uploadStatus.value.pauseRequested = true;
+        break;
       case 'successful':
-        uploadStatus.value.successful++
-        break
+        uploadStatus.value.successful++;
+        break;
       case 'failed':
-        uploadStatus.value.failed++
-        break
+        uploadStatus.value.failed++;
+        break;
       case 'skipped':
-        uploadStatus.value.skipped++
-        break
+        uploadStatus.value.skipped++;
+        break;
       case 'currentFile':
-        uploadStatus.value.currentFile = fileName
-        uploadStatus.value.currentAction = action
-        break
+        uploadStatus.value.currentFile = fileName;
+        uploadStatus.value.currentAction = action;
+        break;
       case 'setUploadIndex':
-        uploadStatus.value.currentUploadIndex = fileName // reusing fileName param for index
-        break
+        uploadStatus.value.currentUploadIndex = fileName; // reusing fileName param for index
+        break;
     }
-  }
+  };
 
   // Instant Upload Queue initialization - show immediately with first 100 files
   const initializeQueueInstantly = async (files) => {
-    const totalFiles = files.length
-    
+    const totalFiles = files.length;
+
     // Show Upload Queue immediately
-    isProcessingUIUpdate.value = true
+    isProcessingUIUpdate.value = true;
     uiUpdateProgress.value = {
       current: 0,
       total: totalFiles,
       percentage: 0,
-      phase: 'loading'
-    }
-    
+      phase: 'loading',
+    };
+
     // Force Vue reactivity update
-    await nextTick()
-    
+    await nextTick();
+
     // Process first 100 files instantly for immediate display
-    const initialFiles = files.slice(0, 100).map(file => ({
+    const initialFiles = files.slice(0, 100).map((file) => ({
       id: crypto.randomUUID(),
       file: file,
       metadata: {},
@@ -197,231 +197,233 @@ export function useFileQueue() {
       type: file.type,
       lastModified: file.lastModified,
       path: file.path,
-      isDuplicate: false
-    }))
-    
-    queueCore.uploadQueue.value = initialFiles
-    
+      isDuplicate: false,
+    }));
+
+    queueCore.uploadQueue.value = initialFiles;
+
     if (totalFiles <= 100) {
       uiUpdateProgress.value = {
         current: totalFiles,
         total: totalFiles,
         percentage: 100,
-        phase: 'awaiting-upload'
-      }
-      isProcessingUIUpdate.value = false
+        phase: 'awaiting-upload',
+      };
+      isProcessingUIUpdate.value = false;
     } else {
       uiUpdateProgress.value = {
         current: 100,
         total: totalFiles,
         percentage: Math.round((100 / totalFiles) * 100),
-        phase: 'loading'
-      }
+        phase: 'loading',
+      };
     }
-  }
+  };
 
   // Simple 2-chunk UI updates for optimal user feedback
   const updateFromWorkerResults = async (readyFiles, duplicateFiles) => {
-    const allFiles = [...readyFiles, ...duplicateFiles]
-    const totalFiles = allFiles.length
-    
+    const allFiles = [...readyFiles, ...duplicateFiles];
+    const totalFiles = allFiles.length;
+
     // Start UI update process (if not already started by initializeQueueInstantly)
     if (!isProcessingUIUpdate.value) {
-      isProcessingUIUpdate.value = true
+      isProcessingUIUpdate.value = true;
       uiUpdateProgress.value = {
         current: 0,
         total: totalFiles,
         percentage: 0,
-        phase: 'loading'
-      }
+        phase: 'loading',
+      };
     }
-    
+
     if (totalFiles <= 100) {
       // For small file sets, just load everything at once
-      queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles)
-      
+      queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles);
+
       uiUpdateProgress.value = {
         current: totalFiles,
         total: totalFiles,
         percentage: 100,
-        phase: 'awaiting-upload'
-      }
-      
+        phase: 'awaiting-upload',
+      };
+
       // Wait for Vue to complete DOM rendering for single chunk
-      await nextTick()
-      await new Promise(resolve => setTimeout(resolve, 0))
+      await nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
     } else {
       // For large file sets, check if queue was already initialized instantly
       if (queueCore.uploadQueue.value.length > 0) {
         // Queue was already initialized with first 100 files
         // Ensure minimum loading display time (at least 1.5 seconds for spinner visibility)
-        const minLoadingTime = 1500
-        const elapsedTime = window.instantQueueStartTime ? Date.now() - window.instantQueueStartTime : 0
-        const remainingTime = Math.max(0, minLoadingTime - elapsedTime)
-        
+        const minLoadingTime = 1500;
+        const elapsedTime = window.instantQueueStartTime
+          ? Date.now() - window.instantQueueStartTime
+          : 0;
+        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+
         if (remainingTime > 0) {
-          await new Promise(resolve => setTimeout(resolve, remainingTime))
+          await new Promise((resolve) => setTimeout(resolve, remainingTime));
         }
-        
+
         // Then replace with full processed results
-        queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles)
-        
+        queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles);
+
         uiUpdateProgress.value = {
           current: totalFiles,
           total: totalFiles,
           percentage: 100,
-          phase: 'awaiting-upload'
-        }
-        
+          phase: 'awaiting-upload',
+        };
+
         // Clean up timestamp
-        window.instantQueueStartTime = null
+        window.instantQueueStartTime = null;
       } else {
         // Fallback to original 2-chunk strategy if queue wasn't pre-initialized
         // CHUNK 1: Initial batch (first 100 files) - immediate user feedback
-        const chunk1Size = 100
-        const chunk1Files = allFiles.slice(0, chunk1Size)
-        queueCore.uploadQueue.value = queueCore.processFileChunk(chunk1Files)
-        
+        const chunk1Size = 100;
+        const chunk1Files = allFiles.slice(0, chunk1Size);
+        queueCore.uploadQueue.value = queueCore.processFileChunk(chunk1Files);
+
         uiUpdateProgress.value = {
           current: chunk1Size,
           total: totalFiles,
           percentage: Math.round((chunk1Size / totalFiles) * 100),
-          phase: 'loading'
-        }
-        
+          phase: 'loading',
+        };
+
         // Brief delay to let user see the initial files and get visual feedback
-        await new Promise(resolve => setTimeout(resolve, 200))
-        
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
         // CHUNK 2: Full render of ALL files
-        queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles)
-        
+        queueCore.uploadQueue.value = queueCore.processFileChunk(allFiles);
+
         uiUpdateProgress.value = {
           current: totalFiles,
           total: totalFiles,
           percentage: 100,
-          phase: 'awaiting-upload'
-        }
+          phase: 'awaiting-upload',
+        };
       }
-      
+
       // Wait for Vue to complete DOM rendering
-      await nextTick()
-      await new Promise(resolve => setTimeout(resolve, 0))
+      await nextTick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
-    
-    logProcessingTime('ALL_FILES_DISPLAYED')
-    
+
+    logProcessingTime('ALL_FILES_DISPLAYED');
+
     // Clean up timing variables
     if (window.endToEndStartTime) {
-      window.endToEndStartTime = null
+      window.endToEndStartTime = null;
     }
     if (window.folderProcessingStartTime) {
-      window.folderProcessingStartTime = null
+      window.folderProcessingStartTime = null;
     }
-    
+
     // Complete the UI update process
-    isProcessingUIUpdate.value = false
-    
+    isProcessingUIUpdate.value = false;
+
     // Stop time monitoring when processing completes
     if (timeWarningInstance) {
-      timeWarningInstance.stopMonitoring()
+      timeWarningInstance.stopMonitoring();
     }
-    
+
     // Reset processing progress when complete
-    resetProgress()
-  }
+    resetProgress();
+  };
 
   // Legacy method - maintains backward compatibility
   const updateUploadQueue = async (readyFiles, duplicateFiles) => {
-    await updateFromWorkerResults(readyFiles, duplicateFiles)
-  }
+    await updateFromWorkerResults(readyFiles, duplicateFiles);
+  };
 
   // Time monitoring integration
   const setTimeWarningInstance = (instance) => {
-    timeWarningInstance = instance
-  }
-  
+    timeWarningInstance = instance;
+  };
+
   const startTimeMonitoring = (estimatedDurationMs) => {
     if (timeWarningInstance && estimatedDurationMs > 0) {
-      timeWarningInstance.startMonitoring(estimatedDurationMs)
+      timeWarningInstance.startMonitoring(estimatedDurationMs);
     }
-  }
-  
+  };
+
   const stopTimeMonitoring = () => {
     if (timeWarningInstance) {
-      timeWarningInstance.stopMonitoring()
+      timeWarningInstance.stopMonitoring();
     }
-  }
-  
+  };
+
   const abortProcessing = () => {
     if (timeWarningInstance) {
-      timeWarningInstance.abortProcessing()
+      timeWarningInstance.abortProcessing();
     }
-    resetProgress()
-    resetUIProgress()
-  }
+    resetProgress();
+    resetUIProgress();
+  };
 
   // Utility functions
   const showNotification = (message, color = 'info') => {
-    singleFileNotification.value = { message, color }
-    showSingleFileNotification.value = true
-  }
+    singleFileNotification.value = { message, color };
+    showSingleFileNotification.value = true;
+  };
 
   // Enhanced clearQueue with comprehensive cleanup
   const clearQueue = () => {
     try {
-      console.log('Starting comprehensive cleanup...')
-      
+      console.log('Starting comprehensive cleanup...');
+
       // 1. Stop time monitoring and progress bar
       try {
         if (timeWarningInstance) {
-          timeWarningInstance.abortProcessing()
+          timeWarningInstance.abortProcessing();
         }
       } catch (error) {
-        console.warn('Error stopping time monitoring:', error)
+        console.warn('Error stopping time monitoring:', error);
       }
-      
+
       // 2. Reset processing states (idempotent operations)
       try {
-        resetProgress()
-        resetUIProgress()
-        isProcessingUIUpdate.value = false
+        resetProgress();
+        resetUIProgress();
+        isProcessingUIUpdate.value = false;
       } catch (error) {
-        console.warn('Error resetting progress states:', error)
+        console.warn('Error resetting progress states:', error);
       }
-      
+
       // 3. Clear timing variables (safe operations)
       try {
-        if (window.endToEndStartTime) window.endToEndStartTime = null
-        if (window.folderProcessingStartTime) window.folderProcessingStartTime = null
-        if (window.instantQueueStartTime) window.instantQueueStartTime = null
+        if (window.endToEndStartTime) window.endToEndStartTime = null;
+        if (window.folderProcessingStartTime) window.folderProcessingStartTime = null;
+        if (window.instantQueueStartTime) window.instantQueueStartTime = null;
       } catch (error) {
-        console.warn('Error clearing timing variables:', error)
+        console.warn('Error clearing timing variables:', error);
       }
-      
+
       // 4. Clear file queue (delegate to core) - always attempt this
       try {
-        queueCore.clearQueue()
+        queueCore.clearQueue();
       } catch (error) {
-        console.error('Error clearing file queue:', error)
+        console.error('Error clearing file queue:', error);
         // Fallback: directly clear uploadQueue if core fails
         try {
-          queueCore.uploadQueue.value = []
+          queueCore.uploadQueue.value = [];
         } catch (fallbackError) {
-          console.error('Fallback clearQueue also failed:', fallbackError)
+          console.error('Fallback clearQueue also failed:', fallbackError);
         }
       }
-      
-      console.log('Comprehensive cleanup completed successfully')
+
+      console.log('Comprehensive cleanup completed successfully');
     } catch (error) {
-      console.error('Error during comprehensive clearQueue cleanup:', error)
+      console.error('Error during comprehensive clearQueue cleanup:', error);
       // Ensure basic cleanup even if advanced cleanup fails
       try {
-        queueCore.clearQueue()
+        queueCore.clearQueue();
       } catch (fallbackError) {
-        console.error('Fallback clearQueue failed:', fallbackError)
+        console.error('Fallback clearQueue failed:', fallbackError);
       }
     }
-  }
+  };
 
   return {
     // Reactive data (from core + UI-specific)
@@ -454,7 +456,7 @@ export function useFileQueue() {
     resetProgress,
     resetUIProgress,
     showNotification,
-    
+
     // Time monitoring methods
     setTimeWarningInstance,
     startTimeMonitoring,
@@ -466,6 +468,6 @@ export function useFileQueue() {
     resetUploadStatus,
     updateUploadStatus,
     updateFileStatus,
-    updateAllFilesToReady
-  }
+    updateAllFilesToReady,
+  };
 }

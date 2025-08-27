@@ -11,14 +11,18 @@
         class="absolute left-5 top-1/2 transform -translate-y-1/2 font-bold text-lg whitespace-nowrap text-white transition-opacity duration-300 ease-in-out"
         :class="{ 'opacity-100': isHovered, 'opacity-0': !isHovered }"
       >
-Coryphaeus
+        Coryphaeus
       </div>
       <!-- Icon that appears when collapsed -->
       <div
         class="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-300 ease-in-out"
         :class="{ 'opacity-0': isHovered, 'opacity-100': !isHovered }"
       >
-        <img src="/src/assets/images/BDLC Logo transparent.png" alt="Logo" class="w-8 h-8 object-cover rounded" />
+        <img
+          src="/src/assets/images/BDLC Logo transparent.png"
+          alt="Logo"
+          class="w-8 h-8 object-cover rounded"
+        />
       </div>
       <div
         class="absolute right-2 top-1/2 transform -translate-y-1/2 text-base text-slate-400 opacity-100 transition-all duration-300 ease-in-out before:content-['❯'] group-hover:before:content-['❮']"
@@ -62,23 +66,22 @@ Coryphaeus
         >
       </router-link>
     </div>
-
   </nav>
 </template>
 
 <script>
-import AppSwitcher from '../AppSwitcher.vue'
+import AppSwitcher from '../AppSwitcher.vue';
 
 export default {
   name: 'AppSidebar',
   components: {
-    AppSwitcher
+    AppSwitcher,
   },
   data() {
     return {
-      isHovered: false
-    }
-  }
+      isHovered: false,
+    };
+  },
 };
 </script>
 

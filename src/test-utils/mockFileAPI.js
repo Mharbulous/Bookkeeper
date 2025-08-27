@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi } from 'vitest';
 
 /**
  * Mock File API utilities for testing cloud folder timeout scenarios
@@ -23,13 +23,13 @@ export const createMockFile = (name, fullPath, size = 1000, type = 'text/plain')
       size,
       type,
       lastModified: Date.now(),
-      lastModifiedDate: new Date()
-    }
-    
+      lastModifiedDate: new Date(),
+    };
+
     // Simulate async file reading
-    setTimeout(() => callback(mockFile), 10)
-  })
-})
+    setTimeout(() => callback(mockFile), 10);
+  }),
+});
 
 /**
  * Creates a mock directory entry for testing
@@ -40,44 +40,50 @@ export const createMockFile = (name, fullPath, size = 1000, type = 'text/plain')
  * @param {number} hangDelay - Delay before hanging (ms)
  * @returns {Object} Mock directory entry
  */
-export const createMockDirectory = (name, fullPath, entries = [], shouldHang = false, hangDelay = 0) => {
+export const createMockDirectory = (
+  name,
+  fullPath,
+  entries = [],
+  shouldHang = false,
+  hangDelay = 0
+) => {
   const reader = {
-    readEntries: vi.fn()
-  }
-  
+    readEntries: vi.fn(),
+  };
+
   if (shouldHang) {
     // Simulate cloud storage hanging behavior
     reader.readEntries.mockImplementation((callback) => {
       if (hangDelay > 0) {
         setTimeout(() => {
           // After delay, never call callback (infinite hang)
-        }, hangDelay)
+        }, hangDelay);
       }
       // Never calls callback to simulate hanging
-    })
+    });
   } else {
     // Normal local directory behavior
-    let callCount = 0
+    let callCount = 0;
     reader.readEntries.mockImplementation((callback) => {
       setTimeout(() => {
         if (callCount === 0) {
-          callCount++
-          callback([...entries])
+          callCount++;
+          callback([...entries]);
         } else {
-          callback([]) // End of entries
+          callback([]); // End of entries
         }
-      }, 10) // Small delay to simulate async behavior
-    })
+      }, 10); // Small delay to simulate async behavior
+    });
   }
-  
+
   return {
     name,
     fullPath,
     isFile: false,
     isDirectory: true,
-    createReader: () => reader
-  }
-}
+    createReader: () => reader,
+  };
+};
 
 /**
  * Creates a mock DataTransfer object for drag-drop testing
@@ -89,20 +95,22 @@ export const createMockDataTransfer = (items) => ({
     length: items.length,
     [Symbol.iterator]: function* () {
       for (let i = 0; i < this.length; i++) {
-        yield this[i]
+        yield this[i];
       }
     },
-    ...items.map((item, index) => ({
-      [index]: {
-        kind: 'file',
-        type: item.isDirectory ? '' : 'text/plain',
-        webkitGetAsEntry: () => item,
-        getAsFile: item.isFile ? () => item : null
-      }
-    })).reduce((acc, item, index) => ({ ...acc, [index]: item[index] }), {})
+    ...items
+      .map((item, index) => ({
+        [index]: {
+          kind: 'file',
+          type: item.isDirectory ? '' : 'text/plain',
+          webkitGetAsEntry: () => item,
+          getAsFile: item.isFile ? () => item : null,
+        },
+      }))
+      .reduce((acc, item, index) => ({ ...acc, [index]: item[index] }), {}),
   },
-  files: items.filter(item => item.isFile)
-})
+  files: items.filter((item) => item.isFile),
+});
 
 /**
  * Creates a complete mock file system structure for testing
@@ -112,26 +120,26 @@ export const createMockDataTransfer = (items) => ({
  * @returns {Array} Array of mock entries
  */
 export const createMockFileSystem = (structure, basePath = '', cloudPaths = []) => {
-  const entries = []
-  
+  const entries = [];
+
   for (const [name, content] of Object.entries(structure)) {
-    const fullPath = basePath ? `${basePath}/${name}` : `/${name}`
-    const isCloudPath = cloudPaths.some(cloudPath => fullPath.includes(cloudPath))
-    
+    const fullPath = basePath ? `${basePath}/${name}` : `/${name}`;
+    const isCloudPath = cloudPaths.some((cloudPath) => fullPath.includes(cloudPath));
+
     if (typeof content === 'object' && content !== null) {
       // Directory
-      const childEntries = createMockFileSystem(content, fullPath, cloudPaths)
-      const directory = createMockDirectory(name, fullPath, childEntries, isCloudPath)
-      entries.push(directory)
+      const childEntries = createMockFileSystem(content, fullPath, cloudPaths);
+      const directory = createMockDirectory(name, fullPath, childEntries, isCloudPath);
+      entries.push(directory);
     } else {
       // File
-      const file = createMockFile(name, fullPath, content || 1000)
-      entries.push(file)
+      const file = createMockFile(name, fullPath, content || 1000);
+      entries.push(file);
     }
   }
-  
-  return entries
-}
+
+  return entries;
+};
 
 /**
  * Cloud folder simulation scenarios for testing
@@ -140,23 +148,25 @@ export const cloudFolderScenarios = {
   /**
    * OneDrive folder that hangs on readEntries
    */
-  oneDriveHanging: (files = []) => createMockDirectory(
-    'OneDrive',
-    '/OneDrive',
-    files,
-    true // shouldHang
-  ),
+  oneDriveHanging: (files = []) =>
+    createMockDirectory(
+      'OneDrive',
+      '/OneDrive',
+      files,
+      true // shouldHang
+    ),
 
   /**
    * Google Drive folder with delayed hanging
    */
-  googleDriveDelayed: (files = [], delay = 500) => createMockDirectory(
-    'Google Drive',
-    '/Google Drive',
-    files,
-    true, // shouldHang
-    delay
-  ),
+  googleDriveDelayed: (files = [], delay = 500) =>
+    createMockDirectory(
+      'Google Drive',
+      '/Google Drive',
+      files,
+      true, // shouldHang
+      delay
+    ),
 
   /**
    * Mixed local/cloud folder structure
@@ -164,15 +174,15 @@ export const cloudFolderScenarios = {
   mixedContent: () => {
     const localFiles = [
       createMockFile('local1.txt', '/mixed/local1.txt'),
-      createMockFile('local2.txt', '/mixed/local2.txt')
-    ]
-    
+      createMockFile('local2.txt', '/mixed/local2.txt'),
+    ];
+
     const cloudSubfolder = cloudFolderScenarios.oneDriveHanging([
       createMockFile('cloud1.txt', '/mixed/OneDrive/cloud1.txt'),
-      createMockFile('cloud2.txt', '/mixed/OneDrive/cloud2.txt')
-    ])
-    
-    return createMockDirectory('mixed', '/mixed', [...localFiles, cloudSubfolder])
+      createMockFile('cloud2.txt', '/mixed/OneDrive/cloud2.txt'),
+    ]);
+
+    return createMockDirectory('mixed', '/mixed', [...localFiles, cloudSubfolder]);
   },
 
   /**
@@ -184,23 +194,23 @@ export const cloudFolderScenarios = {
       '/AllCloud',
       [
         createMockFile('cloud1.txt', '/AllCloud/cloud1.txt'),
-        createMockFile('cloud2.txt', '/AllCloud/cloud2.txt')
+        createMockFile('cloud2.txt', '/AllCloud/cloud2.txt'),
       ],
       true // shouldHang
-    )
+    );
   },
 
   /**
    * Large local folder (performance testing)
    */
   largeLocal: (fileCount = 1000) => {
-    const files = Array.from({ length: fileCount }, (_, i) => 
+    const files = Array.from({ length: fileCount }, (_, i) =>
       createMockFile(`file${i}.txt`, `/large/file${i}.txt`)
-    )
-    
-    return createMockDirectory('large', '/large', files)
-  }
-}
+    );
+
+    return createMockDirectory('large', '/large', files);
+  },
+};
 
 /**
  * Memory leak testing utilities
@@ -210,42 +220,42 @@ export const memoryTestUtils = {
    * Tracks AbortController instances for memory leak detection
    */
   trackControllers: () => {
-    const controllers = []
-    const originalAbortController = global.AbortController
-    
+    const controllers = [];
+    const originalAbortController = global.AbortController;
+
     global.AbortController = vi.fn((options) => {
-      const controller = new originalAbortController(options)
-      controllers.push(controller)
-      return controller
-    })
-    
+      const controller = new originalAbortController(options);
+      controllers.push(controller);
+      return controller;
+    });
+
     return {
       getControllerCount: () => controllers.length,
       cleanup: () => {
-        global.AbortController = originalAbortController
+        global.AbortController = originalAbortController;
       },
       verifyAllAborted: () => {
-        return controllers.every(controller => controller.signal.aborted)
-      }
-    }
+        return controllers.every((controller) => controller.signal.aborted);
+      },
+    };
   },
 
   /**
    * Simulates memory pressure for performance testing
    */
   simulateMemoryPressure: (iterations = 100) => {
-    const largeArrays = []
-    
+    const largeArrays = [];
+
     for (let i = 0; i < iterations; i++) {
       // Create large arrays to simulate memory pressure
-      largeArrays.push(new Array(10000).fill(Math.random()))
+      largeArrays.push(new Array(10000).fill(Math.random()));
     }
-    
+
     return () => {
-      largeArrays.length = 0 // Cleanup
-    }
-  }
-}
+      largeArrays.length = 0; // Cleanup
+    };
+  },
+};
 
 /**
  * Browser compatibility testing mocks
@@ -255,33 +265,33 @@ export const browserCompatMocks = {
    * Mock legacy browser without AbortController
    */
   legacyBrowser: () => {
-    const originalAbortController = global.AbortController
-    const originalAbortSignal = global.AbortSignal
-    
-    global.AbortController = undefined
-    global.AbortSignal = undefined
-    
+    const originalAbortController = global.AbortController;
+    const originalAbortSignal = global.AbortSignal;
+
+    global.AbortController = undefined;
+    global.AbortSignal = undefined;
+
     return () => {
-      global.AbortController = originalAbortController
-      global.AbortSignal = originalAbortSignal
-    }
+      global.AbortController = originalAbortController;
+      global.AbortSignal = originalAbortSignal;
+    };
   },
 
   /**
    * Mock browser without AbortSignal.timeout
    */
   noTimeoutSupport: () => {
-    const originalTimeout = global.AbortSignal?.timeout
-    
+    const originalTimeout = global.AbortSignal?.timeout;
+
     if (global.AbortSignal) {
-      global.AbortSignal.timeout = undefined
+      global.AbortSignal.timeout = undefined;
     }
-    
+
     return () => {
       if (global.AbortSignal && originalTimeout) {
-        global.AbortSignal.timeout = originalTimeout
+        global.AbortSignal.timeout = originalTimeout;
       }
-    }
+    };
   },
 
   /**
@@ -290,36 +300,36 @@ export const browserCompatMocks = {
   browserReadEntriesBehaviors: {
     chrome: (entries) => {
       // Chrome returns max 100 entries per call
-      const chunks = []
+      const chunks = [];
       for (let i = 0; i < entries.length; i += 100) {
-        chunks.push(entries.slice(i, i + 100))
+        chunks.push(entries.slice(i, i + 100));
       }
-      
-      let chunkIndex = 0
+
+      let chunkIndex = 0;
       return (callback) => {
         setTimeout(() => {
           if (chunkIndex < chunks.length) {
-            callback(chunks[chunkIndex++])
+            callback(chunks[chunkIndex++]);
           } else {
-            callback([])
+            callback([]);
           }
-        }, 10)
-      }
+        }, 10);
+      };
     },
 
     firefox: (entries) => {
       // Firefox returns all entries at once
-      let called = false
+      let called = false;
       return (callback) => {
         setTimeout(() => {
           if (!called) {
-            called = true
-            callback([...entries])
+            called = true;
+            callback([...entries]);
           } else {
-            callback([])
+            callback([]);
           }
-        }, 10)
-      }
-    }
-  }
-}
+        }, 10);
+      };
+    },
+  },
+};

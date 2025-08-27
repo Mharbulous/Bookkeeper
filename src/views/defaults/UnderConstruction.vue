@@ -1,7 +1,9 @@
 <template>
   <div class="max-w-4xl mx-auto p-8 text-center">
     <div class="mb-8">
-      <div class="inline-flex items-center px-4 py-2 rounded-full text-lg font-medium bg-amber-100 text-amber-800 mb-6">
+      <div
+        class="inline-flex items-center px-4 py-2 rounded-full text-lg font-medium bg-amber-100 text-amber-800 mb-6"
+      >
         🚧 Under Construction
       </div>
       <h1 class="text-4xl font-bold text-slate-900 mb-4">Page Under Construction</h1>
@@ -10,7 +12,7 @@
       </p>
       <p class="text-lg text-slate-500">Thank you for your patience.</p>
     </div>
-    
+
     <div class="text-center">
       <button
         @click="goBack"
