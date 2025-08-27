@@ -41,7 +41,6 @@ export function useFolderOptions() {
   const includeSubfolders = ref(false)
   const pendingFolderFiles = ref([])
   const subfolderCount = ref(0)
-  const blockedCount = ref(0)
 
   // Analysis state
   const isAnalyzing = ref(false)
@@ -150,7 +149,6 @@ export function useFolderOptions() {
     allFilesAnalysis.value = null
     resetProgress()
     includeSubfolders.value = false
-    blockedCount.value = 0
     cleanup()
     resetSkippedFolders()
     
@@ -194,7 +192,6 @@ export function useFolderOptions() {
     totalDirectoryEntryCount.value = 0
     resetProgress()
     includeSubfolders.value = false
-    blockedCount.value = 0
     cleanup()
     resetSkippedFolders()
     
@@ -245,55 +242,9 @@ export function useFolderOptions() {
       
       const files = await readDirectoryRecursive(dirEntry, signal)
       
-      /* 
-       * BLOCKED FILES DETECTION
-       * 
-       * We use TWO different file counting methods to detect inaccessible files:
-       * 
-       * METHOD 1: getDirectoryEntryCount() - Uses Directory Entry API to COUNT file entries
-       * - Can see and count files that exist in the directory structure
-       * - Does NOT try to access the actual file content
-       * - Will count files even if they can't be read (permissions, cloud-only, etc.)
-       * 
-       * METHOD 2: readDirectoryRecursive() - Tries to ACCESS actual file objects  
-       * - Calls entry.file() on each entry to get the File object
-       * - Will FAIL and skip files that can't be accessed
-       * - Results in lower count when files are blocked/inaccessible
-       * 
-       * The DIFFERENCE between these counts = files that exist but can't be accessed
-       * These are the "blocked" files we show in the black chip
-       */
-      let blockedFileCount = 0
-      
-      // Compare with diagnostic count if available (drag-and-drop case)
-      if (explorerEquivalentCount !== null) {
-        const difference = explorerEquivalentCount - files.length
-        if (difference > 0) {
-          blockedFileCount = Math.max(blockedFileCount, difference)
-          console.warn(`⚠️ File count mismatch: readDirectoryRecursive found ${files.length} files, but directory entry count shows ${explorerEquivalentCount} files (${difference} files missing)`)
-        } else {
-          console.info(`All ${files.length} files were accounted for. No missing files.`)
-        }
-      }
-      
-      // Compare with File Explorer count if available (from file input)
+      // Clear the File Explorer count if it was set
       if (window.fileExplorerCount !== null && window.fileExplorerCount !== undefined) {
-        const difference = window.fileExplorerCount - files.length
-        if (difference > 0) {
-          blockedFileCount = Math.max(blockedFileCount, difference)
-          console.warn(`⚠️ File count mismatch: readDirectoryRecursive found ${files.length} files, but file explorer shows ${window.fileExplorerCount} files (${difference} files missing)`)
-        } else {
-          console.info(`All ${files.length} files were accounted for. No missing files.`)
-        }
-        // Clear the stored count
         window.fileExplorerCount = null
-      }
-      
-      // Store the blocked file count for the UI
-      blockedCount.value = blockedFileCount
-      
-      if (blockedFileCount > 0) {
-        console.info(`📊 Detected ${blockedFileCount} blocked/inaccessible files`)
       }
       
       // Check if timeout occurred during file reading
@@ -370,7 +321,6 @@ export function useFolderOptions() {
     includeSubfolders,
     pendingFolderFiles,
     subfolderCount,
-    blockedCount,
     
     // Analysis state
     isAnalyzing,

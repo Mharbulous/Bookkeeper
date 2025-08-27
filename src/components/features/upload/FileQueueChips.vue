@@ -15,13 +15,13 @@
 
       <!-- Blocked chip (second, conditional) -->
       <v-chip
-        v-if="props.blockedCount > 0"
+        v-if="!shouldShowSpinnerForDeduplicationChips && blockedFilesCount > 0"
         size="large"
         variant="flat"
         color="black"
         class="text-white"
       >
-        {{ props.blockedCount }}
+        {{ blockedFilesCount }}
         blocked
       </v-chip>
 
@@ -43,7 +43,7 @@
         duplicates
       </v-chip>
 
-      <!-- New files chip (fourth) -->
+      <!-- Distinct files chip (fourth) -->
       <v-chip
         size="large"
         variant="flat"
@@ -57,11 +57,11 @@
           width="2"
           class="me-1"
         />
-        <template v-else>{{ newFilesCount }}</template>
-        new
+        <template v-else>{{ distinctFilesCount }}</template>
+        ready
       </v-chip>
 
-      <!-- Previous uploads chip (fifth) -->
+      <!-- Previous uploads chip (fourth) -->
       <v-chip
         v-if="hasUploadStarted"
         size="large"
@@ -146,10 +146,6 @@ const props = defineProps({
     type: Number,
     default: null
   },
-  blockedCount: {
-    type: Number,
-    default: 0
-  },
   hasUploadStarted: {
     type: Boolean,
     default: false
@@ -182,9 +178,14 @@ const queueDuplicatesCount = computed(() => {
   return props.files.filter(file => file.isDuplicate).length
 })
 
-const newFilesCount = computed(() => {
-  // New files = total - duplicates
-  return totalCount.value - queueDuplicatesCount.value
+const distinctFilesCount = computed(() => {
+  // Distinct files = actual count of non-duplicate files in current queue
+  return props.files.filter(file => !file.isDuplicate).length
+})
+
+const blockedFilesCount = computed(() => {
+  // Blocked files = Total - Distinct - Duplicates
+  return totalCount.value - distinctFilesCount.value - queueDuplicatesCount.value
 })
 
 const previouslyUploadedCount = computed(() => {

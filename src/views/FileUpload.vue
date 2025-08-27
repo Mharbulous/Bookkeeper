@@ -45,7 +45,6 @@
       :is-processing-ui-update="isProcessingUIUpdate"
       :ui-update-progress="uiUpdateProgress"
       :total-analyzed-files="totalAnalyzedFiles"
-      :blocked-count="blockedCount"
       :show-time-progress="
         timeWarning.startTime.value !== null && (uploadQueue.length === 0 || isProcessingUIUpdate)
       "
@@ -191,7 +190,6 @@ const {
   showFolderOptions,
   includeSubfolders,
   subfolderCount,
-  blockedCount,
   isAnalyzing,
   mainFolderAnalysis,
   allFilesAnalysis,

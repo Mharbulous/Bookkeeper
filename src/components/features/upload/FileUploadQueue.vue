@@ -81,7 +81,6 @@
         :is-processing-ui-update="isProcessingUIUpdate"
         :ui-update-progress="uiUpdateProgress"
         :total-analyzed-files="totalAnalyzedFiles"
-        :blocked-count="blockedCount"
         :has-upload-started="hasUploadStarted"
       />
 
@@ -248,10 +247,6 @@ const props = defineProps({
     type: Number,
     default: null
   },
-  blockedCount: {
-    type: Number,
-    default: 0
-  }
 })
 
 // Emits
