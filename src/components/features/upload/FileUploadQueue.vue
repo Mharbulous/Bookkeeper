@@ -445,7 +445,8 @@ const getPhaseMessage = () => {
 
 <style scoped>
 .upload-queue {
-  max-width: 1000px;
+  width: 100%; /* Fill 100% of available width */
+  max-width: 1000px; /* Maximum width of 1000px */
   margin: 0 auto;
   display: flex;
   flex-direction: column;
