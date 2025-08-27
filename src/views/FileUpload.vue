@@ -225,12 +225,10 @@ const isStartingUpload = ref(false);
 queueDeduplication.setTimeMonitoringCallback({
   onProcessingStart: () => {
     // Time monitoring will be started when we have an estimate from folder analysis
-    console.log('File processing started - waiting for time estimate');
   },
   onProcessingComplete: () => {
     timeWarning.resetMonitoring();
     queueDeduplication.terminateWorker();
-    console.log('File processing completed - time monitoring reset and workers terminated');
   },
   onProcessingError: (error) => {
     timeWarning.resetMonitoring();
@@ -277,21 +275,15 @@ const processFilesWithQueue = async (files) => {
     if (folderAnalysis && folderAnalysis.timeMs && folderAnalysis.timeMs > 0) {
       // Use existing folder analysis estimate (already hardware-calibrated)
       estimatedTime = folderAnalysis.timeMs;
-      console.log(
-        `Starting time monitoring with folder analysis estimate: ${estimatedTime}ms (hardware-calibrated)`,
-      );
     } else {
       // Generate hardware-calibrated estimate on-the-fly for files without folder analysis
-      console.log(
-        'No folder analysis available, generating hardware-calibrated estimate for file processing',
-      );
+      // No folder analysis available, generating hardware-calibrated estimate for file processing
 
       // Get stored hardware performance factor or use baseline
       let hardwarePerformanceFactor = getStoredHardwarePerformanceFactor();
       if (!hardwarePerformanceFactor || hardwarePerformanceFactor <= 0) {
         // Use baseline H-factor for new users (1.61 files/ms)
         hardwarePerformanceFactor = 1.61;
-        console.log('Using baseline hardware performance factor for new user: 1.61 files/ms');
       }
 
       // Create file analysis data for calibrated estimation
@@ -320,14 +312,10 @@ const processFilesWithQueue = async (files) => {
       );
       estimatedTime = calibratedPrediction.totalTimeMs;
 
-      console.log(
-        `Generated hardware-calibrated estimate: ${estimatedTime}ms for ${files.length} files (${totalSizeMB.toFixed(1)}MB, H=${hardwarePerformanceFactor.toFixed(2)})`,
-      );
     }
 
     if (estimatedTime > 0) {
       timeWarning.startMonitoring(estimatedTime);
-      console.log(`Time monitoring started: estimated=${estimatedTime}ms, files=${files.length}`);
     } else {
       console.warn('Time monitoring not started: Unable to generate hardware-calibrated estimate');
     }
@@ -387,7 +375,6 @@ const processFilesWithQueue = async (files) => {
       }
 
       // Processing completed successfully - perform cleanup
-      console.log('File processing completed successfully - cleaning up time monitoring');
       timeWarning.resetMonitoring();
       queueDeduplication.clearTimeMonitoringCallback();
     } catch (error) {
@@ -429,7 +416,6 @@ const processFilesWithQueue = async (files) => {
       }
 
       // Processing completed successfully - perform cleanup
-      console.log('File processing completed successfully - cleaning up time monitoring');
       timeWarning.resetMonitoring();
       queueDeduplication.clearTimeMonitoringCallback();
     } catch (error) {
@@ -449,7 +435,6 @@ const processFilesWithQueue = async (files) => {
   }
 
   // 🔍 DEBUG: Log AsyncTracker state at successful exit
-  console.log(`✅ [${processId}] EXIT SUCCESS: processFilesWithQueue completed normally`);
   if (window.__asyncTracker) {
     const exitStats = window.__asyncTracker.stats();
     console.log(`📊 [${processId}] AsyncTracker at EXIT:`, exitStats);

@@ -164,7 +164,6 @@ export function getStoredHardwarePerformanceFactor() {
       return null;
     }
     
-    console.log(`Retrieved hardware performance factor: ${avgH.toFixed(3)} files/ms (${validMeasurements.length} measurements)`);
     return avgH;
     
   } catch (error) {

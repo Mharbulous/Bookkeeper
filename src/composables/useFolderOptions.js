@@ -177,7 +177,6 @@ export function useFolderOptions() {
     // SHOW MODAL IMMEDIATELY - don't wait for file reading
     showFolderOptions.value = true
     console.log('T = 0')
-    console.log('DEBUG: processFolderEntry called with dirEntry:', dirEntry.name)
     
     // Note: For drag-and-drop, we don't have access to File Explorer's exact count
     // The Directory Entry API may have different visibility than File Explorer
@@ -218,7 +217,6 @@ export function useFolderOptions() {
       }
       
       // Read files in background with timeout signal
-      console.log('DEBUG: Starting readDirectoryRecursive...')
       updateProgressMessage('Reading directory contents...')
       
       // Create signal for readDirectoryRecursive with progress reporting
@@ -254,7 +252,6 @@ export function useFolderOptions() {
       }
       
       // Store files and start analysis
-      console.log('DEBUG: Setting pendingFolderFiles.value to', files.length, 'files')
       pendingFolderFiles.value = files
       performBackgroundAnalysis(files, addFilesToQueue)
     } catch (error) {

@@ -66,7 +66,6 @@ export function useWorkerManager() {
     workers.set(workerId, workerState)
     updateGlobalState()
     
-    console.info(`Worker ${workerId} created and initialized`)
     return workerState
   }
   
@@ -199,7 +198,6 @@ export function useWorkerManager() {
       workers.delete(workerId)
       updateGlobalState()
       
-      console.info(`Worker ${workerId} terminated`)
       return true
     } catch (error) {
       console.error(`Error terminating worker ${workerId}:`, error)

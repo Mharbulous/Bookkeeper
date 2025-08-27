@@ -27,7 +27,6 @@ export function useQueueWorkers() {
     let workerJustInitialized = false
     
     if (!workerInstance.isWorkerReady.value) {
-      console.info('Initializing Web Worker...')
       const initialized = workerInstance.initializeWorker()
       if (!initialized) {
         console.warn('Web Worker initialization failed, falling back to main thread processing')

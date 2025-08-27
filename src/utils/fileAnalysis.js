@@ -77,10 +77,8 @@ export function analyzeFiles(files, totalDirectoryCount = 0, avgDirectoryDepth =
   if (!hardwarePerformanceFactor || hardwarePerformanceFactor <= 0) {
     // Use baseline H-factor for new users or invalid stored values
     hardwarePerformanceFactor = 1.61; // Standard baseline from performance analysis
-    console.log('Using baseline hardware performance factor: 1.61 files/ms (new user or invalid stored value)')
   } else {
     usedHardwareCalibration = true;
-    console.log(`Using stored hardware performance factor: ${hardwarePerformanceFactor.toFixed(2)} files/ms`)
   }
   
   const folderData = {
