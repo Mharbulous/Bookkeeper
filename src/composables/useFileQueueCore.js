@@ -55,7 +55,7 @@ export function useFileQueueCore() {
         type: fileRef.file.type,
         lastModified: fileRef.file.lastModified,
         path: fileRef.path || getFilePath(fileRef),
-        isDuplicate: fileRef.status === 'duplicate'
+        isDuplicate: fileRef.status === 'uploadMetadataOnly'
       }
       
       // Only include hash if it was calculated during deduplication process

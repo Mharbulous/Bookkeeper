@@ -69,7 +69,7 @@
         color="orange"
         class="text-white"
       >
-        {{ previouslyUploadedCount }}
+        {{ skippedCount }}
         skipped
       </v-chip>
 
@@ -134,7 +134,7 @@ const props = defineProps({
     default: () => ({
       successful: 0,
       failed: 0,
-      previouslyUploaded: 0,
+      skipped: 0,
       isUploading: false,
       currentFile: null
     })
@@ -172,7 +172,7 @@ const distinctFilesCount = computed(() => {
   
   // If upload has started, show remaining files by subtracting processed files
   if (props.hasUploadStarted) {
-    const processedFiles = props.uploadStatus.successful + props.uploadStatus.failed + props.uploadStatus.previouslyUploaded
+    const processedFiles = props.uploadStatus.successful + props.uploadStatus.failed + props.uploadStatus.skipped
     return Math.max(0, totalUploadableFiles - processedFiles)
   }
   
@@ -187,9 +187,9 @@ const blockedFilesCount = computed(() => {
   return totalCount.value - originalUploadableFiles - queueDuplicatesCount.value
 })
 
-const previouslyUploadedCount = computed(() => {
+const skippedCount = computed(() => {
   // Use uploadStatus if upload has started, otherwise fall back to file-based counting
-  return props.hasUploadStarted ? props.uploadStatus.previouslyUploaded : props.files.filter(file => file.isPreviousUpload).length
+  return props.hasUploadStarted ? props.uploadStatus.skipped : props.files.filter(file => file.isPreviousUpload).length
 })
 
 const successfulCount = computed(() => {

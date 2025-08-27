@@ -268,7 +268,7 @@ const props = defineProps({
     default: () => ({
       successful: 0,
       failed: 0,
-      previouslyUploaded: 0,
+      skipped: 0,
       isUploading: false,
       currentFile: null,
       currentAction: null
@@ -417,7 +417,7 @@ const hasErrors = computed(() => {
 
 const hasUploadStarted = computed(() => {
   return props.isUploading || props.isPaused || props.isStartingUpload || 
-         props.uploadStatus.successful > 0 || props.uploadStatus.failed > 0 || props.uploadStatus.previouslyUploaded > 0
+         props.uploadStatus.successful > 0 || props.uploadStatus.failed > 0 || props.uploadStatus.skipped > 0
 })
 
 // Methods

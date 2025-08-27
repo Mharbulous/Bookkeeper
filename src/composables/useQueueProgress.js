@@ -38,7 +38,7 @@ export function useQueueProgress() {
 
     const duplicatesForQueue = duplicateFiles.map((fileRef) => ({
       ...fileRef,
-      status: 'duplicate',
+      status: 'uploadMetadataOnly',
     }));
 
     // Update UI using existing API

@@ -725,10 +725,10 @@ const continueUpload = async () => {
         const fileExists = await checkFileExists(fileHash, queueFile.name);
         
         if (fileExists) {
-          // File already uploaded previously
-          console.log(`File already exists: ${queueFile.name}`);
-          updateUploadStatus('previouslyUploaded');
-          updateFileStatus(queueFile, 'previouslyUploaded');
+          // File already exists, skipping
+          console.log(`File skipped (already exists): ${queueFile.name}`);
+          updateUploadStatus('skipped');
+          updateFileStatus(queueFile, 'skipped');
           
           // Log individual upload event for skipped file
           try {
@@ -856,7 +856,7 @@ const continueUpload = async () => {
       console.log('Upload process completed:', {
         successful: uploadStatus.value.successful,
         failed: uploadStatus.value.failed,
-        previouslyUploaded: uploadStatus.value.previouslyUploaded
+        skipped: uploadStatus.value.skipped
       });
 
       // Log upload session completion
@@ -877,7 +877,7 @@ const continueUpload = async () => {
       }
 
       // Show completion notification
-      const totalProcessed = uploadStatus.value.successful + uploadStatus.value.previouslyUploaded;
+      const totalProcessed = uploadStatus.value.successful + uploadStatus.value.skipped;
       if (uploadStatus.value.failed === 0) {
         showNotification(`All ${totalProcessed} files processed successfully!`, 'success');
       } else {

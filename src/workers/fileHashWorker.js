@@ -219,7 +219,7 @@ async function processFiles(files, batchId) {
       metadata: fileRef.metadata,
       hash: fileRef.hash,
       isDuplicate: fileRef.isDuplicate,
-      status: 'duplicate'
+      status: 'uploadMetadataOnly'
     }))
     
     // Send completion message

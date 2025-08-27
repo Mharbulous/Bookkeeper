@@ -35,7 +35,7 @@ export function useFileQueue() {
   const uploadStatus = ref({
     successful: 0,
     failed: 0,
-    previouslyUploaded: 0,
+    skipped: 0,
     isUploading: false,
     isPaused: false,
     pauseRequested: false,
@@ -87,7 +87,7 @@ export function useFileQueue() {
     uploadStatus.value = {
       successful: 0,
       failed: 0,
-      previouslyUploaded: 0,
+      skipped: 0,
       isUploading: false,
       isPaused: false,
       pauseRequested: false,
@@ -157,8 +157,8 @@ export function useFileQueue() {
       case 'failed':
         uploadStatus.value.failed++
         break
-      case 'previouslyUploaded':
-        uploadStatus.value.previouslyUploaded++
+      case 'skipped':
+        uploadStatus.value.skipped++
         break
       case 'currentFile':
         uploadStatus.value.currentFile = fileName

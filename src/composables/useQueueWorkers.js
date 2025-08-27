@@ -148,7 +148,7 @@ export function useQueueWorkers() {
           ...fileRef,
           file: fileMapping.get(fileRef.id),  // Restore original File object
           path: fileRef.path,  // Preserve path from worker result
-          status: 'duplicate'
+          status: 'uploadMetadataOnly'
         }))
 
         return {
