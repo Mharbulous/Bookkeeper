@@ -172,6 +172,7 @@ const {
   updateUploadQueue,
   removeFromQueue,
   showNotification,
+  setPhaseComplete,
 } = useFileQueue();
 
 const {
@@ -565,6 +566,8 @@ const handleStartUpload = async () => {
   try {
     isStartingUpload.value = true;
     showUploadProgress.value = true;
+    // Set phase to complete when upload actually starts (removes spinners from upload-related chips)
+    setPhaseComplete();
 
     console.log('Starting upload process...');
 

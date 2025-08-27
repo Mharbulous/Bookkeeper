@@ -21,7 +21,7 @@
         class="text-white"
       >
         <v-progress-circular
-          v-if="uiUpdateProgress.phase === 'loading'"
+          v-if="shouldShowSpinnerForDeduplicationChips"
           indeterminate
           size="16"
           width="2"
@@ -51,7 +51,7 @@
         class="text-white"
       >
         <v-progress-circular
-          v-if="uiUpdateProgress.phase === 'loading'"
+          v-if="shouldShowSpinnerForUploadChips"
           indeterminate
           size="16"
           width="2"
@@ -69,7 +69,7 @@
         class="text-white"
       >
         <v-progress-circular
-          v-if="uiUpdateProgress.phase === 'loading'"
+          v-if="shouldShowSpinnerForUploadChips"
           indeterminate
           size="16"
           width="2"
@@ -86,7 +86,7 @@
         color="red"
       >
         <v-progress-circular
-          v-if="uiUpdateProgress.phase === 'loading'"
+          v-if="shouldShowSpinnerForUploadChips"
           indeterminate
           size="16"
           width="2"
@@ -103,7 +103,7 @@
         color="green"
       >
         <v-progress-circular
-          v-if="uiUpdateProgress.phase === 'loading'"
+          v-if="shouldShowSpinnerForUploadChips"
           indeterminate
           size="16"
           width="2"
@@ -185,6 +185,18 @@ const failedCount = computed(() => {
 
 const blockedCount = computed(() => {
   return props.files.filter(file => file.status === 'blocked').length
+})
+
+// Spinner logic for different chip types
+const shouldShowSpinnerForDeduplicationChips = computed(() => {
+  // Only show spinner during deduplication (loading phase)
+  return props.uiUpdateProgress.phase === 'loading'
+})
+
+const shouldShowSpinnerForUploadChips = computed(() => {
+  // Show spinner during deduplication AND continue showing after deduplication finishes
+  // (This will be controlled by the parent component passing appropriate phase values)
+  return props.uiUpdateProgress.phase === 'loading' || props.uiUpdateProgress.phase === 'awaiting-upload'
 })
 </script>
 

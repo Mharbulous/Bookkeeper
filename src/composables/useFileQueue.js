@@ -28,7 +28,7 @@ export function useFileQueue() {
     current: 0,
     total: 0,
     percentage: 0,
-    phase: 'loading' // 'loading', 'complete'
+    phase: 'loading' // 'loading', 'awaiting-upload', 'complete'
   })
 
   // Worker progress update handler
@@ -62,6 +62,11 @@ export function useFileQueue() {
       percentage: 0,
       phase: 'loading'
     }
+  }
+
+  // Set phase to complete (called when upload actually starts)
+  const setPhaseComplete = () => {
+    uiUpdateProgress.value.phase = 'complete'
   }
 
   // Instant Upload Queue initialization - show immediately with first 100 files
@@ -101,7 +106,7 @@ export function useFileQueue() {
         current: totalFiles,
         total: totalFiles,
         percentage: 100,
-        phase: 'complete'
+        phase: 'awaiting-upload'
       }
       isProcessingUIUpdate.value = false
     } else {
@@ -138,7 +143,7 @@ export function useFileQueue() {
         current: totalFiles,
         total: totalFiles,
         percentage: 100,
-        phase: 'complete'
+        phase: 'awaiting-upload'
       }
       
       // Wait for Vue to complete DOM rendering for single chunk
@@ -164,7 +169,7 @@ export function useFileQueue() {
           current: totalFiles,
           total: totalFiles,
           percentage: 100,
-          phase: 'complete'
+          phase: 'awaiting-upload'
         }
         
         // Clean up timestamp
@@ -193,7 +198,7 @@ export function useFileQueue() {
           current: totalFiles,
           total: totalFiles,
           percentage: 100,
-          phase: 'complete'
+          phase: 'awaiting-upload'
         }
       }
       
@@ -352,6 +357,7 @@ export function useFileQueue() {
     setTimeWarningInstance,
     startTimeMonitoring,
     stopTimeMonitoring,
-    abortProcessing
+    abortProcessing,
+    setPhaseComplete
   }
 }
