@@ -64,6 +64,15 @@ export function useFileMetadata() {
       const computedStoragePath =
         storagePath || `teams/${teamId}/matters/general/files/${fileHash}.${extension}`;
 
+      // Extract folder path from original file path (everything except filename)
+      let folderPath = '';
+      if (fileData.originalPath) {
+        const pathParts = fileData.originalPath.split('/');
+        if (pathParts.length > 1) {
+          folderPath = pathParts.slice(0, -1).join('/');
+        }
+      }
+
       // Create metadata record
       const metadataRecord = {
         // Core metadata (only what varies between identical files)
@@ -75,6 +84,10 @@ export function useFileMetadata() {
         uploadedAt: serverTimestamp(),
         uploadedBy: authStore.user.uid,
         sessionId: sessionId,
+
+        // File path information
+        originalPath: fileData.originalPath || '',
+        folderPath: folderPath,
 
         // Computed fields for convenience
         metadataHash: metadataHash,

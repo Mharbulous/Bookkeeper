@@ -358,6 +358,15 @@ export class UploadService {
         const storageRef = ref(storage, storagePath);
         const downloadURL = await getDownloadURL(storageRef);
 
+        // Extract folder path from original file path
+        let folderPath = '';
+        if (metadata.originalPath) {
+          const pathParts = metadata.originalPath.split('/');
+          if (pathParts.length > 1) {
+            folderPath = pathParts.slice(0, -1).join('/');
+          }
+        }
+
         // Save metadata to Firestore (hash deduplication)
         const metadataPath = this.generateMetadataPath(hash);
         const metadataRef = doc(db, metadataPath, metadata.id);
@@ -371,6 +380,7 @@ export class UploadService {
           uploadedAt: serverTimestamp(),
           fileExists: false, // File already exists, we didn't upload it
           isDuplicate: true,
+          folderPath: folderPath,
         };
 
         await setDoc(metadataRef, metadataDoc);
@@ -465,6 +475,15 @@ export class UploadService {
         downloadURL = await getDownloadURL(storageRef);
       }
 
+      // Extract folder path from original file path
+      let folderPath = '';
+      if (metadata.originalPath) {
+        const pathParts = metadata.originalPath.split('/');
+        if (pathParts.length > 1) {
+          folderPath = pathParts.slice(0, -1).join('/');
+        }
+      }
+
       // Save metadata to Firestore
       const metadataPath = this.generateMetadataPath(hash);
       const metadataRef = doc(db, metadataPath, metadata.id);
@@ -477,6 +496,7 @@ export class UploadService {
         userId: this.userId,
         uploadedAt: serverTimestamp(),
         fileExists: !fileExists, // true if file was uploaded, false if it already existed
+        folderPath: folderPath,
       };
 
       await setDoc(metadataRef, metadataDoc);
