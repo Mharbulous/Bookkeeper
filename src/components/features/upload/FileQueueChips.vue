@@ -1,22 +1,16 @@
 <template>
   <div v-if="files.length > 0" class="mb-4">
     <div class="d-flex gap-2 flex-wrap">
-      <!-- New files chip (first) -->
+      <!-- Total Files chip (first) -->
       <v-chip
         size="large"
         variant="flat"
-        color="blue"
-        class="text-white"
+        color="white"
+        class="text-black border-black"
+        style="border-width: 1px;"
       >
-        <v-progress-circular
-          v-if="uiUpdateProgress.phase === 'loading'"
-          indeterminate
-          size="16"
-          width="2"
-          class="me-1"
-        />
-        <template v-else>{{ pendingCount }}</template>
-        new
+        {{ totalCount }}
+        total
       </v-chip>
 
       <!-- Duplicates chip (second) -->
@@ -55,11 +49,12 @@
         previous uploads
       </v-chip>
 
-      <!-- Successful uploads chip (fourth) -->
+      <!-- New files chip (fourth) -->
       <v-chip
         size="large"
         variant="flat"
-        color="green"
+        color="blue"
+        class="text-white"
       >
         <v-progress-circular
           v-if="uiUpdateProgress.phase === 'loading'"
@@ -68,11 +63,23 @@
           width="2"
           class="me-1"
         />
-        <template v-else>{{ successfulCount }}</template>
-        successful uploads
+        <template v-else>{{ pendingCount }}</template>
+        new
       </v-chip>
 
-      <!-- Failed uploads chip (fifth) -->
+      <!-- Blocked chip (fifth, conditional) -->
+      <v-chip
+        v-if="blockedCount > 0"
+        size="large"
+        variant="flat"
+        color="black"
+        class="text-white"
+      >
+        {{ blockedCount }}
+        blocked
+      </v-chip>
+
+      <!-- Failed uploads chip (sixth) -->
       <v-chip
         size="large"
         variant="flat"
@@ -89,17 +96,21 @@
         failed uploads
       </v-chip>
 
-
-      <!-- Total Files chip (rightmost) -->
+      <!-- Successful uploads chip (seventh) -->
       <v-chip
         size="large"
         variant="flat"
-        color="white"
-        class="text-black border-black"
-        style="border-width: 1px;"
+        color="green"
       >
-        {{ totalCount }}
-        total
+        <v-progress-circular
+          v-if="uiUpdateProgress.phase === 'loading'"
+          indeterminate
+          size="16"
+          width="2"
+          class="me-1"
+        />
+        <template v-else>{{ successfulCount }}</template>
+        successful uploads
       </v-chip>
     </div>
   </div>
@@ -170,6 +181,10 @@ const successfulCount = computed(() => {
 
 const failedCount = computed(() => {
   return props.files.filter(file => file.status === 'error').length
+})
+
+const blockedCount = computed(() => {
+  return props.files.filter(file => file.status === 'blocked').length
 })
 </script>
 
