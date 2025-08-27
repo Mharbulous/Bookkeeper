@@ -714,6 +714,7 @@ const continueUpload = async () => {
             lastModified: queueFile.lastModified,
             fileHash: queueFile.hash,
             sessionId: getCurrentSessionId(),
+            originalPath: queueFile.path, // webkitRelativePath for folder uploads
           });
 
           updateUploadStatus('skipped');
@@ -795,6 +796,7 @@ const continueUpload = async () => {
               lastModified: queueFile.lastModified,
               fileHash: fileHash,
               sessionId: getCurrentSessionId(),
+              originalPath: queueFile.path, // webkitRelativePath for folder uploads
             });
           } catch (metadataError) {
             console.error(
@@ -873,6 +875,7 @@ const continueUpload = async () => {
               lastModified: queueFile.lastModified,
               fileHash: fileHash,
               sessionId: getCurrentSessionId(),
+              originalPath: queueFile.path, // webkitRelativePath for folder uploads
             });
           } catch (metadataError) {
             console.error(`Failed to create metadata record for ${queueFile.name}:`, metadataError);
@@ -895,7 +898,10 @@ const continueUpload = async () => {
             try {
               currentFileHash = await calculateFileHash(queueFile.file);
             } catch (hashError) {
-              console.warn(`Could not calculate hash for failed upload: ${queueFile.name}`, hashError);
+              console.warn(
+                `Could not calculate hash for failed upload: ${queueFile.name}`,
+                hashError
+              );
               currentFileHash = 'unknown_hash';
             }
           }

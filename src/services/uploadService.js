@@ -360,24 +360,11 @@ export class UploadService {
 
         // Extract folder path from original file path
         let folderPath = '';
-        console.log(`[DEBUG] Extracting folder path for duplicate file:`, {
-          fileName: file.name,
-          originalPath: metadata.originalPath,
-          isFromFolderUpload: !!metadata.originalPath
-        });
-        
         if (metadata.originalPath) {
           const pathParts = metadata.originalPath.split('/');
           if (pathParts.length > 1) {
             folderPath = pathParts.slice(0, -1).join('/');
           }
-          console.log(`[DEBUG] Folder path extracted:`, {
-            fullPath: metadata.originalPath,
-            folderPath: folderPath || '(root level)',
-            fileName: pathParts[pathParts.length - 1]
-          });
-        } else {
-          console.log(`[DEBUG] No folder path - single file upload: ${file.name}`);
         }
 
         // Save metadata to Firestore (hash deduplication)
@@ -396,12 +383,6 @@ export class UploadService {
           folderPath: folderPath,
         };
 
-        console.log(`[DEBUG] Saving duplicate file metadata to Firestore:`, {
-          fileName: file.name,
-          originalPath: metadataDoc.originalPath || '(single file)',
-          folderPath: metadataDoc.folderPath || '(root level)',
-          isDuplicate: true
-        });
 
         await setDoc(metadataRef, metadataDoc);
 
@@ -497,24 +478,11 @@ export class UploadService {
 
       // Extract folder path from original file path
       let folderPath = '';
-      console.log(`[DEBUG] Extracting folder path for regular upload:`, {
-        fileName: file.name,
-        originalPath: metadata.originalPath,
-        isFromFolderUpload: !!metadata.originalPath
-      });
-      
       if (metadata.originalPath) {
         const pathParts = metadata.originalPath.split('/');
         if (pathParts.length > 1) {
           folderPath = pathParts.slice(0, -1).join('/');
         }
-        console.log(`[DEBUG] Folder path extracted:`, {
-          fullPath: metadata.originalPath,
-          folderPath: folderPath || '(root level)',
-          fileName: pathParts[pathParts.length - 1]
-        });
-      } else {
-        console.log(`[DEBUG] No folder path - single file upload: ${file.name}`);
       }
 
       // Save metadata to Firestore
@@ -532,12 +500,6 @@ export class UploadService {
         folderPath: folderPath,
       };
 
-      console.log(`[DEBUG] Saving regular upload metadata to Firestore:`, {
-        fileName: file.name,
-        originalPath: metadataDoc.originalPath || '(single file)',
-        folderPath: metadataDoc.folderPath || '(root level)',
-        fileWasUploaded: metadataDoc.fileExists
-      });
 
       await setDoc(metadataRef, metadataDoc);
       metadataSaved = true;

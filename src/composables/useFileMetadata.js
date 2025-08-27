@@ -38,11 +38,12 @@ export function useFileMetadata() {
    * @param {number} fileData.lastModified - File's last modified timestamp
    * @param {string} fileData.fileHash - Content hash of the file
    * @param {string} fileData.sessionId - Upload session ID
+   * @param {string} [fileData.originalPath] - Full relative path from folder upload (used to extract folderPath)
    * @returns {Promise<string>} - The metadata hash used as document ID
    */
   const createMetadataRecord = async (fileData) => {
     try {
-      const { originalName, lastModified, fileHash, sessionId } = fileData;
+      const { originalName, lastModified, fileHash, sessionId, originalPath } = fileData;
 
       if (!originalName || !lastModified || !fileHash) {
         throw new Error(
@@ -58,6 +59,15 @@ export function useFileMetadata() {
       // Generate metadata hash for document ID
       const metadataHash = await generateMetadataHash(originalName, lastModified, fileHash);
 
+      // Extract folder path from original path if available
+      let folderPath = '';
+      if (originalPath) {
+        const pathParts = originalPath.split('/');
+        if (pathParts.length > 1) {
+          folderPath = pathParts.slice(0, -1).join('/');
+        }
+      }
+
       // Create metadata record
       const metadataRecord = {
         // Core metadata (only what varies between identical files)
@@ -70,6 +80,9 @@ export function useFileMetadata() {
         uploadedBy: authStore.user.uid,
         sessionId: sessionId,
 
+        // File path information
+        folderPath: folderPath,
+
         // Computed fields for convenience
         metadataHash: metadataHash,
 
@@ -80,8 +93,9 @@ export function useFileMetadata() {
       const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'metadata', metadataHash);
       await setDoc(docRef, metadataRecord);
 
-      console.log(`Metadata record created: ${metadataHash}`, {
+      console.log(`[DEBUG] Metadata record created: ${metadataHash}`, {
         originalName,
+        folderPath: folderPath || '(root level)',
         fileHash: fileHash.substring(0, 8) + '...',
       });
 
