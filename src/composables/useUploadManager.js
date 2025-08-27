@@ -270,6 +270,15 @@ export function useUploadManager() {
         );
       }
 
+      // Debug logging for folder path data flow
+      console.log(`[DEBUG] Preparing file for upload:`, {
+        fileName: queueFile.name,
+        originalPath: queueFile.path,
+        webkitRelativePath: queueFile.file?.webkitRelativePath,
+        hasPath: !!queueFile.path,
+        isFromFolderUpload: !!(queueFile.file?.webkitRelativePath)
+      });
+
       return {
         file: queueFile.file,
         hash: queueFile.hash,

@@ -38,12 +38,11 @@ export function useFileMetadata() {
    * @param {number} fileData.lastModified - File's last modified timestamp
    * @param {string} fileData.fileHash - Content hash of the file
    * @param {string} fileData.sessionId - Upload session ID
-   * @param {string} [fileData.storagePath] - Firebase Storage path (optional, will be generated)
    * @returns {Promise<string>} - The metadata hash used as document ID
    */
   const createMetadataRecord = async (fileData) => {
     try {
-      const { originalName, lastModified, fileHash, sessionId, storagePath } = fileData;
+      const { originalName, lastModified, fileHash, sessionId } = fileData;
 
       if (!originalName || !lastModified || !fileHash) {
         throw new Error(
@@ -59,20 +58,6 @@ export function useFileMetadata() {
       // Generate metadata hash for document ID
       const metadataHash = await generateMetadataHash(originalName, lastModified, fileHash);
 
-      // Generate storage path if not provided
-      const extension = originalName.split('.').pop();
-      const computedStoragePath =
-        storagePath || `teams/${teamId}/matters/general/files/${fileHash}.${extension}`;
-
-      // Extract folder path from original file path (everything except filename)
-      let folderPath = '';
-      if (fileData.originalPath) {
-        const pathParts = fileData.originalPath.split('/');
-        if (pathParts.length > 1) {
-          folderPath = pathParts.slice(0, -1).join('/');
-        }
-      }
-
       // Create metadata record
       const metadataRecord = {
         // Core metadata (only what varies between identical files)
@@ -85,13 +70,8 @@ export function useFileMetadata() {
         uploadedBy: authStore.user.uid,
         sessionId: sessionId,
 
-        // File path information
-        originalPath: fileData.originalPath || '',
-        folderPath: folderPath,
-
         // Computed fields for convenience
         metadataHash: metadataHash,
-        storagePath: computedStoragePath,
 
         createdAt: serverTimestamp(),
       };
@@ -103,7 +83,6 @@ export function useFileMetadata() {
       console.log(`Metadata record created: ${metadataHash}`, {
         originalName,
         fileHash: fileHash.substring(0, 8) + '...',
-        storagePath: computedStoragePath,
       });
 
       return metadataHash;
