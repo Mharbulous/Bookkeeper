@@ -92,7 +92,7 @@
             location="bottom"
           >
             <template #activator="{ props }">
-              <span v-bind="props">⏳</span>
+              <span v-bind="props">🟡</span>
             </template>
           </v-tooltip>
           <v-tooltip 

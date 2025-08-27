@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { db } from '../services/firebase.js'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, doc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { useAuthStore } from '../stores/auth.js'
 
 export function useUploadLogger() {
@@ -117,12 +117,109 @@ export function useUploadLogger() {
     return Date.now() - sessionStartTime.value
   }
   
+  /**
+   * Generate a deterministic document ID for upload events
+   * This allows us to overwrite interrupted uploads with completion events
+   * @param {string} sessionId - Upload session ID
+   * @param {string} fileHash - SHA-256 hash of file content
+   * @returns {string} Deterministic document ID
+   */
+  const generateUploadEventId = (sessionId, fileHash) => {
+    // Create deterministic ID from session + file hash (first 16 chars for readability)
+    const shortHash = fileHash.substring(0, 16)
+    const shortSession = sessionId.split('_')[1] // Extract timestamp part
+    return `${shortSession}_${shortHash}`
+  }
+
+  /**
+   * Log an individual file upload event
+   * @param {Object} fileEvent - File upload event details
+   * @param {string} fileEvent.fileName - Original file name
+   * @param {string} fileEvent.fileHash - SHA-256 hash of file content
+   * @param {number} fileEvent.fileSize - File size in bytes
+   * @param {string} fileEvent.status - Upload status ('uploaded', 'skipped', 'failed', 'interrupted')
+   * @param {string} fileEvent.reason - Reason for status (e.g., 'already_exists', 'upload_complete', 'upload_started', 'network_error')
+   * @param {number} fileEvent.lastModified - File's original timestamp
+   * @param {number} [fileEvent.uploadDurationMs] - Time taken to upload (for successful uploads)
+   * @param {string} [fileEvent.error] - Error message (for failed uploads)
+   * @param {boolean} [fileEvent.allowOverwrite] - Whether this event can overwrite existing events (for interrupted -> completion)
+   */
+  const logFileUploadEvent = async (fileEvent) => {
+    try {
+      if (!currentSessionId.value) {
+        console.warn('No active upload session for individual file event logging')
+        return null
+      }
+      
+      const teamId = authStore.currentTeam
+      if (!teamId) {
+        throw new Error('No team ID available for file event logging')
+      }
+      
+      // Create individual file upload event
+      const eventData = {
+        uploadedAt: serverTimestamp(),
+        uploadedBy: authStore.user.uid,
+        sessionId: currentSessionId.value,
+        
+        // File details
+        fileName: fileEvent.fileName,
+        fileHash: fileEvent.fileHash,
+        fileSize: fileEvent.fileSize,
+        lastModified: fileEvent.lastModified,
+        
+        // Upload event details
+        status: fileEvent.status, // 'uploaded', 'skipped', 'failed', 'interrupted'
+        reason: fileEvent.reason, // 'already_exists', 'upload_complete', 'upload_started', 'network_error', etc.
+        uploadDurationMs: fileEvent.uploadDurationMs || null,
+        error: fileEvent.error || null,
+        
+        createdAt: serverTimestamp()
+      }
+      
+      const eventsCollection = collection(db, 'teams', teamId, 'matters', 'general', 'uploadEvents')
+      let docRef
+      let eventId
+      
+      // For interrupted uploads and their completions, use deterministic IDs to allow overwriting
+      if (fileEvent.allowOverwrite || fileEvent.status === 'interrupted') {
+        eventId = generateUploadEventId(currentSessionId.value, fileEvent.fileHash)
+        docRef = doc(eventsCollection, eventId)
+        await setDoc(docRef, eventData) // This overwrites if exists
+        console.log(`File upload event ${fileEvent.allowOverwrite ? 'overwritten' : 'created'}: ${fileEvent.fileName} (${fileEvent.status})`, {
+          eventId: eventId,
+          sessionId: currentSessionId.value,
+          status: fileEvent.status,
+          reason: fileEvent.reason
+        })
+      } else {
+        // For skipped files, use regular auto-generated IDs (no overwriting needed)
+        docRef = await addDoc(eventsCollection, eventData)
+        eventId = docRef.id
+        console.log(`File upload event logged: ${fileEvent.fileName} (${fileEvent.status})`, {
+          eventId: eventId,
+          sessionId: currentSessionId.value,
+          status: fileEvent.status,
+          reason: fileEvent.reason
+        })
+      }
+      
+      return eventId
+    } catch (error) {
+      console.error('Failed to log file upload event:', error)
+      throw error
+    }
+  }
+  
   return {
     // Session management
     startUploadSession,
     logUploadSession,
     getCurrentSessionId,
     getSessionDuration,
+    
+    // Individual file event logging
+    logFileUploadEvent,
     
     // Reactive session state
     currentSessionId,

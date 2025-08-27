@@ -127,7 +127,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ```
 
 #### File Upload Logs: `/teams/{teamId}/matters/{matterId}/logs/{documentId}`
-**Purpose**: Track file upload events chronologically as distinct records
+**Purpose**: Track file upload session events chronologically as distinct records
 
 ```javascript
 {
@@ -142,6 +142,44 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   createdAt: Timestamp
 }
 ```
+
+#### Individual Upload Events: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
+**Purpose**: Track individual file upload attempts with interrupted upload detection
+
+**Document ID Strategy for Interrupted Uploads**:
+- **Interrupted uploads**: Use deterministic ID: `{timestamp}_{fileHash16}` 
+- **Completion events**: Overwrite interrupted event using same deterministic ID
+- **Skipped files**: Use auto-generated Firestore IDs (no overwriting needed)
+- **Power outage detection**: Interrupted events remain if never overwritten
+
+```javascript
+{
+  uploadedAt: Timestamp,
+  uploadedBy: 'user-john-123',
+  sessionId: 'session_uuid_abc123',
+  
+  // File details
+  fileName: 'document.pdf',
+  fileHash: 'abc123def456789abcdef012345...',  // SHA-256 of file content
+  fileSize: 1234567,                          // Bytes
+  lastModified: 1703123456789,                // Original file timestamp
+  
+  // Upload event details
+  status: 'uploaded',           // 'uploaded' | 'skipped' | 'failed' | 'interrupted'
+  reason: 'upload_complete',    // 'upload_complete' | 'already_exists' | 'upload_error' | 'upload_started'
+  uploadDurationMs: 2340,       // Only for successful uploads
+  error: null,                  // Only for failed uploads (error message)
+  
+  createdAt: Timestamp
+}
+```
+
+**Upload Event Flow**:
+1. **Start upload** → Create `interrupted` event with deterministic ID
+2. **Upload succeeds** → Overwrite with `uploaded` event using same ID  
+3. **Upload fails** → Overwrite with `failed` event using same ID
+4. **Power outage/crash** → `interrupted` event remains as evidence
+5. **Skip file** → Create `skipped` event with auto-generated ID (no overwriting)
 
 #### File Metadata Records: `/teams/{teamId}/matters/{matterId}/metadata/{metadataHash}`
 **Purpose**: Store unique combinations of file metadata using metadata hash as document ID

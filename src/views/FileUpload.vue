@@ -150,7 +150,8 @@ const {
   startUploadSession,
   logUploadSession,
   getCurrentSessionId,
-  getSessionDuration
+  getSessionDuration,
+  logFileUploadEvent
 } = useUploadLogger();
 
 // File metadata system
@@ -729,6 +730,21 @@ const continueUpload = async () => {
           updateUploadStatus('previouslyUploaded');
           updateFileStatus(queueFile.name, 'previouslyUploaded');
           
+          // Log individual upload event for skipped file
+          try {
+            await logFileUploadEvent({
+              fileName: queueFile.name,
+              fileHash: fileHash,
+              fileSize: queueFile.size,
+              lastModified: queueFile.lastModified,
+              status: 'skipped',
+              reason: 'already_exists'
+            });
+          } catch (logError) {
+            console.error(`Failed to log upload event for existing file ${queueFile.name}:`, logError);
+            // Don't fail the upload process for logging errors
+          }
+          
           // Create metadata record even for existing files (metadata may be different)
           try {
             await createMetadataRecord({
@@ -751,10 +767,45 @@ const continueUpload = async () => {
           // File needs to be uploaded
           updateUploadStatus('currentFile', queueFile.name, 'uploading');
           console.log(`Uploading file: ${queueFile.name}`);
+          
+          // Log interrupted upload event before starting (will be overwritten on completion)
+          try {
+            await logFileUploadEvent({
+              fileName: queueFile.name,
+              fileHash: fileHash,
+              fileSize: queueFile.size,
+              lastModified: queueFile.lastModified,
+              status: 'interrupted',
+              reason: 'upload_started'
+            });
+          } catch (logError) {
+            console.error(`Failed to log interrupted upload event for ${queueFile.name}:`, logError);
+            // Don't fail the upload process for logging errors
+          }
+          
+          const uploadStartTime = Date.now();
           await uploadSingleFile(queueFile.file, fileHash, queueFile.name, uploadAbortController.signal);
+          const uploadDurationMs = Date.now() - uploadStartTime;
           updateUploadStatus('successful');
           updateFileStatus(queueFile.name, 'completed');
           console.log(`Successfully uploaded: ${queueFile.name}`);
+          
+          // Overwrite interrupted upload event with successful completion
+          try {
+            await logFileUploadEvent({
+              fileName: queueFile.name,
+              fileHash: fileHash,
+              fileSize: queueFile.size,
+              lastModified: queueFile.lastModified,
+              status: 'uploaded',
+              reason: 'upload_complete',
+              uploadDurationMs: uploadDurationMs,
+              allowOverwrite: true
+            });
+          } catch (logError) {
+            console.error(`Failed to log upload completion event for ${queueFile.name}:`, logError);
+            // Don't fail the upload process for logging errors
+          }
           
           // Create metadata record for successfully uploaded file
           try {
@@ -777,6 +828,23 @@ const continueUpload = async () => {
         console.error(`Failed to upload ${queueFile.name}:`, error);
         updateUploadStatus('failed');
         updateFileStatus(queueFile.name, 'error');
+        
+        // Overwrite interrupted upload event with failure
+        try {
+          await logFileUploadEvent({
+            fileName: queueFile.name,
+            fileHash: fileHash,
+            fileSize: queueFile.size,
+            lastModified: queueFile.lastModified,
+            status: 'failed',
+            reason: 'upload_error',
+            error: error.message || error.toString(),
+            allowOverwrite: true
+          });
+        } catch (logError) {
+          console.error(`Failed to log upload failure event for ${queueFile.name}:`, logError);
+          // Don't fail the upload process for logging errors
+        }
       } finally {
         uploadAbortController = null;
       }
