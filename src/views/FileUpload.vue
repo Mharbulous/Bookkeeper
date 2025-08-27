@@ -148,7 +148,7 @@ const { populateExistingHash } = useLazyHashTooltip();
 // Upload logging system
 const {
   startUploadSession,
-  logUploadSession,
+  logSessionSummary,
   getCurrentSessionId,
   getSessionDuration,
   logFileUploadEvent
@@ -900,7 +900,7 @@ const continueUpload = async () => {
         const filesToUpload = uploadQueue.value.filter(file => !file.isDuplicate);
         const totalSizeMB = filesToUpload.reduce((sum, file) => sum + (file.size / (1024 * 1024)), 0);
         
-        await logUploadSession({
+        await logSessionSummary({
           filesProcessed: filesToUpload.length,
           successful: uploadStatus.value.successful,
           failed: uploadStatus.value.failed,

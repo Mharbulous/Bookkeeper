@@ -126,26 +126,12 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 }
 ```
 
-#### File Upload Logs: `/teams/{teamId}/matters/{matterId}/logs/{documentId}`
-**Purpose**: Track file upload session events chronologically as distinct records
+#### Upload Events: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
+**Purpose**: Track all upload-related events including individual file uploads and session summaries
 
-```javascript
-{
-  uploadedAt: Timestamp,
-  uploadedBy: 'user-john-123',
-  sessionId: 'session_uuid_abc123',  // Groups files uploaded in same batch
-  filesProcessed: 45,
-  duplicatesSkipped: 12,
-  totalSizeMB: 127.8,
-  uploadDurationMs: 45230,
-  hardwareCalibration: 1.85,  // H-factor for performance tracking
-  createdAt: Timestamp
-}
-```
+This collection contains two types of events:
 
-#### Individual Upload Events: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
-**Purpose**: Track individual file upload attempts with interrupted upload detection
-
+##### File Upload Events
 **Document ID Strategy for Interrupted Uploads**:
 - **Interrupted uploads**: Use deterministic ID: `{timestamp}_{fileHash16}` 
 - **Completion events**: Overwrite interrupted event using same deterministic ID
@@ -158,6 +144,9 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   uploadedBy: 'user-john-123',
   sessionId: 'session_uuid_abc123',
   
+  // Event type identifier
+  eventType: 'file_upload',
+  
   // File details
   fileName: 'document.pdf',
   fileHash: 'abc123def456789abcdef012345...',  // SHA-256 of file content
@@ -169,6 +158,31 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   reason: 'upload_complete',    // 'upload_complete' | 'already_exists' | 'queue_duplicate' | 'upload_error' | 'upload_started'
   uploadDurationMs: 2340,       // Only for successful uploads
   error: null,                  // Only for failed uploads (error message)
+  
+  createdAt: Timestamp
+}
+```
+
+##### Session Summary Events
+**Purpose**: Track upload session aggregate statistics
+
+```javascript
+{
+  uploadedAt: Timestamp,
+  uploadedBy: 'user-john-123',
+  sessionId: 'session_uuid_abc123',
+  
+  // Event type identifier
+  eventType: 'session_summary',
+  
+  // Session aggregate statistics
+  filesProcessed: 45,
+  successful: 38,
+  failed: 2,
+  duplicatesSkipped: 5,
+  totalSizeMB: 127.8,
+  uploadDurationMs: 45230,
+  hardwareCalibration: 1.85,  // H-factor for performance tracking
   
   createdAt: Timestamp
 }

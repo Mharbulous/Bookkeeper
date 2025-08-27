@@ -22,8 +22,7 @@ For complete documentation of all file storage paths and Firestore data structur
 ### Quick Reference
 
 - **File Storage**: `/teams/{teamId}/matters/{matterId}/files/{fileHash}.{extension}`
-- **Upload Session Logs**: `/teams/{teamId}/matters/{matterId}/logs/{documentId}`
-- **Individual Upload Events**: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
+- **Upload Events**: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}` (includes both individual file events and session summaries)
 - **File Metadata Records**: `/teams/{teamId}/matters/{matterId}/metadata/{metadataHash}`
 
 **Note**: All data structure schemas, field definitions, and storage strategies are maintained in `data-structures.md` to ensure consistency across the system.

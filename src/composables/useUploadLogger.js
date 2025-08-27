@@ -37,7 +37,7 @@ export function useUploadLogger() {
   }
   
   /**
-   * Log the completion of an upload session
+   * Log the completion of an upload session as a session summary event
    * @param {Object} stats - Upload statistics
    * @param {number} stats.filesProcessed - Total files processed
    * @param {number} stats.successful - Successfully uploaded files
@@ -45,7 +45,7 @@ export function useUploadLogger() {
    * @param {number} stats.duplicatesSkipped - Files skipped as duplicates
    * @param {number} stats.totalSizeMB - Total size of all files in MB
    */
-  const logUploadSession = async (stats) => {
+  const logSessionSummary = async (stats) => {
     try {
       if (!currentSessionId.value || !sessionStartTime.value) {
         console.warn('No active upload session to log')
@@ -59,11 +59,14 @@ export function useUploadLogger() {
         throw new Error('No team ID available for logging')
       }
       
-      // Create log entry in Firestore
-      const logData = {
+      // Create session summary event in uploadEvents collection
+      const sessionSummaryData = {
         uploadedAt: serverTimestamp(),
         uploadedBy: authStore.user.uid,
         sessionId: currentSessionId.value,
+        
+        // Event type identifier
+        eventType: 'session_summary',
         
         // Upload statistics
         filesProcessed: stats.filesProcessed || 0,
@@ -81,11 +84,11 @@ export function useUploadLogger() {
         createdAt: serverTimestamp()
       }
       
-      // Add to Firestore: /teams/{teamId}/matters/general/logs/{documentId}
-      const logsCollection = collection(db, 'teams', teamId, 'matters', 'general', 'logs')
-      const docRef = await addDoc(logsCollection, logData)
+      // Add to uploadEvents collection
+      const eventsCollection = collection(db, 'teams', teamId, 'matters', 'general', 'uploadEvents')
+      const docRef = await addDoc(eventsCollection, sessionSummaryData)
       
-      console.log(`Upload session logged: ${docRef.id}`, {
+      console.log(`Upload session summary logged: ${docRef.id}`, {
         sessionId: currentSessionId.value,
         duration: `${uploadDurationMs}ms`,
         stats: stats
@@ -97,7 +100,7 @@ export function useUploadLogger() {
       
       return docRef.id
     } catch (error) {
-      console.error('Failed to log upload session:', error)
+      console.error('Failed to log upload session summary:', error)
       throw error
     }
   }
@@ -162,6 +165,9 @@ export function useUploadLogger() {
         uploadedBy: authStore.user.uid,
         sessionId: currentSessionId.value,
         
+        // Event type identifier
+        eventType: 'file_upload',
+        
         // File details
         fileName: fileEvent.fileName,
         fileHash: fileEvent.fileHash,
@@ -214,7 +220,7 @@ export function useUploadLogger() {
   return {
     // Session management
     startUploadSession,
-    logUploadSession,
+    logSessionSummary,
     getCurrentSessionId,
     getSessionDuration,
     
