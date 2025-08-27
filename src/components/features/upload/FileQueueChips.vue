@@ -1,17 +1,7 @@
 <template>
   <div v-if="files.length > 0" class="mb-4">
     <div class="d-flex gap-2 flex-wrap">
-      <v-chip
-        v-if="processingCount > 0"
-        size="large"
-        variant="flat"
-        color="purple"
-        class="text-white"
-      >
-        <v-icon start icon="mdi-cog" />
-        {{ processingCount }} processing
-      </v-chip>
-
+      <!-- New files chip (first) -->
       <v-chip
         size="large"
         variant="flat"
@@ -29,6 +19,7 @@
         new
       </v-chip>
 
+      <!-- Duplicates chip (second) -->
       <v-chip
         size="large"
         variant="flat"
@@ -46,6 +37,7 @@
         duplicates
       </v-chip>
 
+      <!-- Previous uploads chip (third) -->
       <v-chip
         size="large"
         variant="flat"
@@ -63,6 +55,7 @@
         previous uploads
       </v-chip>
 
+      <!-- Successful uploads chip (fourth) -->
       <v-chip
         size="large"
         variant="flat"
@@ -79,6 +72,7 @@
         successful uploads
       </v-chip>
 
+      <!-- Failed uploads chip (fifth) -->
       <v-chip
         size="large"
         variant="flat"
@@ -94,6 +88,7 @@
         <template v-else>{{ failedCount }}</template>
         failed uploads
       </v-chip>
+
 
       <!-- Total Files chip (rightmost) -->
       <v-chip
