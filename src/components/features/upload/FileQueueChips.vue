@@ -31,7 +31,19 @@
         duplicates
       </v-chip>
 
-      <!-- Previous uploads chip (third) -->
+      <!-- Blocked chip (third, conditional) -->
+      <v-chip
+        v-if="blockedCount > 0"
+        size="large"
+        variant="flat"
+        color="black"
+        class="text-white"
+      >
+        {{ blockedCount }}
+        blocked
+      </v-chip>
+
+      <!-- Previous uploads chip (fourth) -->
       <v-chip
         size="large"
         variant="flat"
@@ -49,7 +61,7 @@
         previous uploads
       </v-chip>
 
-      <!-- New files chip (fourth) -->
+      <!-- New files chip (fifth) -->
       <v-chip
         size="large"
         variant="flat"
@@ -65,18 +77,6 @@
         />
         <template v-else>{{ pendingCount }}</template>
         new
-      </v-chip>
-
-      <!-- Blocked chip (fifth, conditional) -->
-      <v-chip
-        v-if="blockedCount > 0"
-        size="large"
-        variant="flat"
-        color="black"
-        class="text-white"
-      >
-        {{ blockedCount }}
-        blocked
       </v-chip>
 
       <!-- Failed uploads chip (sixth) -->
