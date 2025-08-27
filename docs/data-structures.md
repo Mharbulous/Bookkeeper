@@ -166,7 +166,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   
   // Upload event details
   status: 'uploaded',           // 'uploaded' | 'skipped' | 'failed' | 'interrupted'
-  reason: 'upload_complete',    // 'upload_complete' | 'already_exists' | 'upload_error' | 'upload_started'
+  reason: 'upload_complete',    // 'upload_complete' | 'already_exists' | 'queue_duplicate' | 'upload_error' | 'upload_started'
   uploadDurationMs: 2340,       // Only for successful uploads
   error: null,                  // Only for failed uploads (error message)
   
@@ -179,7 +179,8 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 2. **Upload succeeds** → Overwrite with `uploaded` event using same ID  
 3. **Upload fails** → Overwrite with `failed` event using same ID
 4. **Power outage/crash** → `interrupted` event remains as evidence
-5. **Skip file** → Create `skipped` event with auto-generated ID (no overwriting)
+5. **Skip existing file** → Create `skipped` event (`already_exists`) with auto-generated ID
+6. **Skip queue duplicate** → Create `skipped` event (`queue_duplicate`) with auto-generated ID
 
 #### File Metadata Records: `/teams/{teamId}/matters/{matterId}/metadata/{metadataHash}`
 **Purpose**: Store unique combinations of file metadata using metadata hash as document ID
