@@ -8,7 +8,7 @@
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
-} from '../../../utils/hardwareCalibration.js';
+} from './hardwareCalibration.js';
 
 /**
  * Analyze files to provide count, size, duplication estimates, and hardware-calibrated time predictions

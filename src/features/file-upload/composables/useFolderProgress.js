@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { useFolderAnalysis } from './useFolderAnalysis.js';
+import { useFolderAnalysis } from '@/features/file-upload/composables/useFolderAnalysis.js';
 import { storeHardwarePerformanceFactor } from '../utils/hardwareCalibration.js';
 
 export function useFolderProgress() {

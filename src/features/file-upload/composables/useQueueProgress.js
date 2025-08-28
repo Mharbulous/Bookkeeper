@@ -1,4 +1,4 @@
-import { logProcessingTime } from '../../../utils/processingTimer.js';
+import { logProcessingTime } from '../utils/processingTimer.js';
 import { createApplicationError, getRetryDelay, isRecoverableError } from '../../../utils/errorMessages';
 
 export function useQueueProgress() {

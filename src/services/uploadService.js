@@ -1,7 +1,7 @@
 import { storage, db } from './firebase.js';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { updateFolderPaths } from '../utils/folderPathUtils.js';
+import { updateFolderPaths } from '../features/file-upload/utils/folderPathUtils.js';
 
 /**
  * Upload Service for Firebase Storage with atomic metadata operations

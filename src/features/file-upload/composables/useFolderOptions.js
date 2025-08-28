@@ -1,8 +1,8 @@
 import { ref } from 'vue';
 import { startProcessingTimer } from '../utils/processingTimer.js';
-import { useFolderAnalysis } from './useFolderAnalysis.js';
+import { useFolderAnalysis } from '@/features/file-upload/composables/useFolderAnalysis.js';
 import { useFolderProgress } from './useFolderProgress.js';
-import { useFolderTimeouts } from './useFolderTimeouts.js';
+import { useFolderTimeouts } from '../../../composables/useFolderTimeouts.js';
 
 export function useFolderOptions() {
   // Initialize sub-composables

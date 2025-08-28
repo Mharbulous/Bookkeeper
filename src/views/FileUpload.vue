@@ -118,12 +118,12 @@ import CloudFileWarningModal from '../features/file-upload/components/CloudFileW
 import { useFileQueue } from '../features/file-upload/composables/useFileQueue.js';
 import { useFileDragDrop } from '../features/file-upload/composables/useFileDragDrop.js';
 import { useQueueDeduplication } from '../features/file-upload/composables/useQueueDeduplication.js';
-import { useFolderOptions } from '../composables/useFolderOptions.js';
+import { useFolderOptions } from '../features/file-upload/composables/useFolderOptions.js';
 import { useTimeBasedWarning } from '../composables/useTimeBasedWarning.js';
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
-} from '../utils/hardwareCalibration.js';
+} from '../features/file-upload/utils/hardwareCalibration.js';
 import { storage } from '../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useAuthStore } from '../stores/auth.js';
