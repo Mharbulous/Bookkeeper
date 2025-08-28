@@ -289,7 +289,7 @@ export class UploadService {
    */
   generateStoragePath(fileHash, originalFileName) {
     const extension = originalFileName.split('.').pop();
-    return `teams/${this.teamId}/matters/general/files/${fileHash}.${extension}`;
+    return `teams/${this.teamId}/matters/general/uploads/${fileHash}.${extension}`;
   }
 
   /**

@@ -249,7 +249,7 @@ const calculateFileHash = async (file) => {
 // Simple upload helper functions
 const generateStoragePath = (fileHash, originalFileName) => {
   const extension = originalFileName.split('.').pop();
-  return `teams/${authStore.currentTeam}/matters/general/files/${fileHash}.${extension}`;
+  return `teams/${authStore.currentTeam}/matters/general/uploads/${fileHash}.${extension}`;
 };
 
 const checkFileExists = async (fileHash, originalFileName) => {
