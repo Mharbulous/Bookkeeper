@@ -127,9 +127,9 @@
 <script setup>
 import { ref, computed } from 'vue';
 import DemoContainer from '../components/DemoContainer.vue';
-import FileQueuePlaceholder from '../../components/features/upload/FileQueuePlaceholder.vue';
-import LazyFileItem from '../../components/features/upload/LazyFileItem.vue';
-import { useLazyFileList } from '../../composables/useLazyFileList.js';
+import FileQueuePlaceholder from '../../features/file-upload/components/FileQueuePlaceholder.vue';
+import LazyFileItem from '../../features/file-upload/components/LazyFileItem.vue';
+import { useLazyFileList } from '@/features/file-upload/composables/useLazyFileList.js';
 
 const showPlaceholders = ref(false);
 const placeholderCount = ref(100);

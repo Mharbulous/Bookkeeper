@@ -89,19 +89,6 @@ const formattedEstimate = computed(() => {
   return `${estimatedSeconds}s`;
 });
 
-// Remove unnecessary destructuring - props are already reactive
-// const {
-//   isVisible,
-//   elapsedTime,
-//   progressPercentage,
-//   isOverdue,
-//   overdueSeconds,
-//   timeRemaining,
-//   formattedElapsedTime,
-//   formattedTimeRemaining,
-//   estimatedDuration
-// } = toRefs(props)
-
 // Computed properties
 const displayProgress = computed(() => {
   // Ensure progress doesn't go below 0 or above 100

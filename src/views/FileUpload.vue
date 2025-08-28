@@ -111,13 +111,13 @@
 <script setup>
 import { ref, computed } from 'vue';
 import FileUploadQueue from '../features/file-upload/components/FileUploadQueue.vue';
-import UploadDropzone from '../components/features/upload/UploadDropzone.vue';
-import FolderOptionsDialog from '../components/features/upload/FolderOptionsDialog.vue';
-import ProcessingProgressModal from '../components/features/upload/ProcessingProgressModal.vue';
+import UploadDropzone from '../features/file-upload/components/UploadDropzone.vue';
+import FolderOptionsDialog from '../features/file-upload/components/FolderOptionsDialog.vue';
+import ProcessingProgressModal from '../features/file-upload/components/ProcessingProgressModal.vue';
 import CloudFileWarningModal from '../features/file-upload/components/CloudFileWarningModal.vue';
-import { useFileQueue } from '../composables/useFileQueue.js';
-import { useFileDragDrop } from '../composables/useFileDragDrop.js';
-import { useQueueDeduplication } from '../composables/useQueueDeduplication.js';
+import { useFileQueue } from '../features/file-upload/composables/useFileQueue.js';
+import { useFileDragDrop } from '../features/file-upload/composables/useFileDragDrop.js';
+import { useQueueDeduplication } from '../features/file-upload/composables/useQueueDeduplication.js';
 import { useFolderOptions } from '../composables/useFolderOptions.js';
 import { useTimeBasedWarning } from '../composables/useTimeBasedWarning.js';
 import {
@@ -127,9 +127,9 @@ import {
 import { storage } from '../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useAuthStore } from '../stores/auth.js';
-import { useLazyHashTooltip } from '../composables/useLazyHashTooltip.js';
+import { useLazyHashTooltip } from '../features/file-upload/composables/useLazyHashTooltip.js';
 import { useUploadLogger } from '../composables/useUploadLogger.js';
-import { useFileMetadata } from '../composables/useFileMetadata.js';
+import { useFileMetadata } from '../features/file-upload/composables/useFileMetadata.js';
 
 // Component configuration
 defineOptions({

@@ -1,5 +1,5 @@
 import { ref, reactive, onUnmounted } from 'vue';
-import { useWebWorker } from '../features/file-upload/composables/useWebWorker';
+import { useWebWorker } from './useWebWorker';
 
 /**
  * Centralized Web Worker management composable

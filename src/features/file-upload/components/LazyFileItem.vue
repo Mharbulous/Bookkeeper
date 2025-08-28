@@ -132,7 +132,7 @@
 </template>
 
 <script setup>
-import { useLazyHashTooltip } from '../../../composables/useLazyHashTooltip.js';
+import { useLazyHashTooltip } from '../composables/useLazyHashTooltip.js';
 
 // Props
 const props = defineProps({

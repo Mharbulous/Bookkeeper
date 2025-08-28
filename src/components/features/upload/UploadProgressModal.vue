@@ -307,7 +307,7 @@
 
 <script setup>
 import { computed, watch } from 'vue';
-import FileUploadStatus from './FileUploadStatus.vue';
+import FileUploadStatus from '@/features/file-upload/components/FileUploadStatus.vue';
 
 // Component props
 const props = defineProps({
