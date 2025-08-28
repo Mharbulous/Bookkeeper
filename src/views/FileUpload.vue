@@ -110,11 +110,11 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import FileUploadQueue from '../components/features/upload/FileUploadQueue.vue';
+import FileUploadQueue from '../features/file-upload/components/FileUploadQueue.vue';
 import UploadDropzone from '../components/features/upload/UploadDropzone.vue';
 import FolderOptionsDialog from '../components/features/upload/FolderOptionsDialog.vue';
 import ProcessingProgressModal from '../components/features/upload/ProcessingProgressModal.vue';
-import CloudFileWarningModal from '../components/features/upload/CloudFileWarningModal.vue';
+import CloudFileWarningModal from '../features/file-upload/components/CloudFileWarningModal.vue';
 import { useFileQueue } from '../composables/useFileQueue.js';
 import { useFileDragDrop } from '../composables/useFileDragDrop.js';
 import { useQueueDeduplication } from '../composables/useQueueDeduplication.js';
