@@ -38,13 +38,12 @@ export function useFileMetadata() {
    * @param {string} fileData.originalName - Original filename
    * @param {number} fileData.lastModified - File's last modified timestamp
    * @param {string} fileData.fileHash - Content hash of the file
-   * @param {string} fileData.sessionId - Upload session ID
    * @param {string} [fileData.originalPath] - Full relative path from folder upload (used to extract folderPath)
    * @returns {Promise<string>} - The metadata hash used as document ID
    */
   const createMetadataRecord = async (fileData) => {
     try {
-      const { originalName, lastModified, fileHash, sessionId, originalPath } = fileData;
+      const { originalName, lastModified, fileHash, originalPath } = fileData;
 
       if (!originalName || !lastModified || !fileHash) {
         throw new Error(
@@ -86,23 +85,16 @@ export function useFileMetadata() {
 
       // Create metadata record
       const metadataRecord = {
-        // Core metadata (only what varies between identical files)
+        // Core file metadata (only what varies between identical files)
         originalName: originalName,
         lastModified: lastModified,
         fileHash: fileHash,
-
-        // Upload context
-        uploadedAt: serverTimestamp(),
-        uploadedBy: authStore.user.uid,
-        sessionId: sessionId,
 
         // File path information
         folderPaths: pathUpdate.folderPaths,
 
         // Computed fields for convenience
         metadataHash: metadataHash,
-
-        createdAt: serverTimestamp(),
       };
 
       // Save to Firestore: /teams/{teamId}/matters/general/metadata/{metadataHash}
@@ -127,22 +119,18 @@ export function useFileMetadata() {
   /**
    * Create metadata records for multiple files
    * @param {Array} filesData - Array of file metadata objects
-   * @param {string} sessionId - Upload session ID
    * @returns {Promise<Array>} - Array of metadata hashes
    */
-  const createMultipleMetadataRecords = async (filesData, sessionId) => {
+  const createMultipleMetadataRecords = async (filesData) => {
     try {
       const results = [];
 
       for (const fileData of filesData) {
-        const metadataHash = await createMetadataRecord({
-          ...fileData,
-          sessionId: sessionId,
-        });
+        const metadataHash = await createMetadataRecord(fileData);
         results.push(metadataHash);
       }
 
-      console.log(`Created ${results.length} metadata records for session: ${sessionId}`);
+      console.log(`Created ${results.length} metadata records`);
       return results;
     } catch (error) {
       console.error('Failed to create multiple metadata records:', error);

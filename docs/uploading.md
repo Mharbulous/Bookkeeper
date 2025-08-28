@@ -427,8 +427,7 @@ await createMetadataRecord({
   originalName: 'document.pdf',
   lastModified: timestamp,
   fileHash: 'abc123...',
-  sessionId: 'session_123',
-  originalPath: 'Documents/2023/invoice.pdf', // webkitRelativePath from folder uploads (optional)
+  folderPaths: 'Documents/2023', // Generated from webkitRelativePath via smart pattern recognition
   // Note: folderPaths field is automatically generated with pattern recognition
   // See data-structures.md#folder-path-system for complete documentation
 });
@@ -475,7 +474,6 @@ const performanceConfig = {
 // Console logging format
 console.log(`[UPLOAD] ${action}: ${fileName} (${status})`, {
   eventId: 'event_123',
-  sessionId: 'session_456',
   duration: '2.3s',
   fileSize: '1.2MB',
 });
@@ -555,6 +553,6 @@ console.log('File paths:', files.map(f => ({
 
 ---
 
-_Last Updated: August 2025_
-_Version: 2.0_
+_Last Updated: 2025-08-28_
+_Version: 2.1_
 _Bookkeeper Upload System Documentation_

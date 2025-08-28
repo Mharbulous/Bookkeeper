@@ -1,5 +1,7 @@
 # Simplified Firebase Storage Plan (KISS Edition)
 
+Last Updated: 2025-08-28
+
 ## Overview
 
 **Core Simplification**: ALL files go through matters. No exceptions.
@@ -84,7 +86,6 @@ class StorageService {
       fileSize: file.size,
       mimeType: file.type,
       metadata,
-      uploadedBy: auth.currentUser.uid,
       loggedAt: new Date()
     })
     
@@ -160,8 +161,6 @@ class StorageService {
   // Metadata
   fileSize: 1048576,
   mimeType: 'application/pdf',
-  uploadedBy: 'user-123',
-  uploadedAt: Timestamp,
   
   // Simple categorization
   tags: ['contract', 'draft'],     // Simple array of tags
@@ -328,7 +327,7 @@ const clientDocs = await db
   .collection('teams').doc(teamId)
   .collection('documents')
   .where('clientIds', 'array-contains', clientId)
-  .orderBy('uploadedAt', 'desc')
+  .orderBy('loggedAt', 'desc')
   .get()
 
 // Find intake documents for a client (pre-matter)
@@ -336,10 +335,10 @@ const intakeDocs = await db
   .collection('teams').doc(teamId)
   .collection('documents')
   .where('matterId', '==', `matter-client-${clientId}-general`)
-  .orderBy('uploadedAt', 'desc')
+  .orderBy('loggedAt', 'desc')
   .get()
 
-// Find all uploads by a user
+// Find all uploads by a user (use upload_logs collection)
 const userUploads = await db
   .collection('teams').doc(teamId)
   .collection('upload_logs')
@@ -367,7 +366,7 @@ const matterDocs = await db
   .collection('teams').doc(teamId)
   .collection('documents')
   .where('matterId', '==', matterId)
-  .orderBy('uploadedAt', 'desc')
+  .orderBy('loggedAt', 'desc')
   .get()
 ```
 
@@ -527,21 +526,21 @@ async function associateDocumentWithMatter(documentId, fromMatterId, toMatterId)
     collection: 'teams/{teamId}/documents',
     fields: [
       { field: 'matterId', order: 'ASCENDING' },
-      { field: 'uploadedAt', order: 'DESCENDING' }
+      { field: 'loggedAt', order: 'DESCENDING' }
     ]
   },
   {
     collection: 'teams/{teamId}/documents',
     fields: [
       { field: 'clientIds', mode: 'ARRAY_CONTAINS' },
-      { field: 'uploadedAt', order: 'DESCENDING' }
+      { field: 'loggedAt', order: 'DESCENDING' }
     ]
   },
   {
     collection: 'teams/{teamId}/upload_logs',
     fields: [
       { field: 'uploadedBy', order: 'ASCENDING' },
-      { field: 'attemptedAt', order: 'DESCENDING' }
+      { field: 'loggedAt', order: 'DESCENDING' }
     ]
   }
 ]

@@ -1,5 +1,7 @@
 # Firestore Data Structure Design (KISS Edition)
 
+Last Updated: 2025-08-28
+
 ## Overview
 
 This document defines a **simple, scalable** Firestore data structure for our multi-tenant team-based architecture supporting Multi-App SSO. Following the KISS principle, we've eliminated unnecessary complexity while maintaining all essential functionality.
@@ -27,7 +29,6 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   },
   
   // Activity tracking
-  createdAt: Timestamp,
   lastLogin: Timestamp
 }
 ```
@@ -100,9 +101,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
     state: 'NY',
     zip: '10001'
   },
-  status: 'active',  // 'active' | 'inactive'
-  createdAt: Timestamp,
-  createdBy: 'user-john-123'
+  status: 'active'  // 'active' | 'inactive'
 }
 ```
 
@@ -120,9 +119,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   priority: 'high',  // 'high' | 'medium' | 'low'
   assignedTo: ['user-john-123', 'user-jane-456'],
   openedDate: Timestamp,
-  dueDate: Timestamp,
-  createdAt: Timestamp,
-  createdBy: 'user-john-123'
+  dueDate: Timestamp
 }
 ```
 
@@ -162,23 +159,16 @@ This collection logs only the 4 essential upload events with basic information:
 
 ```javascript
 {
-  // Core metadata (only what varies between identical files)
+  // Core file metadata (only true file properties)
   originalName: 'document.pdf',
   lastModified: 1703123456789,  // File's original timestamp
-  fileHash: 'abc123def456789abcdef012345...',  // Standard SHA-256 reference to actual file content
-  
-  // Upload context
-  uploadedAt: Timestamp,
-  uploadedBy: 'user-john-123',
-  sessionId: 'session_uuid_abc123',
+  fileHash: 'abc123def456789abcdef012345...',  // SHA-256 reference to actual file content
   
   // File path information (from folder uploads)
   folderPaths: 'Documents/2023|Archive/Backup',  // Pipe-delimited paths, supports multiple contexts via pattern recognition
   
   // Computed fields for convenience
-  metadataHash: 'xyz789abc123',  // SHA-256 of concatenated metadata string
-  
-  createdAt: Timestamp
+  metadataHash: 'xyz789abc123'  // SHA-256 of concatenated metadata string (originalName|lastModified|fileHash)
 }
 ```
 
@@ -342,7 +332,6 @@ async function createNewUser(userId, email, displayName) {
   await db.collection('users').doc(userId).set({
     defaultTeamId: userId,
     preferences: { theme: 'light', notifications: true },
-    createdAt: new Date(),
     lastLogin: new Date()
   })
   
@@ -504,7 +493,7 @@ Keep indexes minimal:
     collection: 'teams/{teamId}/invoices',
     fields: [
       { field: 'clientId', order: 'ASCENDING' },
-      { field: 'createdAt', order: 'DESCENDING' }
+      { field: 'lastLogin', order: 'DESCENDING' }
     ]
   },
   {
