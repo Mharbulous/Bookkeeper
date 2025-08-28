@@ -119,7 +119,7 @@ import { useFileQueue } from '../features/file-upload/composables/useFileQueue.j
 import { useFileDragDrop } from '../features/file-upload/composables/useFileDragDrop.js';
 import { useQueueDeduplication } from '../features/file-upload/composables/useQueueDeduplication.js';
 import { useFolderOptions } from '../features/file-upload/composables/useFolderOptions.js';
-import { useTimeBasedWarning } from '../composables/useTimeBasedWarning.js';
+import { useTimeBasedWarning } from '../features/file-upload/composables/useTimeBasedWarning.js';
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
@@ -128,7 +128,7 @@ import { storage } from '../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useAuthStore } from '../core/stores/auth.js';
 import { useLazyHashTooltip } from '../features/file-upload/composables/useLazyHashTooltip.js';
-import { useUploadLogger } from '../composables/useUploadLogger.js';
+import { useUploadLogger } from '../features/file-upload/composables/useUploadLogger.js';
 import { useFileMetadata } from '../features/file-upload/composables/useFileMetadata.js';
 
 // Component configuration

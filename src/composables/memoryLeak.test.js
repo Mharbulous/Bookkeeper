@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useFolderTimeouts } from './useFolderTimeouts.js';
+import { useFolderTimeouts } from '../features/file-upload/composables/useFolderTimeouts.js';
 import { useFolderAnalysis } from '@/features/file-upload/composables/useFolderAnalysis.js';
 import { memoryTestUtils, cloudFolderScenarios } from '../test-utils/mockFileAPI.js';
 

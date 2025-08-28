@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { useAsyncRegistry } from './useAsyncRegistry';
+import { useAsyncRegistry } from '../../../composables/useAsyncRegistry';
 
 export function useFolderTimeouts() {
   // Modern timeout state with AbortController

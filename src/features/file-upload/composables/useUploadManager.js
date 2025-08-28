@@ -1,6 +1,6 @@
 import { ref, computed, reactive, readonly, onUnmounted, watch } from 'vue';
-import { UploadService } from '../services/uploadService.js';
-import { useAuthStore } from '../core/stores/auth.js';
+import { UploadService } from '../../../services/uploadService.js';
+import { useAuthStore } from '../../../core/stores/auth.js';
 
 /**
  * Upload Manager Composable

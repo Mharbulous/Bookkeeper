@@ -1,6 +1,6 @@
-import { db } from '../services/firebase.js';
+import { db } from '../../../services/firebase.js';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useAuthStore } from '../core/stores/auth.js';
+import { useAuthStore } from '../../../core/stores/auth.js';
 
 export function useUploadLogger() {
   const authStore = useAuthStore();
