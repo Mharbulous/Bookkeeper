@@ -7,6 +7,7 @@ Create comprehensive documentation of all asynchronous processes currently runni
 ## Purpose
 
 Before implementing the Task Registry system, we need a complete inventory of all async processes to ensure proper registration and management. This table will serve as the foundation for:
+
 - Task Registry implementation planning
 - Identifying parent-child relationships between processes
 - Ensuring no async processes are missed during registry integration
@@ -37,6 +38,7 @@ Each async process is documented using the following structured template:
 ### **WEB WORKERS & WORKER MANAGEMENT**
 
 **ASYNC PROCESS: File Hash Web Worker**
+
 - **Location**: `src/workers/fileHashWorker.js:1-300`
 - **Type**: Web Worker
 - **Trigger**: File deduplication process initiation
@@ -47,6 +49,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Worker Manager Health Check**
+
 - **Location**: `src/composables/useWebWorker.js:90`
 - **Type**: setInterval
 - **Trigger**: Worker initialization
@@ -57,6 +60,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Worker Message Timeout**
+
 - **Location**: `src/composables/useWebWorker.js:115,220`
 - **Type**: setTimeout
 - **Trigger**: Worker message sending
@@ -67,6 +71,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Worker Restart Delay**
+
 - **Location**: `src/composables/useWorkerManager.js:155`
 - **Type**: setTimeout
 - **Trigger**: Worker failure detection
@@ -81,6 +86,7 @@ Each async process is documented using the following structured template:
 ### **TIMERS & INTERVALS**
 
 **ASYNC PROCESS: AsyncTracker Statistics Monitor**
+
 - **Location**: `src/App.vue:54-61`
 - **Type**: setInterval
 - **Trigger**: Application startup (component mount)
@@ -92,6 +98,7 @@ Each async process is documented using the following structured template:
 - **Notes**: Self-monitoring process that tracks async processes every 30 seconds. Registered as 'async-monitoring' type and excluded from suspicious process detection. This process is expected to persist for the application's lifetime and should never be flagged as suspicious.
 
 **ASYNC PROCESS: Folder Analysis Timeout Controller**
+
 - **Location**: `src/composables/useFolderTimeouts.js:32`
 - **Type**: setTimeout with AbortController
 - **Trigger**: Folder processing initiation
@@ -102,6 +109,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Global Processing Timeout**
+
 - **Location**: `src/composables/useFolderTimeouts.js:102`
 - **Type**: setTimeout
 - **Trigger**: Folder analysis start
@@ -112,6 +120,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Time-Based Warning Monitor**
+
 - **Location**: `src/composables/useTimeBasedWarning.js:101`
 - **Type**: setInterval
 - **Trigger**: File processing start
@@ -122,6 +131,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Login Form Success Delay**
+
 - **Location**: `src/components/features/auth/LoginForm.vue:108`
 - **Type**: setTimeout
 - **Trigger**: Successful authentication
@@ -132,6 +142,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: Partial (no explicit cleanup)
 
 **ASYNC PROCESS: Folder Options Analysis Delay**
+
 - **Location**: `src/composables/useFolderOptions.js:166`
 - **Type**: setTimeout
 - **Trigger**: UI completion message display
@@ -146,6 +157,7 @@ Each async process is documented using the following structured template:
 ### **EVENT LISTENERS**
 
 **ASYNC PROCESS: Document Click Outside Detection**
+
 - **Location**: `src/components/AppSwitcher.vue:342,346`
 - **Type**: Document Event Listener
 - **Trigger**: Component mount
@@ -156,6 +168,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Modal Focus Trap**
+
 - **Location**: `src/components/features/upload/CloudFileWarningModal.vue:257,276,284`
 - **Type**: Document Event Listener (keydown)
 - **Trigger**: Modal visibility
@@ -166,6 +179,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: AbortController Signal Listeners**
+
 - **Location**: `src/composables/useFolderTimeouts.js:65,99`
 - **Type**: AbortSignal Event Listener
 - **Trigger**: AbortController creation
@@ -176,6 +190,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Folder Analysis Abort Handler**
+
 - **Location**: `src/composables/useFolderAnalysis.js:184`
 - **Type**: AbortSignal Event Listener
 - **Trigger**: Analysis start with timeout
@@ -190,6 +205,7 @@ Each async process is documented using the following structured template:
 ### **VUE REACTIVITY & WATCHERS**
 
 **ASYNC PROCESS: Favicon Route Watcher**
+
 - **Location**: `src/composables/useFavicon.js:27`
 - **Type**: Vue watch
 - **Trigger**: Route path changes
@@ -200,6 +216,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: App Switcher Hover Watcher**
+
 - **Location**: `src/components/AppSwitcher.vue:106`
 - **Type**: Vue watch
 - **Trigger**: Props change
@@ -210,6 +227,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Folder Options Completion Watcher**
+
 - **Location**: `src/components/features/upload/FolderOptionsDialog.vue:240`
 - **Type**: Vue watch
 - **Trigger**: Props.allFilesComplete change
@@ -220,6 +238,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: File Upload Queue File Watcher**
+
 - **Location**: `src/components/features/upload/FileUploadQueue.vue:243,326`
 - **Type**: Vue watch (deep)
 - **Trigger**: Props.files changes
@@ -230,6 +249,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Cloud Warning Modal Visibility Watcher**
+
 - **Location**: `src/components/features/upload/CloudFileWarningModal.vue:249`
 - **Type**: Vue watch
 - **Trigger**: Props.isVisible changes
@@ -240,7 +260,8 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Auth Store State Watcher**
-- **Location**: `src/stores/auth.js:303`
+
+- **Location**: `src/core/stores/auth.js:303`
 - **Type**: Vue watch with unwatch
 - **Trigger**: Auth state monitoring
 - **Cleanup**: Explicit `unwatch()` call
@@ -254,6 +275,7 @@ Each async process is documented using the following structured template:
 ### **COMPONENT LIFECYCLE & DOM OPERATIONS**
 
 **ASYNC PROCESS: App Switcher DOM Updates**
+
 - **Location**: `src/components/AppSwitcher.vue:111,157,171,198,209,220`
 - **Type**: Vue nextTick
 - **Trigger**: Component reactivity
@@ -264,6 +286,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Cloud Modal DOM Updates**
+
 - **Location**: `src/components/features/upload/CloudFileWarningModal.vue:251,268`
 - **Type**: Vue nextTick
 - **Trigger**: Modal rendering
@@ -274,6 +297,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: File Queue Intersection Observer**
+
 - **Location**: `src/components/features/upload/FileQueuePlaceholder.vue:28`
 - **Type**: IntersectionObserver (VueUse)
 - **Trigger**: Component mount
@@ -284,6 +308,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Idle Callback Observer Setup**
+
 - **Location**: `src/components/features/upload/FileQueuePlaceholder.vue:47`
 - **Type**: requestIdleCallback
 - **Trigger**: Component initialization
@@ -298,6 +323,7 @@ Each async process is documented using the following structured template:
 ### **PROMISE CHAINS & ASYNC OPERATIONS**
 
 **ASYNC PROCESS: Firebase Auth State Monitoring**
+
 - **Location**: `src/services/authService.js:12`
 - **Type**: Firebase onAuthStateChanged
 - **Trigger**: Auth service initialization
@@ -308,6 +334,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: File Queue Processing Chain**
+
 - **Location**: `src/composables/useFileQueue.js:34,118,229`
 - **Type**: Promise chains with async/await
 - **Trigger**: File upload initiation
@@ -318,6 +345,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: Partial
 
 **ASYNC PROCESS: Deduplication Processing Coordination**
+
 - **Location**: `src/composables/useQueueDeduplication.js:26`
 - **Type**: Promise chains with Worker coordination
 - **Trigger**: File deduplication start
@@ -328,6 +356,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: File Progress Yield Points**
+
 - **Location**: `src/composables/useFolderProgress.js:58`
 - **Type**: Promise with setTimeout
 - **Trigger**: Progress reporting loops
@@ -338,6 +367,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Route Guard Auth Waiting**
+
 - **Location**: `src/router/guards/auth.js:12`
 - **Type**: Async Promise await
 - **Trigger**: Route navigation
@@ -352,6 +382,7 @@ Each async process is documented using the following structured template:
 ### **LAZY LOADING & DYNAMIC IMPORTS**
 
 **ASYNC PROCESS: Route Component Lazy Loading**
+
 - **Location**: `src/router/index.js:11,17,23,29,35,41,47,53,59`
 - **Type**: Dynamic imports
 - **Trigger**: Route navigation
@@ -362,7 +393,8 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Firebase Services Lazy Loading**
-- **Location**: `src/stores/auth.js:187,269,284`
+
+- **Location**: `src/core/stores/auth.js:187,269,284`
 - **Type**: Dynamic imports
 - **Trigger**: First auth operation
 - **Cleanup**: Module cache persistence
@@ -372,7 +404,8 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Team Store Service Lazy Loading**
-- **Location**: `src/stores/team.js:89`
+
+- **Location**: `src/core/stores/team.js:89`
 - **Type**: Dynamic imports
 - **Trigger**: Auth store initialization
 - **Cleanup**: Module cache persistence
@@ -386,6 +419,7 @@ Each async process is documented using the following structured template:
 ### **SPECIALIZED ASYNC PATTERNS**
 
 **ASYNC PROCESS: File Queue nextTick Synchronization**
+
 - **Location**: `src/composables/useFileQueue.js:81,145,201`
 - **Type**: Vue nextTick
 - **Trigger**: Queue state updates
@@ -396,6 +430,7 @@ Each async process is documented using the following structured template:
 - **Cleanup Verification**: ✓
 
 **ASYNC PROCESS: Memory Leak Test Timeouts**
+
 - **Location**: Various test files
 - **Type**: setTimeout in test suites
 - **Trigger**: Test execution
@@ -408,7 +443,7 @@ Each async process is documented using the following structured template:
 ### Column Definitions
 
 - **Process Name**: Descriptive name for the async process
-- **File Location**: File path and approximate line numbers where process is created/managed  
+- **File Location**: File path and approximate line numbers where process is created/managed
 - **Process Type**: Type of async operation (Web Worker, setTimeout, setInterval, Promise chain, etc.)
 - **Parent Process**: If this process is spawned by another process, identify the parent
 - **Termination Method**: How the process is currently terminated (if at all)
@@ -417,22 +452,26 @@ Each async process is documented using the following structured template:
 ## Process Categories to Document
 
 ### Web Workers
+
 - File hashing workers
 - Any background processing workers
 
-### Timers and Intervals  
+### Timers and Intervals
+
 - Time monitoring intervals
 - Progress update timers
 - Cleanup timeouts
 - Performance measurement timers
 
 ### Promise Chains and Async Operations
+
 - File deduplication processes
 - Firebase uploads
 - Progress tracking operations
 - UI update cycles
 
 ### Component Lifecycle Processes
+
 - Lazy loading operations
 - Cache management processes
 - Progressive rendering systems
@@ -442,17 +481,21 @@ Each async process is documented using the following structured template:
 The AsyncTracker system includes sophisticated monitoring logic designed to identify problematic async processes while excluding expected system processes:
 
 ### Suspicious Process Detection
+
 - **Long-running threshold**: 30 seconds from process creation
 - **Excluded process types**: `'watcher'`, `'listener'`, `'async-monitoring'`
 - **Self-monitoring exclusion**: The AsyncTracker's own monitoring interval is never flagged as suspicious
 
 ### Process Classification
+
 1. **async-monitoring**: The AsyncTracker's 30-second statistics logging interval
+
    - Expected to run continuously for application lifetime
    - Explicitly excluded from suspicious process detection
    - Registered with proper cleanup on component unmount
 
 2. **Suspicious processes**: Long-running processes that are NOT expected system processes
+
    - Triggers warning messages in console
    - Indicates potential memory leaks or stuck operations
 
@@ -465,21 +508,25 @@ The AsyncTracker system includes sophisticated monitoring logic designed to iden
 The AsyncTracker monitoring system follows a simple rule:
 
 **Desired Behavior:**
+
 - **Only 1 async-monitoring process** → **No console output at all**
 - **Any other scenario** → **Show full statistics table including async-monitoring**
 
 **Specific Cases:**
 
 ✅ **Silent Cases (No Console Output):**
+
 - Only 1 `async-monitoring` process running (normal application state)
 
 🔊 **Console Output Cases (Full Statistics Table Displayed):**
+
 - 1 `async-monitoring` + 1 `worker` → Show table with both processes
 - 2+ `async-monitoring` processes → Show table + error about duplicates (bug condition)
 - 0 `async-monitoring` + other processes → Show table with other processes
 - Any combination of processes beyond just the single expected `async-monitoring`
 
 **When Console Output Occurs, It Includes:**
+
 - **Always**: Full statistics table showing ALL process types including `async-monitoring`
 - **If multiple monitors detected**: Error message about duplicate monitoring processes
 - **If suspicious processes found**: Warning about potentially problematic long-running processes
@@ -498,6 +545,7 @@ The AsyncTracker monitoring system follows a simple rule:
 ## Enhanced Methodology Validation
 
 The improved methodology successfully identified **13 additional processes** beyond the initial 21, including:
+
 - AsyncTracker self-monitoring interval (critical system process)
 - Document event listeners (click outside, focus trapping)
 - Vue reactivity watchers (route, props, visibility)
@@ -507,6 +555,7 @@ The improved methodology successfully identified **13 additional processes** bey
 ## Implementation Notes
 
 This comprehensive async process inventory provides the definitive foundation for Task Registry implementation. Each process includes:
+
 - **Precise location information** for implementation targeting
 - **Risk assessment** for prioritization
 - **Cleanup verification status** for reliability assurance

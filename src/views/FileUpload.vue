@@ -126,7 +126,7 @@ import {
 } from '../features/file-upload/utils/hardwareCalibration.js';
 import { storage } from '../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
-import { useAuthStore } from '../stores/auth.js';
+import { useAuthStore } from '../core/stores/auth.js';
 import { useLazyHashTooltip } from '../features/file-upload/composables/useLazyHashTooltip.js';
 import { useUploadLogger } from '../composables/useUploadLogger.js';
 import { useFileMetadata } from '../features/file-upload/composables/useFileMetadata.js';

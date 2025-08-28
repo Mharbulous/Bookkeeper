@@ -130,7 +130,7 @@ New-Item -ItemType Directory -Path "$srcPath/core/services" -Force | Out-Null
 
 $coreMoves = @(
     @{
-        Source = "$srcPath/stores/auth.js"
+        Source = "$srcPath/core/stores/auth.js"
         Dest   = "$srcPath/core/stores/auth.js"
         Desc   = "auth.js store"
     },

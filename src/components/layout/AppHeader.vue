@@ -103,7 +103,7 @@
 </template>
 
 <script>
-import { useAuthStore } from '../../stores/auth';
+import { useAuthStore } from '../../core/stores/auth';
 import BaseSearchBar from '../base/BaseSearchBar.vue';
 
 export default {

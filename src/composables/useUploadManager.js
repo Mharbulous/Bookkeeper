@@ -1,6 +1,6 @@
 import { ref, computed, reactive, readonly, onUnmounted, watch } from 'vue';
 import { UploadService } from '../services/uploadService.js';
-import { useAuthStore } from '../stores/auth.js';
+import { useAuthStore } from '../core/stores/auth.js';
 
 /**
  * Upload Manager Composable
@@ -269,7 +269,6 @@ export function useUploadManager() {
           `File "${queueFile.name}" is missing hash. Files must be processed through deduplication before upload.`
         );
       }
-
 
       return {
         file: queueFile.file,

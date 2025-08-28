@@ -5,7 +5,7 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import vuetify from './plugins/vuetify';
-import { useAuthStore } from './stores/auth';
+import { useAuthStore } from './core/stores/auth';
 import { useGlobalAsyncRegistry } from './composables/useAsyncRegistry';
 
 const app = createApp(App);

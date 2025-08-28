@@ -95,7 +95,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, reactive, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
+import { useAuthStore } from '../core/stores/auth';
 
 // Props
 const props = defineProps({

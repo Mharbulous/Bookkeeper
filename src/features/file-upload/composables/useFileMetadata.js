@@ -1,6 +1,6 @@
 import { db } from '../../../services/firebase.js';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { useAuthStore } from '../../../stores/auth.js';
+import { useAuthStore } from '../../../core/stores/auth.js';
 import { updateFolderPaths } from '../utils/folderPathUtils.js';
 
 export function useFileMetadata() {
@@ -77,7 +77,10 @@ export function useFileMetadata() {
           existingFolderPaths = existingDoc.data().folderPaths || '';
         }
       } catch (error) {
-        console.warn('Could not retrieve existing folderPaths, proceeding with new path only:', error);
+        console.warn(
+          'Could not retrieve existing folderPaths, proceeding with new path only:',
+          error
+        );
       }
 
       // Update folder paths using pattern recognition

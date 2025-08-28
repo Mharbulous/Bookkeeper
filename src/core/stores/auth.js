@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
+import { auth, db } from '../../services/firebase';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -183,7 +183,7 @@ export const useAuthStore = defineStore('auth', {
 
     // Create solo team - ONE TIME ONLY
     async _createSoloTeam(firebaseUser) {
-      const { db } = await import('../services/firebase');
+      const { db } = await import('../../services/firebase');
       const { writeBatch, doc } = await import('firebase/firestore');
       const batch = writeBatch(db);
 
@@ -220,7 +220,7 @@ export const useAuthStore = defineStore('auth', {
         });
 
         // 3. Create user document with preferences
-        const { UserService } = await import('../services/userService');
+        const { UserService } = await import('../../services/userService');
         await UserService.createOrUpdateUserDocument(firebaseUser, {
           preferences: {
             theme: 'light',
@@ -265,7 +265,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         this.error = null;
         // Import auth service dynamically to avoid circular imports
-        const { authService } = await import('../services/authService');
+        const { authService } = await import('../../services/authService');
         await authService.signIn(email, password);
         // The onAuthStateChanged listener will handle the state transition
       } catch (error) {
@@ -280,7 +280,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         this.error = null;
         // Import auth service dynamically to avoid circular imports
-        const { authService } = await import('../services/authService');
+        const { authService } = await import('../../services/authService');
         await authService.signOut();
         // The onAuthStateChanged listener will handle the state transition
       } catch (error) {
