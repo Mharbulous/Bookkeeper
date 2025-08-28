@@ -7,6 +7,7 @@ Last Updated: 2025-08-28
 This document defines a **simple, scalable** Firestore data structure for our multi-tenant team-based architecture supporting Multi-App SSO. Following the KISS principle, we've eliminated unnecessary complexity while maintaining all essential functionality.
 
 **Key Design Decisions:**
+
 - Teams typically have 3-10 members (max 100)
 - All apps share the same role-based permissions
 - No denormalization needed for queries
@@ -16,6 +17,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ## Core Data Structure
 
 ### 1. Users Collection: `/users/{userId}`
+
 **Purpose**: Store user preferences and app-specific settings
 
 ```javascript
@@ -27,13 +29,14 @@ This document defines a **simple, scalable** Firestore data structure for our mu
     notifications: true,
     language: 'en'
   },
-  
+
   // Activity tracking
   lastLogin: Timestamp
 }
 ```
 
 ### 2. Teams Collection: `/teams/{teamId}`
+
 **Purpose**: Store team info and embedded member list
 
 **Solo User Design**: New users automatically get a team where `teamId === userId`, making them a "team of one". This eliminates special cases in storage, security, and duplicate detection.
@@ -43,7 +46,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
   // Team information
   name: 'ACME Law Firm',  // For solo users: "John's Workspace"
   description: 'Full-service law firm',  // For solo users: "Personal workspace"
-  
+
   // Embedded members (perfect for 3-10 users, or 1 for solo users)
   members: {
     'user-john-123': {
@@ -57,7 +60,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
       joinedAt: Timestamp
     }
   },
-  
+
   // Simple pending invitations
   pendingInvites: {
     'newuser@acme.com': {
@@ -67,19 +70,19 @@ This document defines a **simple, scalable** Firestore data structure for our mu
       fromTeam: 'team-abc-123'  // Track which team invited them
     }
   },
-  
+
   // Which apps this team has access to
   apps: ['intranet', 'bookkeeper'],  // Simple array
-  
+
   // Basic settings
   settings: {
     timezone: 'America/New_York',
     maxMembers: 100
   },
-  
+
   // Team type flags
   isPersonal: false,  // true for solo users (teamId === userId)
-  
+
   // Metadata
   createdAt: Timestamp,
   createdBy: 'user-john-123'
@@ -87,9 +90,11 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ```
 
 ### 3. Team Data Collections: `/teams/{teamId}/{collection}/{documentId}`
+
 **Purpose**: All team data lives in flat collections under the team
 
 #### Clients Collection: `/teams/{teamId}/clients/{clientId}`
+
 ```javascript
 {
   name: 'ABC Corporation',
@@ -124,9 +129,11 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 ```
 
 #### Upload Events: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
+
 **Purpose**: Track essential upload events with minimal information
 
 This collection logs only the 4 essential upload events with basic information:
+
 - **upload_interrupted**: Upload started but not completed
 - **upload_success**: Upload completed successfully
 - **upload_failed**: Upload failed
@@ -145,15 +152,18 @@ This collection logs only the 4 essential upload events with basic information:
 ```
 
 **Event Types**:
+
 - `upload_interrupted`: Upload started (may remain if process interrupted)
 - `upload_success`: Upload completed successfully
 - `upload_failed`: Upload failed for any reason
 - `upload_skipped_metadata_recorded`: File skipped but metadata was recorded
 
 #### File Metadata Records: `/teams/{teamId}/matters/{matterId}/metadata/{metadataHash}`
+
 **Purpose**: Store unique combinations of file metadata using metadata hash as document ID
 
-**Hash Generation**: 
+**Hash Generation**:
+
 - **File Hash**: SHA-256 of file content (`abc123def456789abcdef012345...`)
 - **Metadata Hash**: SHA-256 of concatenated string: `originalName|lastModified|fileHash`
 
@@ -161,14 +171,14 @@ This collection logs only the 4 essential upload events with basic information:
 {
   // Core file metadata (only true file properties)
   originalName: 'document.pdf',
-  lastModified: 1703123456789,  // File's original timestamp
+  lastModified: 1703123456789,  // Original files lastModified metadata info
   fileHash: 'abc123def456789abcdef012345...',  // SHA-256 reference to actual file content
-  
+  metadataHash: 'xyz789abc123'  // SHA-256 of concatenated metadata string (originalName|lastModified|fileHash)
+
   // File path information (from folder uploads)
   folderPaths: 'Documents/2023|Archive/Backup',  // Pipe-delimited paths, supports multiple contexts via pattern recognition
-  
-  // Computed fields for convenience
-  metadataHash: 'xyz789abc123'  // SHA-256 of concatenated metadata string (originalName|lastModified|fileHash)
+
+
 }
 ```
 
@@ -187,19 +197,22 @@ The `folderPaths` field stores folder path information for files uploaded throug
 
 #### Data Format Examples
 
-**Single Path**: 
+**Single Path**:
+
 ```javascript
-folderPaths: "Documents/2023"
+folderPaths: 'Documents/2023';
 ```
 
-**Multiple Paths**: 
+**Multiple Paths**:
+
 ```javascript
-folderPaths: "Documents/2023|Archive/Backup|Legal/Contracts"
+folderPaths: 'Documents/2023|Archive/Backup|Legal/Contracts';
 ```
 
-**Root Level Files**: 
+**Root Level Files**:
+
 ```javascript
-folderPaths: ""  // Empty string for files uploaded without folder context
+folderPaths: ''; // Empty string for files uploaded without folder context
 ```
 
 #### Path Extraction Rules
@@ -207,7 +220,7 @@ folderPaths: ""  // Empty string for files uploaded without folder context
 Folder paths are automatically extracted from the HTML5 `webkitRelativePath` property:
 
 - `"Documents/2023/invoices/invoice.pdf"` → `folderPaths: "Documents/2023/invoices"`
-- `"photos/vacation.jpg"` → `folderPaths: "photos"`  
+- `"photos/vacation.jpg"` → `folderPaths: "photos"`
 - `"readme.txt"` → `folderPaths: ""` (root level)
 
 #### Field Properties
@@ -221,29 +234,69 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
 ## Firebase Storage Structure
 
 ### File Storage Paths
+
 **Purpose**: Store actual file content with automatic deduplication based on file hash
 
 ```
-/teams/{teamId}/matters/{matterId}/files/{fileHash}.{extension}
+/teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{extension}
 ```
 
 **Key Features**:
+
 - **Content Deduplication**: Identical files (same hash) stored only once
 - **Multi-Reference**: Single storage file can be referenced by multiple metadata records
 - **Matter-Scoped**: Files organized under specific matters for proper access control
 - **Extension Preservation**: Original file extensions maintained for proper file handling
 
 **Examples**:
+
 ```
-/teams/team-abc-123/matters/general/files/abc123def456789abcdef012345.pdf
-/teams/team-abc-123/matters/matter-001/files/xyz789ghi012345fedcba678901.docx
-/teams/solo-user-789/matters/general/files/def456abc123789012345abcdef.jpg
+/teams/team-abc-123/matters/general/uploads/abc123def456789abcdef012345.pdf
+/teams/team-abc-123/matters/matter-001/uploads/xyz789ghi012345fedcba678901.docx
+/teams/solo-user-789/matters/general/uploads/def456abc123789012345abcdef.jpg
 ```
 
 **Storage Efficiency**:
+
 - Same file uploaded to multiple matters = single storage file + multiple metadata records
 - Same file with different original names = single storage file + multiple metadata records
 - Perfect deduplication while preserving all metadata variations
+
+### Processing Folders
+**Purpose**: Organize files based on processing status and operations performed
+
+The following folders are reserved for future file processing workflows:
+
+#### OCRed Files: `/teams/{teamId}/matters/{matterId}/OCRed/`
+**Purpose**: Store files that have been processed through Optical Character Recognition
+- Contains text-searchable versions of scanned documents
+- Maintains original file hash for deduplication
+- Enables full-text search capabilities
+
+#### Split Files: `/teams/{teamId}/matters/{matterId}/split/`
+**Purpose**: Store files that have been split from larger documents
+- Contains individual pages or sections from multi-page documents
+- Each split file gets its own hash and metadata record
+- Maintains reference to original source file
+
+#### Merged Files: `/teams/{teamId}/matters/{matterId}/merged/`
+**Purpose**: Store files that have been merged from multiple source files
+- Contains consolidated documents created from multiple inputs
+- New hash generated for merged content
+- Metadata tracks all source files used in merge operation
+
+**Processing Workflow**:
+```
+Original Upload → /uploads/
+     ↓
+OCR Processing → /OCRed/
+     ↓
+Document Split → /split/
+     ↓
+File Merging → /merged/
+```
+
+**Note**: These processing folders are documented for future implementation. Current file uploads use the `/uploads/` folder exclusively.
 
 ## Custom Claims (Firebase Auth)
 
@@ -266,24 +319,24 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Users can only access their own document
     match /users/{userId} {
-      allow read, write: if request.auth != null && 
+      allow read, write: if request.auth != null &&
                             request.auth.uid == userId;
     }
-    
+
     // Team members can read team, admins can write
     match /teams/{teamId} {
-      allow read: if request.auth != null && 
+      allow read: if request.auth != null &&
                      request.auth.token.teamId == teamId;
-      allow write: if request.auth != null && 
+      allow write: if request.auth != null &&
                       request.auth.token.teamId == teamId &&
                       request.auth.token.role == 'admin';
     }
-    
+
     // All team data follows same pattern
     match /teams/{teamId}/{collection}/{document} {
-      allow read: if request.auth != null && 
+      allow read: if request.auth != null &&
                      request.auth.token.teamId == teamId;
-      allow write: if request.auth != null && 
+      allow write: if request.auth != null &&
                       request.auth.token.teamId == teamId;
     }
   }
@@ -294,7 +347,7 @@ service cloud.firestore {
 
 ### Simple, Efficient Queries
 
-```javascript
+````javascript
 // Get user's team
 const team = await db.collection('teams').doc(auth.currentUser.teamId).get()
 
@@ -327,14 +380,14 @@ async function createNewUser(userId, email, displayName) {
     teamId: userId,  // teamId === userId for solo users
     role: 'admin'    // Solo users are admin of their own team
   })
-  
+
   // 2. Create user document
   await db.collection('users').doc(userId).set({
     defaultTeamId: userId,
     preferences: { theme: 'light', notifications: true },
     lastLogin: new Date()
   })
-  
+
   // 3. Create solo team
   await db.collection('teams').doc(userId).set({
     name: `${displayName}'s Workspace`,
@@ -354,11 +407,12 @@ async function createNewUser(userId, email, displayName) {
     createdBy: userId
   })
 }
-```
+````
 
 ## Handling Team Invitations and Mergers
 
 ### Invitation Process
+
 1. **Admin adds email to `pendingInvites`** in team document
 2. **User signs up** with that email (creates solo team)
 3. **On login**, check all teams for pending invites
@@ -369,24 +423,25 @@ async function createNewUser(userId, email, displayName) {
 ```javascript
 // Check for pending invitations on login
 async function checkAndProcessInvitations(userId, userEmail) {
-  const teamsSnapshot = await db.collection('teams')
+  const teamsSnapshot = await db
+    .collection('teams')
     .where(`pendingInvites.${userEmail}`, '!=', null)
-    .get()
+    .get();
 
   if (!teamsSnapshot.empty) {
-    const invitingTeam = teamsSnapshot.docs[0]
-    const invite = invitingTeam.data().pendingInvites[userEmail]
-    
+    const invitingTeam = teamsSnapshot.docs[0];
+    const invite = invitingTeam.data().pendingInvites[userEmail];
+
     // Get user's current team (their solo team)
-    const currentTeam = await db.collection('teams').doc(userId).get()
-    const currentTeamData = currentTeam.data()
-    
+    const currentTeam = await db.collection('teams').doc(userId).get();
+    const currentTeamData = currentTeam.data();
+
     if (currentTeamData.isPersonal && Object.keys(currentTeamData.members).length === 1) {
       // Solo user joining another team - migrate data
-      await migrateSoloUserToTeam(userId, invitingTeam.id, invite.role)
+      await migrateSoloUserToTeam(userId, invitingTeam.id, invite.role);
     } else {
       // Team founder with members - team merger scenario
-      await promptForTeamMerger(userId, invitingTeam.id, invite)
+      await promptForTeamMerger(userId, invitingTeam.id, invite);
     }
   }
 }
@@ -395,52 +450,50 @@ async function migrateSoloUserToTeam(userId, newTeamId, role) {
   // 1. Update custom claims
   await setCustomClaims(userId, {
     teamId: newTeamId,
-    role: role
-  })
-  
+    role: role,
+  });
+
   // 2. Add user to new team
-  await db.collection('teams').doc(newTeamId).update({
-    [`members.${userId}`]: {
-      email: auth.currentUser.email,
-      role: role,
-      joinedAt: new Date()
-    },
-    [`pendingInvites.${auth.currentUser.email}`]: firebase.firestore.FieldValue.delete()
-  })
-  
+  await db
+    .collection('teams')
+    .doc(newTeamId)
+    .update({
+      [`members.${userId}`]: {
+        email: auth.currentUser.email,
+        role: role,
+        joinedAt: new Date(),
+      },
+      [`pendingInvites.${auth.currentUser.email}`]: firebase.firestore.FieldValue.delete(),
+    });
+
   // 3. Migrate data from solo team to new team
-  await migrateTeamData(userId, newTeamId)
-  
+  await migrateTeamData(userId, newTeamId);
+
   // 4. Clean up solo team
-  await db.collection('teams').doc(userId).delete()
+  await db.collection('teams').doc(userId).delete();
 }
 
 async function migrateTeamData(fromTeamId, toTeamId) {
   // Migrate all subcollections: clients, matters, logs, metadata, etc.
-  const collections = ['clients', 'matters', 'logs', 'metadata']
-  
+  const collections = ['clients', 'matters', 'logs', 'metadata'];
+
   for (const collectionName of collections) {
-    const docs = await db
-      .collection('teams').doc(fromTeamId)
-      .collection(collectionName)
-      .get()
-    
+    const docs = await db.collection('teams').doc(fromTeamId).collection(collectionName).get();
+
     // Copy documents to new team
-    const batch = db.batch()
-    docs.forEach(doc => {
-      const newDocRef = db
-        .collection('teams').doc(toTeamId)
-        .collection(collectionName).doc(doc.id)
+    const batch = db.batch();
+    docs.forEach((doc) => {
+      const newDocRef = db.collection('teams').doc(toTeamId).collection(collectionName).doc(doc.id);
       batch.set(newDocRef, {
         ...doc.data(),
         migratedFrom: fromTeamId,
-        migratedAt: new Date()
-      })
-    })
-    await batch.commit()
+        migratedAt: new Date(),
+      });
+    });
+    await batch.commit();
   }
-  
-  // Note: Firebase Storage files don't need to move - 
+
+  // Note: Firebase Storage files don't need to move -
   // we'll update storage paths in future uploads
   // or create a background job for this
 }
@@ -451,25 +504,30 @@ async function migrateTeamData(fromTeamId, toTeamId) {
 The `folderPaths` field supports various query patterns for finding files by their organizational context:
 
 **Query Examples**:
+
 ```javascript
 // Find all files in a specific folder path
 const docs = await db
-  .collection('teams').doc(teamId)
-  .collection('matters').doc(matterId)
+  .collection('teams')
+  .doc(teamId)
+  .collection('matters')
+  .doc(matterId)
   .collection('metadata')
   .where('folderPaths', '==', 'Documents/2023')
   .get();
 
 // Find files that contain a specific path (requires client-side filtering)
 const docs = await db
-  .collection('teams').doc(teamId)
-  .collection('matters').doc(matterId)  
+  .collection('teams')
+  .doc(teamId)
+  .collection('matters')
+  .doc(matterId)
   .collection('metadata')
   .get();
-  
-const filtered = docs.docs.filter(doc => {
+
+const filtered = docs.docs.filter((doc) => {
   const paths = doc.data().folderPaths.split('|');
-  return paths.some(path => path.includes('2023'));
+  return paths.some((path) => path.includes('2023'));
 });
 ```
 
@@ -486,29 +544,29 @@ Keep indexes minimal:
     collection: 'teams/{teamId}/matters',
     fields: [
       { field: 'clientId', order: 'ASCENDING' },
-      { field: 'status', order: 'ASCENDING' }
-    ]
+      { field: 'status', order: 'ASCENDING' },
+    ],
   },
   {
     collection: 'teams/{teamId}/invoices',
     fields: [
       { field: 'clientId', order: 'ASCENDING' },
-      { field: 'lastLogin', order: 'DESCENDING' }
-    ]
+      { field: 'lastLogin', order: 'DESCENDING' },
+    ],
   },
   {
     collection: 'teams/{teamId}/time-entries',
     fields: [
       { field: 'invoiceId', order: 'ASCENDING' },
-      { field: 'billable', order: 'ASCENDING' }
-    ]
-  }
-]
+      { field: 'billable', order: 'ASCENDING' },
+    ],
+  },
+];
 ```
 
 ## Future Considerations (Only If Needed)
 
-**Don't add these until you actually need them:**
+**YAGNI. Don't add these until you actually need them:**
 
 1. **If teams grow beyond 100 members**: Move members to subcollection
 2. **If you need audit trails**: Add `history` array to documents
