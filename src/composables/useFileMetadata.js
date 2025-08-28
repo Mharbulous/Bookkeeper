@@ -1,1 +1,0 @@
-# Intentionally left blank. The contents of this file have been moved to src/features/file-upload/composables/useFileMetadata.js
