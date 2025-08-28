@@ -114,7 +114,7 @@
 
 <script setup>
 import { computed, watch, ref } from 'vue';
-import { formatDuration } from '@/features/file-upload/utils/fileAnalysis.js';
+import { formatDuration } from '@/features/upload/utils/fileAnalysis.js';
 
 const props = defineProps({
   show: {

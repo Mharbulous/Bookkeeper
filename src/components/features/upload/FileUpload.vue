@@ -110,26 +110,26 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import FileUploadQueue from '../features/file-upload/components/FileUploadQueue.vue';
-import UploadDropzone from '../features/file-upload/components/UploadDropzone.vue';
-import FolderOptionsDialog from '../features/file-upload/components/FolderOptionsDialog.vue';
-import ProcessingProgressModal from '../features/file-upload/components/ProcessingProgressModal.vue';
-import CloudFileWarningModal from '../features/file-upload/components/CloudFileWarningModal.vue';
-import { useFileQueue } from '../features/file-upload/composables/useFileQueue.js';
-import { useFileDragDrop } from '../features/file-upload/composables/useFileDragDrop.js';
-import { useQueueDeduplication } from '../features/file-upload/composables/useQueueDeduplication.js';
-import { useFolderOptions } from '../features/file-upload/composables/useFolderOptions.js';
-import { useTimeBasedWarning } from '../features/file-upload/composables/useTimeBasedWarning.js';
+import FileUploadQueue from '../../../features/file-upload/components/FileUploadQueue.vue';
+import UploadDropzone from '../../../features/file-upload/components/UploadDropzone.vue';
+import FolderOptionsDialog from '../../../features/file-upload/components/FolderOptionsDialog.vue';
+import ProcessingProgressModal from '../../../features/file-upload/components/ProcessingProgressModal.vue';
+import CloudFileWarningModal from '../../../features/file-upload/components/CloudFileWarningModal.vue';
+import { useFileQueue } from '../../../features/file-upload/composables/useFileQueue.js';
+import { useFileDragDrop } from '../../../features/file-upload/composables/useFileDragDrop.js';
+import { useQueueDeduplication } from '../../../features/file-upload/composables/useQueueDeduplication.js';
+import { useFolderOptions } from '../../../features/file-upload/composables/useFolderOptions.js';
+import { useTimeBasedWarning } from '../../../features/file-upload/composables/useTimeBasedWarning.js';
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
-} from '../features/file-upload/utils/hardwareCalibration.js';
-import { storage } from '../services/firebase.js';
+} from '../../../features/file-upload/utils/hardwareCalibration.js';
+import { storage } from '../../../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
-import { useAuthStore } from '../core/stores/auth.js';
-import { useLazyHashTooltip } from '../features/file-upload/composables/useLazyHashTooltip.js';
-import { useUploadLogger } from '../features/file-upload/composables/useUploadLogger.js';
-import { useFileMetadata } from '../features/file-upload/composables/useFileMetadata.js';
+import { useAuthStore } from '../../../core/stores/auth.js';
+import { useLazyHashTooltip } from '../../../features/upload/composables/useLazyHashTooltip.js';
+import { useUploadLogger } from '../../../features/upload/composables/useUploadLogger.js';
+import { useFileMetadata } from '../../../features/upload/composables/useFileMetadata.js';
 
 // Component configuration
 defineOptions({

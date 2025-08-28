@@ -3,7 +3,7 @@
 ```
 📁 src/
 ├── 📁 features/
-│   ├── 📁 file-upload/
+│   ├── 📁 upload/
 │   │   ├── 📁 components/
 │   │   │   ├── 📄 CloudFileWarningModal.vue (from: components/features/upload/CloudFileWarningModal.vue)
 │   │   │   ├── 📄 FileQueueChips.vue (from: components/features/upload/FileQueueChips.vue)

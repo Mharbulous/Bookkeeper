@@ -1,4 +1,4 @@
-import { analyzeFiles } from '@/features/file-upload/utils/fileAnalysis.js';
+import { analyzeFiles } from '@/features/upload/utils/fileAnalysis.js';
 
 export function useFolderAnalysis() {
   // Single preprocessing function to parse all paths once and extract all needed information

@@ -52,22 +52,22 @@ Write-Host "`n=== PHASE 1: Moving File Upload Composables ===" -ForegroundColor 
 $composableMoves = @(
     @{
         Source = "$srcPath/composables/useFolderTimeouts.js"
-        Dest   = "$srcPath/features/file-upload/composables/useFolderTimeouts.js"
+        Dest   = "$srcPath/features/upload/composables/useFolderTimeouts.js"
         Desc   = "useFolderTimeouts.js composable"
     },
     @{
         Source = "$srcPath/composables/useTimeBasedWarning.js"
-        Dest   = "$srcPath/features/file-upload/composables/useTimeBasedWarning.js"
+        Dest   = "$srcPath/features/upload/composables/useTimeBasedWarning.js"
         Desc   = "useTimeBasedWarning.js composable"
     },
     @{
         Source = "$srcPath/composables/useUploadLogger.js"
-        Dest   = "$srcPath/features/file-upload/composables/useUploadLogger.js"
+        Dest   = "$srcPath/features/upload/composables/useUploadLogger.js"
         Desc   = "useUploadLogger.js composable"
     },
     @{
         Source = "$srcPath/composables/useUploadManager.js"
-        Dest   = "$srcPath/features/file-upload/composables/useUploadManager.js"
+        Dest   = "$srcPath/features/upload/composables/useUploadManager.js"
         Desc   = "useUploadManager.js composable"
     }
 )
@@ -80,7 +80,7 @@ foreach ($move in $composableMoves) {
 $testMoves = @(
     @{
         Source = "$srcPath/composables/useFolderTimeouts.test.js"
-        Dest   = "$srcPath/features/file-upload/composables/useFolderTimeouts.test.js"
+        Dest   = "$srcPath/features/upload/composables/useFolderTimeouts.test.js"
         Desc   = "useFolderTimeouts.test.js test file"
     }
 )
@@ -94,22 +94,22 @@ Write-Host "`n=== PHASE 2: Moving File Upload Utils ===" -ForegroundColor Magent
 $utilMoves = @(
     @{
         Source = "$srcPath/utils/folderPathUtils.js"
-        Dest   = "$srcPath/features/file-upload/utils/folderPathUtils.js"
+        Dest   = "$srcPath/features/upload/utils/folderPathUtils.js"
         Desc   = "folderPathUtils.js utility"
     },
     @{
         Source = "$srcPath/utils/folderPathUtils.test.js"
-        Dest   = "$srcPath/features/file-upload/utils/folderPathUtils.test.js"
+        Dest   = "$srcPath/features/upload/utils/folderPathUtils.test.js"
         Desc   = "folderPathUtils.test.js test file"
     },
     @{
         Source = "$srcPath/utils/hardwareCalibration.js"
-        Dest   = "$srcPath/features/file-upload/utils/hardwareCalibration.js"
+        Dest   = "$srcPath/features/upload/utils/hardwareCalibration.js"
         Desc   = "hardwareCalibration.js utility"
     },
     @{
         Source = "$srcPath/utils/processingTimer.js"
-        Dest   = "$srcPath/features/file-upload/utils/processingTimer.js"
+        Dest   = "$srcPath/features/upload/utils/processingTimer.js"
         Desc   = "processingTimer.js utility"
     }
 )
@@ -120,7 +120,7 @@ foreach ($move in $utilMoves) {
 
 Write-Host "`n=== PHASE 3: Moving FileUpload View ===" -ForegroundColor Magenta
 
-Move-FileWithBackup -Source "$srcPath/views/FileUpload.vue" -Destination "$srcPath/features/file-upload/views/FileUpload.vue" -Description "FileUpload.vue main view"
+Move-FileWithBackup -Source "$srcPath/views/FileUpload.vue" -Destination "$srcPath/features/upload/views/FileUpload.vue" -Description "FileUpload.vue main view"
 
 Write-Host "`n=== PHASE 4: Creating Core Architecture ===" -ForegroundColor Magenta
 
@@ -178,7 +178,7 @@ export const featureInfo = {
 '@
 
 Write-Host "Creating file-upload feature index..." -ForegroundColor Cyan
-$indexPath = "$srcPath/features/file-upload/index.js"
+$indexPath = "$srcPath/features/upload/index.js"
 Set-Content -Path $indexPath -Value $fileUploadIndex -Encoding UTF8
 Write-Host "  Created: $indexPath" -ForegroundColor Green
 
@@ -217,9 +217,9 @@ Set-Content -Path $viewerIndexPath -Value $fileViewerIndex -Encoding UTF8
 Write-Host "  Created: $viewerIndexPath" -ForegroundColor Green
 
 Write-Host "`n=== MIGRATION SUMMARY ===" -ForegroundColor Green
-Write-Host "File Upload composables moved to features/file-upload/composables/" -ForegroundColor Green
-Write-Host "File Upload utils moved to features/file-upload/utils/" -ForegroundColor Green  
-Write-Host "FileUpload.vue moved to features/file-upload/views/" -ForegroundColor Green
+Write-Host "File Upload composables moved to features/upload/composables/" -ForegroundColor Green
+Write-Host "File Upload utils moved to features/upload/utils/" -ForegroundColor Green  
+Write-Host "FileUpload.vue moved to features/upload/views/" -ForegroundColor Green
 Write-Host "Core files moved to core/ directory structure" -ForegroundColor Green
 Write-Host "Feature index files created" -ForegroundColor Green
 Write-Host "File-viewer placeholder structure created" -ForegroundColor Green

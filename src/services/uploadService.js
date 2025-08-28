@@ -1,7 +1,7 @@
 import { storage, db } from './firebase.js';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { updateFolderPaths } from '../features/file-upload/utils/folderPathUtils.js';
+import { updateFolderPaths } from '../features/upload/utils/folderPathUtils.js';
 
 /**
  * Upload Service for Firebase Storage with atomic metadata operations
@@ -372,14 +372,17 @@ export class UploadService {
         const metadataPath = this.generateMetadataPath(hash);
         const metadataRef = doc(db, metadataPath, metadata.id);
         let existingFolderPaths = '';
-        
+
         try {
           const existingDoc = await getDoc(metadataRef);
           if (existingDoc.exists()) {
             existingFolderPaths = existingDoc.data().folderPaths || '';
           }
         } catch (error) {
-          console.warn('Could not retrieve existing folderPaths, proceeding with new path only:', error);
+          console.warn(
+            'Could not retrieve existing folderPaths, proceeding with new path only:',
+            error
+          );
         }
 
         // Update folder paths using pattern recognition
@@ -502,14 +505,17 @@ export class UploadService {
       const metadataPath = this.generateMetadataPath(hash);
       const metadataRef = doc(db, metadataPath, metadata.id);
       let existingFolderPaths = '';
-      
+
       try {
         const existingDoc = await getDoc(metadataRef);
         if (existingDoc.exists()) {
           existingFolderPaths = existingDoc.data().folderPaths || '';
         }
       } catch (error) {
-        console.warn('Could not retrieve existing folderPaths, proceeding with new path only:', error);
+        console.warn(
+          'Could not retrieve existing folderPaths, proceeding with new path only:',
+          error
+        );
       }
 
       // Update folder paths using pattern recognition
@@ -526,7 +532,6 @@ export class UploadService {
         fileExists: !fileExists, // true if file was uploaded, false if it already existed
         folderPaths: pathUpdate.folderPaths,
       };
-
 
       await setDoc(metadataRef, metadataDoc);
       metadataSaved = true;
