@@ -28,27 +28,30 @@ flowchart TB
 
     subgraph Col3 ["📄 Storage 3: Pages"]
         SoloPage1["🧩Page 1 of 3"]
-        SoloPage2["🧩Page 2 of 3"]
-        OnePage_split["🧩Page 4 of 7"]
-        PageRaw1["🧩Page 4 of 7"]
         PageRaw2["🧩Page 2 of 3"]
+        SoloPage2["🧩Page 2 of 3"]
         PageRaw3["🧩Page 3 of 3"]
+        PageRaw1["🧩Page 4 of 7"]
+        OnePage_split["🧩Page 4 of 7"]
     end
 
     subgraph Col4 ["🗄️ Database 2: Merged"]
         MergedDoc["Completed Document<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"]
     end
 
-    subgraph Col5 ["Column 5: Complete"]
+    subgraph Col5 ["📁 Storage 4: Complete"]
 
         OnePageComplete["📃One Page PDF"]
-        CompleteRaw["📖Doc #1"]
-        CompleteSplit["📖Doc #2"]
+        CompleteRaw["📖PDF Document #1"]
+        CompleteSplit["📖PDF Document #2"]
+        CompleteMerged["📖PDF Document #3"]
 
     end
 
     subgraph DB1 ["🗄️ Database 1: Best Copy"]
+        ChooseBestCopy3{"Choose Best:<br/>👉Page 1 of 3"}
         ChooseBestCopy2{"Choose Best:<br/>👉Page 2 of 3<br/>👉Page 2 of 3"}
+        ChooseBestCopy4{"Choose Best:<br/>👉Page 3 of 3"}
         ChooseBestCopy{"Choose Best:<br/>👉Page 4 of 7<br/>👉Page 4 of 7"}
     end
 
@@ -77,17 +80,24 @@ flowchart TB
     Incomplete -.->|Split to Pages| PageRaw2
     Incomplete -.->|Split to Pages| PageRaw3
 
-    %% Flow from Column 3 to Column 4 - Duplicate pages
-    OnePage_split -->|Duplicate Page| ChooseBestCopy
-    PageRaw1 -->|Duplicate Page| ChooseBestCopy
-    
-    SoloPage2 -->|Duplicate Page| ChooseBestCopy2
-    PageRaw2 -->|Duplicate Page| ChooseBestCopy2
-    
-    %% Flow from Column 3 to Column 4 - Assembling pages into merged document
-    SoloPage1 -->|Assemble| MergedDoc
-    PageRaw3 -->|Assemble| MergedDoc
-    ChooseBestCopy2 -->|Best Copy| MergedDoc
+    %% Flow from Column 3 to Column 4 - References
+    OnePage_split -->|Reference| ChooseBestCopy
+    PageRaw1 -->|Reference| ChooseBestCopy
+
+    SoloPage2 -->|Reference| ChooseBestCopy2
+    PageRaw2 -->|Reference| ChooseBestCopy2
+
+    %% Flow from Column 3 to Database 1 - Pages to decision nodes
+    SoloPage1 -->|Reference| ChooseBestCopy3
+    PageRaw3 -->|Reference| ChooseBestCopy4
+
+    %% Flow from Database 1 to Database 2 - Decision nodes to merged document
+    ChooseBestCopy2 -->|Get Best| MergedDoc
+    ChooseBestCopy3 -->|Get Best| MergedDoc
+    ChooseBestCopy4 -->|Get Best| MergedDoc
+
+    %% Flow from Database 2 to Storage 4
+    MergedDoc -->|Assemble| CompleteMerged
 
 
     %% Color Coding by Document Source/Family
