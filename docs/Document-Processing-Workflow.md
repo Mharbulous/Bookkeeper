@@ -38,18 +38,13 @@ flowchart TB
         OnePage_split["🧩Page 4 of 7"]
     end
 
-    subgraph Col4 ["🗄️ Database 2: Page Assembly"]
-        MergedDoc{"Find & Associate<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"}
-        FindsPages{"Find & Associate<br/>👉Page 4 of 7"}
-    end
-
     subgraph Col5 ["📁 Storage 4: Merged"]
         CompleteMerged["📖PDF Document #3"]
         IncompleteFinal["📑⚠️PDF document with missing pages"]
 
     end
 
-    subgraph DB3 ["🗄️ Database 3: Evidence"]
+    subgraph DB3 ["🗄️ Database 2: Evidence"]
         EmailRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'abc123...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
         Photo1Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'def456...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
         Photo2Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'ghi789...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
@@ -59,11 +54,13 @@ flowchart TB
         IncompleteFinalRef["{<br/>  storage: 'merged',<br/>  fileHash: 'stu901...',<br/>  isProcessed: true,<br/>  hasAllPages: false<br/>}"]
     end
 
-    subgraph DB1 ["🗄️ Database 1: Best Page"]
+    subgraph DB1 ["🗄️ Database 1: Pages"]
         ChooseBestCopy3{"Choose Best:<br/>👉Page 1 of 3"}
         ChooseBestCopy2{"Choose Best:<br/>👉Page 2 of 3<br/>👉Page 2 of 3"}
         ChooseBestCopy4{"Choose Best:<br/>👉Page 3 of 3"}
         ChooseBestCopy{"Choose Best:<br/>👉Page 4 of 7<br/>👉Page 4 of 7"}
+        MergedDoc{"Find & Associate<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"}
+        FindsPages{"Find & Associate<br/>👉Page 4 of 7"}
     end
 
     %% Flow from Storage 1 to Database 3 (Evidence Pointers)
@@ -102,17 +99,17 @@ flowchart TB
     SoloPage1 -->|Reference| ChooseBestCopy3
     PageRaw3 -->|Reference| ChooseBestCopy4
 
-    %% Flow from Database 1 to Database 2 - Decision nodes to merged document
+    %% Flow within Database 1 - Decision nodes to assembly document
     ChooseBestCopy2 -->|Get Best| MergedDoc
     ChooseBestCopy3 -->|Get Best| MergedDoc
     ChooseBestCopy4 -->|Get Best| MergedDoc
     ChooseBestCopy -->|GetBest| FindsPages
 
-    %% Flow from Database 2 to Storage 5
+    %% Flow from Database 1 to Storage 4
     MergedDoc -->|Assemble| CompleteMerged
     FindsPages -->|Assemble| IncompleteFinal
-    
-    %% Flow from Storage 5 to Database 3 (Evidence Pointers)
+
+    %% Flow from Storage 4 to Database 3 (Evidence Pointers)
     CompleteMerged -->|Reference| CompleteMergedRef
     IncompleteFinal -->|Reference| IncompleteFinalRef
 
@@ -155,7 +152,7 @@ flowchart TB
 
     %% Photo Document #1 Family (Light Amber)
     class PhotoOfDoc photoTwoFamily
-    
+
     %% Evidence Reference Nodes (Database Objects)
     class EmailRef,Photo1Ref,Photo2Ref,PdfRef,CompleteSplitRef,CompleteMergedRef,IncompleteFinalRef databaseObject
 
