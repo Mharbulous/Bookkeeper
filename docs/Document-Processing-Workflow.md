@@ -44,13 +44,12 @@ flowchart TB
     end
 
     subgraph Col5 ["📁 Storage 5: Processed"]
-        EmailProcessed["📧email in .msg format"]
-        CompleteRaw["📖PDF Document #1"]
-        OnePageComplete["📸photograph#2.jpg"]
-        PhotoProcessed["📸photograph#1.jpg"]
-        CompleteSplit["📖PDF Document #2"]
         CompleteMerged["📖PDF Document #3"]
         IncompleteFinal["📑⚠️PDF document with missing pages"]
+
+    end
+
+    subgraph DB3 ["🗄️ Database 3: Evidence"]
 
     end
 
@@ -62,10 +61,6 @@ flowchart TB
     end
 
     %% Flow from Storage 1 to Storage 5 (Direct Processing)
-    SingleUpload -->|Direct Move| EmailProcessed
-    PdfUpload -->|Direct Move| CompleteRaw
-    OnePageUpload -->|Direct Move| OnePageComplete
-    PhotoOfDoc -->|Direct Move| PhotoProcessed
 
 
     Bundle -.->|Split| DocA
@@ -120,10 +115,10 @@ flowchart TB
     classDef pdfDocFamily fill:#e8eaf6,stroke:#e91e63,stroke-width:2px,color:#000000
 
     %% Single Complete Document Family (Light Red)
-    class Single,EmailProcessed singleDocFamily
+    class Single singleDocFamily
 
     %% PDF Document Family (Light Indigo)
-    class CompleteRaw,PdfUpload pdfDocFamily
+    class PdfUpload pdfDocFamily
 
     %% Bundle Document Family (Light Yellow)
     class Bundle,DocA,OnePage_split,DocC,SoloPage1,SoloPage2,CompleteSplit bundleDocFamily
@@ -132,7 +127,7 @@ flowchart TB
     class Incomplete,PageRaw1,PageRaw2,PageRaw3,IncompleteFinal incompleteDocFamily
 
     %% One Page Document Family (Light Purple)
-    class OnePage,OnePageComplete onePageDocFamily
+    class OnePage onePageDocFamily
 
     %% Blended Document Family (Green - Yellow+Blue blend for multi-source documents)
     class CompleteMerged blendedDocFamily
@@ -144,7 +139,7 @@ flowchart TB
     class Bundle bundleDocFamily
     class Incomplete incompleteDocFamily
 
-    %% Photo Document #2 Family (Light Amber)
-    class PhotoOfDoc,PhotoProcessed photoTwoFamily
+    %% Photo Document #1 Family (Light Amber)
+    class PhotoOfDoc photoTwoFamily
 
 ```
