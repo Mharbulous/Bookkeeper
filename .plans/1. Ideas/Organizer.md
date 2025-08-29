@@ -101,22 +101,26 @@ flowchart TB
 
 
     %% Color Coding by Document Source/Family
-    classDef singleDocFamily fill:#e8f5e8,stroke:#4caf50,stroke-width:2px,color:#000000
-    classDef bundleDocFamily fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#000000
-    classDef incompleteDocFamily fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px,color:#000000
-    classDef onePageDocFamily fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#000000
-    classDef duplicateNode fill:#ffebee,stroke:#f44336,stroke-width:2px,color:#000000
+    classDef singleDocFamily fill:#ffebee,stroke:#e53935,stroke-width:2px,color:#000000
+    classDef bundleDocFamily fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000000
+    classDef incompleteDocFamily fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000000
+    classDef onePageDocFamily fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px,color:#000000
+    classDef blendedDocFamily fill:#e8f5e8,stroke:#4caf50,stroke-width:2px,color:#000000
+    classDef duplicateNode fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#000000
 
-    %% Single Complete Document Family (Light Green)
+    %% Single Complete Document Family (Light Red)
     class Single,CompleteRaw singleDocFamily
 
-    %% Bundle Document Family (Light Blue)
+    %% Bundle Document Family (Light Yellow)
     class Bundle,DocA,OnePage_split,DocC,SoloPage1,SoloPage2,CompleteSplit bundleDocFamily
 
-    %% Incomplete Document Family (Light Purple)
+    %% Incomplete Document Family (Light Blue)
     class Incomplete,PageRaw1,PageRaw2,PageRaw3 incompleteDocFamily
 
-    %% One Page Document Family (Light Orange)
+    %% One Page Document Family (Light Purple)
     class OnePage,OnePageComplete onePageDocFamily
+
+    %% Blended Document Family (Green - Yellow+Blue blend for multi-source documents)
+    class CompleteMerged blendedDocFamily
 
 ```
