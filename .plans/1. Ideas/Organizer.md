@@ -12,7 +12,7 @@ A multi-column interface that allows users to visually organize uploaded files i
 
 ```mermaid
 flowchart TB
-    subgraph Col1 ["📁 Storage 1: Uploads"]
+    subgraph Col1 ["📁 Storage 2: Uploads"]
         OnePage["📃One Page PDF"]
         Single["📖Complete Document"]
         Incomplete["📑⚠️Incomplete Document PDF"]
@@ -20,13 +20,13 @@ flowchart TB
 
     end
 
-    subgraph Col2 ["📂 Storage 2: Split Files"]
+    subgraph Col2 ["📂 Storage 3: Split Files"]
         DocA["📖Complete Document"]
         DocC["📑Incomplete PDF"]
 
     end
 
-    subgraph Col3 ["📄 Storage 3: Pages"]
+    subgraph Col3 ["📄 Storage 4: Pages"]
         SoloPage1["🧩Page 1 of 3"]
         PageRaw2["🧩Page 2 of 3"]
         SoloPage2["🧩Page 2 of 3"]
@@ -39,7 +39,7 @@ flowchart TB
         MergedDoc["Completed Document<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"]
     end
 
-    subgraph Col5 ["📁 Storage 4: Complete"]
+    subgraph Col5 ["📁 Storage 5: Complete"]
 
         OnePageComplete["📃One Page PDF"]
         CompleteRaw["📖PDF Document #1"]
@@ -96,7 +96,7 @@ flowchart TB
     ChooseBestCopy3 -->|Get Best| MergedDoc
     ChooseBestCopy4 -->|Get Best| MergedDoc
 
-    %% Flow from Database 2 to Storage 4
+    %% Flow from Database 2 to Storage 5
     MergedDoc -->|Assemble| CompleteMerged
 
 
