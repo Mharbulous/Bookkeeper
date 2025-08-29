@@ -54,6 +54,9 @@ flowchart TB
         Photo1Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'def456...',<br/>  status: 'ready'<br/>}"]
         Photo2Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'ghi789...',<br/>  status: 'ready'<br/>}"]
         PdfRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'jkl012...',<br/>  status: 'ready'<br/>}"]
+        CompleteSplitRef["{<br/>  storage: 'split',<br/>  fileHash: 'mno345...',<br/>  status: 'processed'<br/>}"]
+        CompleteMergedRef["{<br/>  storage: 'processed',<br/>  fileHash: 'pqr678...',<br/>  status: 'merged'<br/>}"]
+        IncompleteFinalRef["{<br/>  storage: 'processed',<br/>  fileHash: 'stu901...',<br/>  status: 'incomplete'<br/>}"]
     end
 
     subgraph DB1 ["🗄️ Database 1: Best Copy"]
@@ -75,7 +78,7 @@ flowchart TB
 
     %% Flow from Column 2
 
-    DocA -->|Complete| CompleteSplit
+    DocA -->|Reference| CompleteSplitRef
 
     DocC -.->|Split to Pages| SoloPage1
     DocC -.->|Split to Pages| SoloPage2
@@ -108,6 +111,10 @@ flowchart TB
     %% Flow from Database 2 to Storage 5
     MergedDoc -->|Assemble| CompleteMerged
     FindsPages -->|Assemble| IncompleteFinal
+    
+    %% Flow from Storage 5 to Database 3 (Evidence Pointers)
+    CompleteMerged -->|Reference| CompleteMergedRef
+    IncompleteFinal -->|Reference| IncompleteFinalRef
 
 
     %% Color Coding by Document Source/Family
@@ -128,7 +135,7 @@ flowchart TB
     class PdfUpload pdfDocFamily
 
     %% Bundle Document Family (Light Yellow)
-    class Bundle,DocA,OnePage_split,DocC,SoloPage1,SoloPage2,CompleteSplit bundleDocFamily
+    class Bundle,DocA,OnePage_split,DocC,SoloPage1,SoloPage2 bundleDocFamily
 
     %% Incomplete Document Family (Light Blue)
     class Incomplete,PageRaw1,PageRaw2,PageRaw3,IncompleteFinal incompleteDocFamily
@@ -150,6 +157,6 @@ flowchart TB
     class PhotoOfDoc photoTwoFamily
     
     %% Evidence Reference Nodes (Database Objects)
-    class EmailRef,Photo1Ref,Photo2Ref,PdfRef databaseObject
+    class EmailRef,Photo1Ref,Photo2Ref,PdfRef,CompleteSplitRef,CompleteMergedRef,IncompleteFinalRef databaseObject
 
 ```
