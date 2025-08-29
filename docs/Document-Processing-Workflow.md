@@ -50,7 +50,10 @@ flowchart TB
     end
 
     subgraph DB3 ["🗄️ Database 3: Evidence"]
-
+        EmailRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'abc123...',<br/>  status: 'ready'<br/>}"]
+        Photo1Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'def456...',<br/>  status: 'ready'<br/>}"]
+        Photo2Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'ghi789...',<br/>  status: 'ready'<br/>}"]
+        PdfRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'jkl012...',<br/>  status: 'ready'<br/>}"]
     end
 
     subgraph DB1 ["🗄️ Database 1: Best Copy"]
@@ -60,8 +63,11 @@ flowchart TB
         ChooseBestCopy{"Choose Best:<br/>👉Page 4 of 7<br/>👉Page 4 of 7"}
     end
 
-    %% Flow from Storage 1 to Storage 5 (Direct Processing)
-
+    %% Flow from Storage 1 to Database 3 (Evidence Pointers)
+    SingleUpload -->|Reference| EmailRef
+    PhotoOfDoc -->|Reference| Photo1Ref
+    OnePageUpload -->|Reference| Photo2Ref
+    PdfUpload -->|Reference| PdfRef
 
     Bundle -.->|Split| DocA
     Bundle -.->|Split to Pages| OnePage_split
@@ -113,6 +119,7 @@ flowchart TB
     classDef duplicateNode fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#000000
     classDef photoTwoFamily fill:#fff8e1,stroke:#f57c00,stroke-width:3px,color:#000000
     classDef pdfDocFamily fill:#e8eaf6,stroke:#e91e63,stroke-width:2px,color:#000000
+    classDef databaseObject fill:#000000,stroke:#ffffff,stroke-width:2px,color:#ffffff
 
     %% Single Complete Document Family (Light Red)
     class Single singleDocFamily
@@ -141,5 +148,8 @@ flowchart TB
 
     %% Photo Document #1 Family (Light Amber)
     class PhotoOfDoc photoTwoFamily
+    
+    %% Evidence Reference Nodes (Database Objects)
+    class EmailRef,Photo1Ref,Photo2Ref,PdfRef databaseObject
 
 ```
