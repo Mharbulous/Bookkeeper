@@ -17,9 +17,11 @@ The **Organizer** is an AI-powered document discovery and organization system de
 ## Architecture Overview
 
 ### Storage Strategy
-- **Flat File Storage**: All files stored in single Firebase Storage folder
-- **Tag-Based Organization**: Organization achieved through metadata tags, not physical folders
-- **Virtual Folder Presentation**: Tags dynamically presented as familiar folder structures
+- **File Storage**: Continues using Storage 1 (existing Firebase Storage)
+- **Evidence Database**: New Firestore collection for organization metadata
+- **Reference Architecture**: Evidence entries point to files via fileHash
+- **No File Duplication**: Multiple evidence entries can reference same stored file
+- **Processing States**: Evidence tracks document through processing workflow
 
 ### Processing Workflow
 1. **Manual Trigger**: Users select folders/batches for AI processing (not automatic)
@@ -101,6 +103,20 @@ The **Organizer** is an AI-powered document discovery and organization system de
 - **Hash-Based Prevention**: Upload system prevents duplicate file uploads
 - **Near-Duplicate Handling**: Similar but different files each receive unique BATES numbers
 
+## Integration with Document Processing Workflow
+
+### Evidence Database Role
+- **Central Registry**: All processed documents tracked in Evidence database
+- **Processing Status**: Tracks files through upload → split → merge pipeline
+- **Quality Tracking**: Records hasAllPages and completeness status
+- **Multi-Storage Support**: References files across uploads/split/merged folders
+
+### Version 1.0 Preparation
+- Evidence schema includes processing fields (unused in v1.0)
+- Storage reference structure supports future split/merged folders
+- Processing status defaults to "uploaded" for all v1.0 entries
+- Future versions update these fields without schema changes
+
 ## Technical Implementation Approach
 
 ### AI Integration
@@ -110,7 +126,13 @@ The **Organizer** is an AI-powered document discovery and organization system de
 
 ### Data Storage
 - **Firebase Integration**: Leverage existing authentication and storage infrastructure
-- **Metadata Storage**: Firestore documents track tags, categories, processing history, BATES assignments
+- **Evidence Database**: New Firestore collection `/teams/{teamId}/evidence/`
+- **Storage References**: Evidence documents reference files in Storage 1 via:
+  - `storage`: Which storage folder (uploads/split/merged)
+  - `fileHash`: Unique file identifier
+  - `matterId`: Matter context for access control
+- **Processing Metadata**: Evidence tracks isProcessed, hasAllPages, processingStage
+- **Tag Storage**: All organizational data lives in Evidence, not upload metadata
 - **Team Isolation**: All data scoped by team ID (solo users: teamId === userId)
 
 ### Performance Considerations

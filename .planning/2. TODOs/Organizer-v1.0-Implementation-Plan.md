@@ -12,6 +12,27 @@ Implement a basic file listing interface with manual tag assignment capability, 
 
 Create a simple file list view with manual tag assignment capability, providing users with basic document organization through text-based tags.
 
+## Architecture Overview
+
+### Two-Database Design
+
+1. **Storage 1: Uploads** (Existing) - Raw file storage in Firebase Storage
+   - Contains actual file bytes stored by hash
+   - Maintains upload metadata for deduplication
+   - Single source of truth for file content
+
+2. **Database 2: Evidence** (New) - Organizer's core database
+   - References files in Storage 1 via fileHash
+   - Maintains all organizational metadata (tags, categories)
+   - Supports future processing workflow states
+   - Enables multiple evidence entries pointing to same file
+
+### Key Design Decisions
+- Evidence database is separate from upload metadata
+- One uploaded file can have multiple evidence entries (different matters, different tags)
+- Evidence entries reference storage files, never duplicate them
+- Processing status fields included but unused in v1.0 (future-proofing)
+
 ## Features to Implement
 
 ### 1. Basic File List View
@@ -38,15 +59,37 @@ Create a simple file list view with manual tag assignment capability, providing 
 
 ### Data Model
 ```javascript
-// Firestore document structure for file metadata
+// NEW: Evidence Database Structure (Database 2: Evidence)
+// Collection: /teams/{teamId}/evidence/{evidenceId}
 {
-  id: "file-hash-id", // Existing hash-based ID from upload system
-  teamId: "user-team-id", // Existing team isolation
-  filename: "document.pdf",
-  originalName: "Original Document Name.pdf",
+  evidenceId: "auto-generated", // Firestore auto-ID
+  teamId: "user-team-id",
+  
+  // Reference to actual file in Storage 1
+  storageRef: {
+    storage: "uploads", // or "split", "merged" in future versions
+    fileHash: "abc123...", // Points to file in Storage 1
+    matterId: "general", // Which matter folder in storage
+  },
+  
+  // Evidence metadata
+  displayName: "Bank Statement March 2024.pdf", // User-friendly name
+  originalName: "statement_03_2024.pdf", // Original upload name
   fileExtension: ".pdf",
-  uploadDate: "2024-01-01T00:00:00.000Z",
-  tags: ["invoice", "2024", "client-a"], // New field for manual tags
+  fileSize: 245632,
+  
+  // Processing status (for future Document Processing Workflow)
+  isProcessed: false, // Will be true after v2.0 processing
+  hasAllPages: null, // null = unknown, true/false after processing
+  processingStage: "uploaded", // uploaded|splitting|merging|complete
+  
+  // Organization (v1.0 focus)
+  tags: ["bank-statement", "2024", "march"],
+  tagCount: 3,
+  lastTaggedAt: "2024-01-01T00:00:00.000Z",
+  taggedBy: "manual", // "manual" | "auto" in future
+  
+  // Timestamps
   createdAt: "2024-01-01T00:00:00.000Z",
   updatedAt: "2024-01-01T00:00:00.000Z"
 }
@@ -98,12 +141,20 @@ stores/organizer.js
 **Dependencies**: None  
 **Internet Research Summary**: Based on Firebase documentation and 2024 best practices, optimal Firestore collection patterns recommend using lowerCamelCase field names, avoiding sequential document IDs to prevent hotspots, and implementing subcollections for hierarchical data. For file metadata, the recommendation is to denormalize data for query performance while keeping documents under 1MB. The pattern of using hash-based IDs (already implemented in upload system) aligns with best practices for avoiding monotonically increasing IDs that can cause latency issues.
 
-**Rollback Mechanism**: All data model changes are additive only. New `tags` field can be removed from existing documents without breaking upload functionality. Firestore security rules can be reverted to previous state if needed.
+**Rollback Mechanism**: All data model changes are additive only. Evidence collection can be deleted without affecting upload functionality. Firestore security rules can be reverted to previous state if needed.
 
-- [ ] Create Firestore collection structure for file metadata
-- [ ] Implement data migration from existing upload system  
-- [ ] Create Pinia store for organizer state management
-- [ ] Add Firestore security rules for organizer data access
+- [ ] Create new Evidence collection in Firestore at `/teams/{teamId}/evidence/`
+- [ ] Design evidence document schema with storage references
+- [ ] Create migration script to populate Evidence from existing uploads:
+  ```javascript
+  // Migration approach:
+  // 1. Query all existing files in /teams/{teamId}/matters/*/metadata/
+  // 2. For each unique fileHash, create one Evidence entry
+  // 3. Set storageRef to point to existing file location
+  // 4. Initialize with empty tags array and isProcessed: false
+  ```
+- [ ] Update Firestore security rules for Evidence collection
+- [ ] Create Pinia store for evidence management (separate from upload store)
 
 ### Step 2: Core Components (Low Complexity)
 **Breaking Risk Level**: Low  
@@ -286,6 +337,18 @@ service cloud.firestore {
 - Sanitize tag input to prevent XSS
 - Validate file access permissions
 - Ensure team isolation in all operations
+
+## Migration Strategy
+
+### Existing File Indexing
+```javascript
+// On first Organizer access:
+// 1. Check if user has un-indexed files (files without taggedBy field)
+// 2. Batch create/update metadata documents with empty tags array
+// 3. Show one-time "Indexing files..." progress modal
+// 4. Set taggedBy: "manual" and tagCount: 0 for all existing files
+// 5. Cache indexing completion in localStorage to avoid re-runs
+```
 
 ## Integration Points
 

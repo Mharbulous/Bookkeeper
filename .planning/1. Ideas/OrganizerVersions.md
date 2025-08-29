@@ -30,6 +30,37 @@ This document outlines the incremental implementation phases for the Organizer f
 
 ---
 
+## Version 1.0.1: Quick Enhancements (Optional Minor Release)
+
+**Core Goal**: Iterate quickly on Version 1.0 based on user feedback
+
+**New Features**:
+- Bulk tag operations (select multiple files for batch tagging)
+- Tag autocomplete and recent tags list
+- Enhanced search with OR logic (find files with any of multiple tags)
+- Empty states and better loading indicators
+- Improved tag input UX (keyboard shortcuts, better validation)
+
+**Implementation Scope**:
+- Multi-select interface for file list
+- Autocomplete component for tag input
+- Enhanced search logic supporting multiple terms
+- Loading states and empty state components
+- UX polish and accessibility improvements
+
+**User Flow**:
+1. Select multiple files using checkboxes or Ctrl+click
+2. Apply tags to all selected files at once
+3. Use autocomplete for faster tag entry
+4. Search for files using multiple tag names (OR logic)
+5. See helpful messages when no files match filters
+
+**Timeline**: 1 week after v1.0 launch (based on user feedback)
+
+**Rationale**: Low-risk, high-value additions that ship quickly based on initial user feedback
+
+---
+
 ## Version 1.1: Category-Based Tag System
 
 **Core Goal**: Structure tags into user-defined categories
@@ -55,32 +86,7 @@ This document outlines the incremental implementation phases for the Organizer f
 
 ---
 
-## Version 1.2: Virtual Folder View
-
-**Core Goal**: Present tags as familiar folder structures
-
-**New Features**:
-- "Show in Folders" option when right-clicking tags
-- Dynamic folder hierarchy based on selected tag categories
-- Breadcrumb navigation in folder view
-- Switch between flat view and folder view
-- Folder view shows only files matching current folder context
-
-**Implementation Scope**:
-- Folder view component
-- Tag-to-folder conversion logic
-- Navigation breadcrumbs
-- View toggle between flat/folder modes
-
-**User Flow**:
-1. From flat view, right-click any tag and select "Show in Folders"
-2. View reorganizes into folder structure based on that tag category
-3. Navigate through folders using breadcrumbs
-4. Switch back to flat view anytime
-
----
-
-## Version 1.3: AI Categorization (Manual Trigger)
+## Version 1.2: AI Categorization (Manual Trigger)
 
 **Core Goal**: Let AI suggest tags for selected files
 
@@ -104,6 +110,33 @@ This document outlines the incremental implementation phases for the Organizer f
 3. AI processes files and suggests appropriate tags
 4. User reviews and approves/rejects suggestions
 5. Approved tags are applied to files
+
+---
+
+## Version 1.3: Virtual Folder View
+
+**Core Goal**: Present tags as familiar folder structures
+
+**New Features**:
+- "Show in Folders" option when right-clicking tags
+- Dynamic folder hierarchy based on selected tag categories
+- Breadcrumb navigation in folder view
+- Switch between flat view and folder view
+- Folder view shows only files matching current folder context
+
+**Implementation Scope**:
+- Folder view component
+- Tag-to-folder conversion logic
+- Navigation breadcrumbs
+- View toggle between flat/folder modes
+
+**User Flow**:
+1. From flat view, right-click any tag and select "Show in Folders"
+2. View reorganizes into folder structure based on that tag category
+3. Navigate through folders using breadcrumbs
+4. Switch back to flat view anytime
+
+---
 
 ---
 
@@ -297,8 +330,12 @@ This document outlines the incremental implementation phases for the Organizer f
 - Legal workflow validation for BATES numbering features
 
 ### Timeline Considerations
-- Version 1.0-1.2: Core foundation (2-3 weeks each)
-- Version 1.3-1.5: AI integration (3-4 weeks each) 
+- Version 1.0: Basic foundation (2-3 weeks)
+- Version 1.0.1: Quick enhancements (1 week, optional based on feedback)
+- Version 1.1: Category system (2-3 weeks)
+- Version 1.2: AI integration foundation (3-4 weeks)
+- Version 1.3: Virtual folder view (2-3 weeks) 
+- Version 1.4-1.5: Advanced AI features (3-4 weeks each)
 - Version 1.6-1.7: User interface enhancements (2 weeks each)
 - Version 1.8+: Advanced features (2-4 weeks each)
 
