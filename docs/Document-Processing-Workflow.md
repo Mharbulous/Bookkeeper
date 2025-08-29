@@ -23,13 +23,13 @@ flowchart TB
         Incomplete["📑⚠️Incomplete Document PDF"]
     end
 
-    subgraph Col2 ["📂 Storage 3: Split Files"]
+    subgraph Col2 ["📂 Storage 2: Split Files"]
         DocA["📖Complete Document"]
         DocC["📑Incomplete PDF"]
 
     end
 
-    subgraph Col3 ["📄 Storage 4: Pages"]
+    subgraph Col3 ["📄 Storage 3: Pages"]
         SoloPage1["🧩Page 1 of 3"]
         PageRaw2["🧩Page 2 of 3"]
         SoloPage2["🧩Page 2 of 3"]
@@ -38,28 +38,28 @@ flowchart TB
         OnePage_split["🧩Page 4 of 7"]
     end
 
-    subgraph Col4 ["🗄️ Database 2: Merge Pages"]
+    subgraph Col4 ["🗄️ Database 2: Page Assembly"]
         MergedDoc{"Find & Associate<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"}
         FindsPages{"Find & Associate<br/>👉Page 4 of 7"}
     end
 
-    subgraph Col5 ["📁 Storage 5: Processed"]
+    subgraph Col5 ["📁 Storage 4: Merged"]
         CompleteMerged["📖PDF Document #3"]
         IncompleteFinal["📑⚠️PDF document with missing pages"]
 
     end
 
     subgraph DB3 ["🗄️ Database 3: Evidence"]
-        EmailRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'abc123...',<br/>  status: 'ready'<br/>}"]
-        Photo1Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'def456...',<br/>  status: 'ready'<br/>}"]
-        Photo2Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'ghi789...',<br/>  status: 'ready'<br/>}"]
-        PdfRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'jkl012...',<br/>  status: 'ready'<br/>}"]
-        CompleteSplitRef["{<br/>  storage: 'split',<br/>  fileHash: 'mno345...',<br/>  status: 'processed'<br/>}"]
-        CompleteMergedRef["{<br/>  storage: 'processed',<br/>  fileHash: 'pqr678...',<br/>  status: 'merged'<br/>}"]
-        IncompleteFinalRef["{<br/>  storage: 'processed',<br/>  fileHash: 'stu901...',<br/>  status: 'incomplete'<br/>}"]
+        EmailRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'abc123...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
+        Photo1Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'def456...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
+        Photo2Ref["{<br/>  storage: 'uploads',<br/>  fileHash: 'ghi789...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
+        PdfRef["{<br/>  storage: 'uploads',<br/>  fileHash: 'jkl012...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
+        CompleteSplitRef["{<br/>  storage: 'split',<br/>  fileHash: 'mno345...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
+        CompleteMergedRef["{<br/>  storage: 'merged',<br/>  fileHash: 'pqr678...',<br/>  isProcessed: true,<br/>  hasAllPages: true<br/>}"]
+        IncompleteFinalRef["{<br/>  storage: 'merged',<br/>  fileHash: 'stu901...',<br/>  isProcessed: true,<br/>  hasAllPages: false<br/>}"]
     end
 
-    subgraph DB1 ["🗄️ Database 1: Best Copy"]
+    subgraph DB1 ["🗄️ Database 1: Best Page"]
         ChooseBestCopy3{"Choose Best:<br/>👉Page 1 of 3"}
         ChooseBestCopy2{"Choose Best:<br/>👉Page 2 of 3<br/>👉Page 2 of 3"}
         ChooseBestCopy4{"Choose Best:<br/>👉Page 3 of 3"}
