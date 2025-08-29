@@ -13,14 +13,14 @@ A multi-column interface that allows users to visually organize uploaded files i
 ```mermaid
 flowchart TB
     subgraph Col0 ["📁 Storage 1: Uploads"]
-        OnePageUpload["📃One Page PDF"]
-        SingleUpload["📖Complete Document"]
+        OnePageUpload["📸photograph.jpg"]
+        SingleUpload["📧email in .msg format"]
         BundleUpload["📚3 Bundled Documents"]
         IncompleteUpload["📑⚠️Incomplete Document PDF"]
     end
 
-    subgraph Col1 ["📁 Storage 2: OCRed"]
-        OnePage["📃One Page PDF"]
+    subgraph Col1 ["📁 Storage 2: PDF"]
+        OnePage["📄single page PDF"]
         Single["📖Complete Document"]
         Incomplete["📑⚠️Incomplete Document PDF"]
         Bundle["📚3 Bundled Documents"]
@@ -42,16 +42,18 @@ flowchart TB
         OnePage_split["🧩Page 4 of 7"]
     end
 
-    subgraph Col4 ["🗄️ Database 2: Merged"]
-        MergedDoc["Completed Document<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"]
+    subgraph Col4 ["🗄️ Database 2: Merge Pages"]
+        MergedDoc{"Find & Associate<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"}
+        FindsPages{"Find & Associate<br/>👉Page 4 of 7"}
     end
 
     subgraph Col5 ["📁 Storage 5: Processed"]
 
-        OnePageComplete["📃One Page PDF"]
+        OnePageComplete["📄single page PDF"]
         CompleteRaw["📖PDF Document #1"]
         CompleteSplit["📖PDF Document #2"]
         CompleteMerged["📖PDF Document #3"]
+        IncompleteFinal["📑⚠️PDF document with missing pages"]
 
     end
 
@@ -63,10 +65,10 @@ flowchart TB
     end
 
     %% Flow from Storage 1 to Storage 2 (OCR Processing)
-    OnePageUpload -->|OCR| OnePage
-    SingleUpload -->|OCR| Single
-    BundleUpload -->|OCR| Bundle
-    IncompleteUpload -->|OCR| Incomplete
+    OnePageUpload -->|print to PDF| OnePage
+    SingleUpload -->|print to PDF| Single
+    BundleUpload -->|PDF| Bundle
+    IncompleteUpload -->|PDF| Incomplete
 
     %% Flow from Storage 2
 
@@ -108,9 +110,11 @@ flowchart TB
     ChooseBestCopy2 -->|Get Best| MergedDoc
     ChooseBestCopy3 -->|Get Best| MergedDoc
     ChooseBestCopy4 -->|Get Best| MergedDoc
+    ChooseBestCopy -->|GetBest| FindsPages
 
     %% Flow from Database 2 to Storage 5
     MergedDoc -->|Assemble| CompleteMerged
+    FindsPages -->|Assemble| IncompleteFinal
 
 
     %% Color Coding by Document Source/Family
@@ -128,7 +132,7 @@ flowchart TB
     class Bundle,DocA,OnePage_split,DocC,SoloPage1,SoloPage2,CompleteSplit bundleDocFamily
 
     %% Incomplete Document Family (Light Blue)
-    class Incomplete,PageRaw1,PageRaw2,PageRaw3 incompleteDocFamily
+    class Incomplete,PageRaw1,PageRaw2,PageRaw3,IncompleteFinal incompleteDocFamily
 
     %% One Page Document Family (Light Purple)
     class OnePage,OnePageComplete onePageDocFamily
