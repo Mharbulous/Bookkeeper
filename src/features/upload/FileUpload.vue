@@ -110,26 +110,26 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import FileUploadQueue from '../../../features/upload/components/FileUploadQueue.vue';
-import UploadDropzone from '../../../features/upload/components/UploadDropzone.vue';
-import FolderOptionsDialog from '../../../features/upload/components/FolderOptionsDialog.vue';
-import ProcessingProgressModal from '../../../features/upload/components/ProcessingProgressModal.vue';
-import CloudFileWarningModal from '../../../features/upload/components/CloudFileWarningModal.vue';
-import { useFileQueue } from '../../../features/upload/composables/useFileQueue.js';
-import { useFileDragDrop } from '../../../features/upload/composables/useFileDragDrop.js';
-import { useQueueDeduplication } from '../../../features/upload/composables/useQueueDeduplication.js';
-import { useFolderOptions } from '../../../features/upload/composables/useFolderOptions.js';
-import { useTimeBasedWarning } from '../../../features/upload/composables/useTimeBasedWarning.js';
+import FileUploadQueue from './components/FileUploadQueue.vue';
+import UploadDropzone from './components/UploadDropzone.vue';
+import FolderOptionsDialog from './components/FolderOptionsDialog.vue';
+import ProcessingProgressModal from './components/ProcessingProgressModal.vue';
+import CloudFileWarningModal from './components/CloudFileWarningModal.vue';
+import { useFileQueue } from './composables/useFileQueue.js';
+import { useFileDragDrop } from './composables/useFileDragDrop.js';
+import { useQueueDeduplication } from './composables/useQueueDeduplication.js';
+import { useFolderOptions } from './composables/useFolderOptions.js';
+import { useTimeBasedWarning } from './composables/useTimeBasedWarning.js';
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
-} from '../../../features/upload/utils/hardwareCalibration.js';
-import { storage } from '../../../services/firebase.js';
+} from './utils/hardwareCalibration.js';
+import { storage } from '../../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
-import { useAuthStore } from '../../../core/stores/auth.js';
-import { useLazyHashTooltip } from '../../../features/upload/composables/useLazyHashTooltip.js';
-import { useUploadLogger } from '../../../features/upload/composables/useUploadLogger.js';
-import { useFileMetadata } from '../../../features/upload/composables/useFileMetadata.js';
+import { useAuthStore } from '../../core/stores/auth.js';
+import { useLazyHashTooltip } from './composables/useLazyHashTooltip.js';
+import { useUploadLogger } from './composables/useUploadLogger.js';
+import { useFileMetadata } from './composables/useFileMetadata.js';
 
 // Component configuration
 defineOptions({
