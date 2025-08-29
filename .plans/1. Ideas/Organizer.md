@@ -8,195 +8,105 @@ A visual file organization system for managing uploaded files in Firebase Storag
 
 A multi-column interface that allows users to visually organize uploaded files into different processing categories through an automated analysis and processing workflow.
 
-## Processing Flow Diagram
-
-```mermaid
-stateDiagram-v2
-    [*] --> RawUploaded : File Upload
-    
-    state RawUploaded {
-        [*] --> AnalyzeFile : Auto-analyze
-        AnalyzeFile --> Bundle : Multi-doc detected
-        AnalyzeFile --> CompleteSingle : Single complete doc
-        AnalyzeFile --> PartialDoc : Incomplete doc detected
-    }
-    
-    Bundle --> SplitProcess : Split bundle
-    
-    state SplitProcess {
-        [*] --> Splitting : Processing...
-        Splitting --> IndividualFiles : Generate individual docs
-    }
-    
-    CompleteSingle --> CompleteDocuments : Direct move
-    PartialDoc --> PartialFiles : Direct move
-    
-    IndividualFiles --> AnalyzeIndividual : Analyze completeness
-    
-    state AnalyzeIndividual {
-        [*] --> CheckCompleteness
-        CheckCompleteness --> IsComplete : Complete doc
-        CheckCompleteness --> IsPartial : Incomplete doc
-    }
-    
-    IsComplete --> CompleteDocuments : Move to final
-    IsPartial --> PartialFiles : Move to partials
-    
-    state PartialFiles {
-        [*] --> WaitingForMatch : Looking for other parts
-        WaitingForMatch --> FoundMatch : Match found
-        FoundMatch --> MergeProcess : Merge partials
-        
-        state MergeProcess {
-            [*] --> Merging : Combining files...
-            Merging --> MergedComplete : Complete document created
-        }
-        
-        MergedComplete --> CompleteDocuments : Move to final
-    }
-    
-    CompleteDocuments --> [*] : Processing complete
-    
-    note right of RawUploaded : Column 1:\nRaw Uploaded Files
-    note right of IndividualFiles : Column 2:\nSplit Files
-    note right of PartialFiles : Column 3:\nFile Fragments
-    note right of CompleteDocuments : Column 4:\nComplete Documents
-```
-
 ## Kanban Board Workflow
 
 ```mermaid
 flowchart TB
-    subgraph Col1 ["📁 Column 1: Raw Uploaded Files"]
-        Bundle["📄📄📄📄📄<br/>Bundle<br/>(5 docs)"]
-        Single["📄<br/>Complete<br/>Single"]
-        Partial["📄⚠️<br/>Partial<br/>Document"]
+    subgraph Col1 ["📁 Storage 1: Uploads"]
+        OnePage["📃One Page PDF"]
+        Single["📖Complete Document"]
+        Incomplete["📑⚠️Incomplete Document PDF"]
+        Bundle["📚3 Bundled Documents"]
+
     end
-    
-    subgraph Col2 ["📂 Column 2: Split Files"]
-        DocA["📄<br/>Doc A<br/>(from bundle)"]
-        DocB["📄<br/>Doc B<br/>(from bundle)"]
-        DocC["📄<br/>Doc C<br/>(from bundle)"]
-        DocD["📄<br/>Doc D<br/>(from bundle)"]
-        DocE["📄<br/>Doc E<br/>(from bundle)"]
+
+    subgraph Col2 ["📂 Storage 2: Split Files"]
+        DocA["📖Complete Document"]
+        DocC["📑Incomplete PDF"]
+
     end
-    
-    subgraph Col3 ["⚠️ Column 3: File Fragments"]
-        PartialRaw["📄⚠️<br/>Partial<br/>from Raw"]
-        PartialSplit["📄⚠️<br/>Partial<br/>from Split"]
-        Merging["🔄<br/>Merging<br/>Process"]
+
+    subgraph Col3 ["📄 Storage 3: Pages"]
+        SoloPage1["🧩Page 1 of 3"]
+        SoloPage2["🧩Page 2 of 3"]
+        OnePage_split["🧩Page 4 of 7"]
+        PageRaw1["🧩Page 4 of 7"]
+        PageRaw2["🧩Page 2 of 3"]
+        PageRaw3["🧩Page 3 of 3"]
     end
-    
-    subgraph Col4 ["✅ Column 4: Complete Documents"]
-        CompleteRaw["📄✅<br/>Complete<br/>from Raw"]
-        CompleteSplit["📄✅<br/>Complete<br/>from Split"]
-        CompleteMerge["📄✅<br/>Complete<br/>from Merge"]
+
+    subgraph Col4 ["🗄️ Database 2: Merged"]
+        MergedDoc["Completed Document<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"]
     end
-    
+
+    subgraph Col5 ["Column 5: Complete"]
+
+        OnePageComplete["📃One Page PDF"]
+        CompleteRaw["📖Doc #1"]
+        CompleteSplit["📖Doc #2"]
+
+    end
+
+    subgraph DB1 ["🗄️ Database 1: Best Copy"]
+        ChooseBestCopy2{"Choose Best:<br/>👉Page 2 of 3<br/>👉Page 2 of 3"}
+        ChooseBestCopy{"Choose Best:<br/>👉Page 4 of 7<br/>👉Page 4 of 7"}
+    end
+
     %% Flow from Column 1
-    Bundle -.->|Split| DocA
-    Bundle -.->|Split| DocB
-    Bundle -.->|Split| DocC
-    Bundle -.->|Split| DocD
-    Bundle -.->|Split| DocE
-    
+
     Single -->|Direct Move| CompleteRaw
-    Partial -->|Direct Move| PartialRaw
-    
+    OnePage -->|Direct Move| OnePageComplete
+
+
+    Bundle -.->|Split| DocA
+    Bundle -.->|Split to Pages| OnePage_split
+    Bundle -.->|Split| DocC
+
     %% Flow from Column 2
-    DocA -->|If Complete| CompleteSplit
-    DocB -->|If Complete| CompleteSplit
-    DocC -->|If Partial| PartialSplit
-    DocD -->|If Complete| CompleteSplit
-    DocE -->|If Partial| PartialSplit
+
+    DocA -->|Complete| CompleteSplit
+
+    DocC -.->|Split to Pages| SoloPage1
+    DocC -.->|Split to Pages| SoloPage2
+
+
+
+
+    %% Flow from Column 1 direct to Column 3
+    Incomplete -.->|Split to Pages| PageRaw1
+    Incomplete -.->|Split to Pages| PageRaw2
+    Incomplete -.->|Split to Pages| PageRaw3
+
+    %% Flow from Column 3 to Column 4 - Duplicate pages
+    OnePage_split -->|Duplicate Page| ChooseBestCopy
+    PageRaw1 -->|Duplicate Page| ChooseBestCopy
     
-    %% Flow within Column 3
-    PartialRaw -->|Find Match| Merging
-    PartialSplit -->|Find Match| Merging
+    SoloPage2 -->|Duplicate Page| ChooseBestCopy2
+    PageRaw2 -->|Duplicate Page| ChooseBestCopy2
     
-    %% Flow from Column 3 to Column 4
-    Merging -->|Merge Complete| CompleteMerge
-    
-    %% Styling
-    classDef bundleCard fill:#ffeb3b,stroke:#f57f17,stroke-width:3px
-    classDef completeCard fill:#4caf50,stroke:#2e7d32,stroke-width:2px
-    classDef partialCard fill:#ff9800,stroke:#ef6c00,stroke-width:2px
-    classDef processCard fill:#2196f3,stroke:#1565c0,stroke-width:2px
-    
-    class Bundle bundleCard
-    class Single,CompleteRaw,CompleteSplit,CompleteMerge completeCard
-    class Partial,PartialRaw,PartialSplit partialCard
-    class DocA,DocB,DocC,DocD,DocE,Merging processCard
+    %% Flow from Column 3 to Column 4 - Assembling pages into merged document
+    SoloPage1 -->|Assemble| MergedDoc
+    PageRaw3 -->|Assemble| MergedDoc
+    ChooseBestCopy2 -->|Best Copy| MergedDoc
+
+
+    %% Color Coding by Document Source/Family
+    classDef singleDocFamily fill:#e8f5e8,stroke:#4caf50,stroke-width:2px,color:#000000
+    classDef bundleDocFamily fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,color:#000000
+    classDef incompleteDocFamily fill:#f3e5f5,stroke:#9c27b0,stroke-width:2px,color:#000000
+    classDef onePageDocFamily fill:#fff3e0,stroke:#ff9800,stroke-width:2px,color:#000000
+    classDef duplicateNode fill:#ffebee,stroke:#f44336,stroke-width:2px,color:#000000
+
+    %% Single Complete Document Family (Light Green)
+    class Single,CompleteRaw singleDocFamily
+
+    %% Bundle Document Family (Light Blue)
+    class Bundle,DocA,OnePage_split,DocC,SoloPage1,SoloPage2,CompleteSplit bundleDocFamily
+
+    %% Incomplete Document Family (Light Purple)
+    class Incomplete,PageRaw1,PageRaw2,PageRaw3 incompleteDocFamily
+
+    %% One Page Document Family (Light Orange)
+    class OnePage,OnePageComplete onePageDocFamily
+
 ```
-
-## Layout Design
-
-### Column 1: Raw Uploaded Files (Far Left)
-- **Purpose**: Display all recently uploaded files in their original, unprocessed state
-- **Visual Design**: Small cards representing file icons
-- **Content**: Each card shows:
-  - File thumbnail/icon
-  - Filename
-  - Upload date/time
-  - File type indicator
-- **Functionality**: Source column for dragging files to processing categories
-
-### Column 2: Split Files (Center-Left)
-- **Purpose**: Individual documents that have been extracted from bundle files
-- **Content**: Each card shows documents that were split from multi-document bundles
-- **Processing Action**: Analysis to determine if each split document is complete or partial
-- **Next Steps**: Route to either File Fragments (Column 3) or Complete Documents (Column 4)
-
-### Column 3: File Fragments (Center-Right)
-- **Purpose**: Incomplete documents that are missing pages or components
-- **Content**: Partial files from raw uploads and incomplete documents from split bundles
-- **Processing Action**: Find matching fragments and merge them into complete documents
-- **Next Steps**: Once matching fragments are found and merged, move complete documents to Column 4
-
-### Column 4: Complete Documents (Far Right)  
-- **Purpose**: Finalized, complete documents ready for use
-- **Content**: Documents that are verified as complete from any processing stage
-- **Sources**: Complete singles from raw uploads, complete documents from split bundles, merged documents from fragments
-
-## User Workflow
-
-1. **Upload Phase**: Files appear in Column 1 (Raw Uploaded Files)
-2. **Organization Phase**: User drags files from Column 1 to appropriate buckets in Column 2
-3. **Processing Phase**: System processes files based on their categorization
-4. **Completion**: Processed files move to final organized state
-
-## Technical Considerations
-
-### File Types
-- Primary focus: PDF documents
-- Extensible to other document types (images, Office documents, etc.)
-
-### Processing Operations
-- **Document Bundles**: PDF splitting functionality
-- **Partial Files**: PDF merging/combining functionality
-
-### Integration Points
-- Firebase Storage for file storage
-- Existing upload system in Bookkeeper application
-- Potential integration with PDF processing libraries
-
-## User Experience Goals
-
-- **Visual Organization**: Clear, intuitive drag-and-drop interface
-- **File Identification**: Easy recognition of file types and processing needs
-- **Workflow Efficiency**: Streamlined process from upload to organized storage
-- **Processing Transparency**: Clear indication of what actions will be taken
-
-## Future Considerations
-
-- Additional processing categories as needs arise
-- Batch processing capabilities
-- Automated categorization suggestions
-- Integration with existing file management features
-
-## Success Metrics
-
-- Reduced time spent manually organizing uploaded documents
-- Improved accuracy in document separation and combination
-- User satisfaction with visual organization workflow
-- Successful processing of bundled and partial documents
