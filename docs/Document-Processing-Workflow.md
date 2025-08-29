@@ -1,4 +1,4 @@
-# File Organizer Feature Reference Document
+# Document Processing Workflow
 
 ## Overview
 
@@ -12,7 +12,14 @@ A multi-column interface that allows users to visually organize uploaded files i
 
 ```mermaid
 flowchart TB
-    subgraph Col1 ["📁 Storage 2: Uploads"]
+    subgraph Col0 ["📁 Storage 1: Uploads"]
+        OnePageUpload["📃One Page PDF"]
+        SingleUpload["📖Complete Document"]
+        BundleUpload["📚3 Bundled Documents"]
+        IncompleteUpload["📑⚠️Incomplete Document PDF"]
+    end
+
+    subgraph Col1 ["📁 Storage 2: OCRed"]
         OnePage["📃One Page PDF"]
         Single["📖Complete Document"]
         Incomplete["📑⚠️Incomplete Document PDF"]
@@ -39,7 +46,7 @@ flowchart TB
         MergedDoc["Completed Document<br/>👉 page 1 of 3<br/>👉 page 2 of 3<br/>👉 page 3 of 3"]
     end
 
-    subgraph Col5 ["📁 Storage 5: Complete"]
+    subgraph Col5 ["📁 Storage 5: Processed"]
 
         OnePageComplete["📃One Page PDF"]
         CompleteRaw["📖PDF Document #1"]
@@ -55,7 +62,13 @@ flowchart TB
         ChooseBestCopy{"Choose Best:<br/>👉Page 4 of 7<br/>👉Page 4 of 7"}
     end
 
-    %% Flow from Column 1
+    %% Flow from Storage 1 to Storage 2 (OCR Processing)
+    OnePageUpload -->|OCR| OnePage
+    SingleUpload -->|OCR| Single
+    BundleUpload -->|OCR| Bundle
+    IncompleteUpload -->|OCR| Incomplete
+
+    %% Flow from Storage 2
 
     Single -->|Direct Move| CompleteRaw
     OnePage -->|Direct Move| OnePageComplete
@@ -122,5 +135,11 @@ flowchart TB
 
     %% Blended Document Family (Green - Yellow+Blue blend for multi-source documents)
     class CompleteMerged blendedDocFamily
+
+    %% Storage 1 Upload nodes inherit same colors as their Storage 2 counterparts
+    class OnePageUpload onePageDocFamily
+    class SingleUpload singleDocFamily
+    class BundleUpload bundleDocFamily
+    class IncompleteUpload incompleteDocFamily
 
 ```
