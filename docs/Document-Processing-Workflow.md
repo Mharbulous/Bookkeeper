@@ -47,6 +47,7 @@ flowchart TB
         EmailProcessed["📧email in .msg format"]
         CompleteRaw["📖PDF Document #1"]
         OnePageComplete["📸photograph#2.jpg"]
+        PhotoProcessed["📸photograph#1.jpg"]
         CompleteSplit["📖PDF Document #2"]
         CompleteMerged["📖PDF Document #3"]
         IncompleteFinal["📑⚠️PDF document with missing pages"]
@@ -64,6 +65,7 @@ flowchart TB
     SingleUpload -->|Direct Move| EmailProcessed
     PdfUpload -->|Direct Move| CompleteRaw
     OnePageUpload -->|Direct Move| OnePageComplete
+    PhotoOfDoc -->|Direct Move| PhotoProcessed
 
 
     Bundle -.->|Split| DocA
@@ -139,8 +141,10 @@ flowchart TB
     class OnePageUpload onePageDocFamily
     class SingleUpload singleDocFamily
     class IncompleteUpload incompleteDocFamily
+    class Bundle bundleDocFamily
+    class Incomplete incompleteDocFamily
 
-    %% Photo Document #2 Family (Light Pink)
-    class PhotoOfDoc photoTwoFamily
+    %% Photo Document #2 Family (Light Amber)
+    class PhotoOfDoc,PhotoProcessed photoTwoFamily
 
 ```
