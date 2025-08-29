@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { startProcessingTimer } from '../utils/processingTimer.js';
+import { startProcessingTimer } from '../../upload/utils/processingTimer.js';
 import { useFolderAnalysis } from '@/features/upload/composables/useFolderAnalysis.js';
 import { useFolderProgress } from './useFolderProgress.js';
 import { useFolderTimeouts } from './useFolderTimeouts.js';

@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { useFolderAnalysis } from '@/features/upload/composables/useFolderAnalysis.js';
-import { storeHardwarePerformanceFactor } from '../utils/hardwareCalibration.js';
+import { storeHardwarePerformanceFactor } from '../../upload/utils/hardwareCalibration.js';
 
 export function useFolderProgress() {
   const {

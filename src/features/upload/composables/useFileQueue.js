@@ -1,5 +1,5 @@
 import { ref, nextTick } from 'vue';
-import { logProcessingTime } from '../utils/processingTimer.js';
+import { logProcessingTime } from '../../upload/utils/processingTimer.js';
 import { useFileQueueCore } from './useFileQueueCore';
 
 export function useFileQueue() {

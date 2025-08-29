@@ -1,5 +1,9 @@
-import { logProcessingTime } from '../utils/processingTimer.js';
-import { createApplicationError, getRetryDelay, isRecoverableError } from '../../../utils/errorMessages';
+import { logProcessingTime } from '../../upload/utils/processingTimer.js';
+import {
+  createApplicationError,
+  getRetryDelay,
+  isRecoverableError,
+} from '../../../utils/errorMessages';
 
 export function useQueueProgress() {
   // Main thread processing with progress tracking

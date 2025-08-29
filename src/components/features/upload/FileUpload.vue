@@ -110,20 +110,20 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import FileUploadQueue from '../../../features/file-upload/components/FileUploadQueue.vue';
-import UploadDropzone from '../../../features/file-upload/components/UploadDropzone.vue';
-import FolderOptionsDialog from '../../../features/file-upload/components/FolderOptionsDialog.vue';
-import ProcessingProgressModal from '../../../features/file-upload/components/ProcessingProgressModal.vue';
-import CloudFileWarningModal from '../../../features/file-upload/components/CloudFileWarningModal.vue';
-import { useFileQueue } from '../../../features/file-upload/composables/useFileQueue.js';
-import { useFileDragDrop } from '../../../features/file-upload/composables/useFileDragDrop.js';
-import { useQueueDeduplication } from '../../../features/file-upload/composables/useQueueDeduplication.js';
-import { useFolderOptions } from '../../../features/file-upload/composables/useFolderOptions.js';
-import { useTimeBasedWarning } from '../../../features/file-upload/composables/useTimeBasedWarning.js';
+import FileUploadQueue from '../../../features/upload/components/FileUploadQueue.vue';
+import UploadDropzone from '../../../features/upload/components/UploadDropzone.vue';
+import FolderOptionsDialog from '../../../features/upload/components/FolderOptionsDialog.vue';
+import ProcessingProgressModal from '../../../features/upload/components/ProcessingProgressModal.vue';
+import CloudFileWarningModal from '../../../features/upload/components/CloudFileWarningModal.vue';
+import { useFileQueue } from '../../../features/upload/composables/useFileQueue.js';
+import { useFileDragDrop } from '../../../features/upload/composables/useFileDragDrop.js';
+import { useQueueDeduplication } from '../../../features/upload/composables/useQueueDeduplication.js';
+import { useFolderOptions } from '../../../features/upload/composables/useFolderOptions.js';
+import { useTimeBasedWarning } from '../../../features/upload/composables/useTimeBasedWarning.js';
 import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
-} from '../../../features/file-upload/utils/hardwareCalibration.js';
+} from '../../../features/upload/utils/hardwareCalibration.js';
 import { storage } from '../../../services/firebase.js';
 import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { useAuthStore } from '../../../core/stores/auth.js';

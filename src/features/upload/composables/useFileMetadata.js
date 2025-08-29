@@ -1,7 +1,7 @@
 import { db } from '../../../services/firebase.js';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../../../core/stores/auth.js';
-import { updateFolderPaths } from '../utils/folderPathUtils.js';
+import { updateFolderPaths } from '../../upload/utils/folderPathUtils.js';
 
 export function useFileMetadata() {
   const authStore = useAuthStore();
