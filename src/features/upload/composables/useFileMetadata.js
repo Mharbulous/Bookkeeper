@@ -2,6 +2,7 @@ import { db } from '../../../services/firebase.js';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../../../core/stores/auth.js';
 import { updateFolderPaths } from '../../upload/utils/folderPathUtils.js';
+import { EvidenceService } from '../../organizer/services/evidenceService.js';
 
 export function useFileMetadata() {
   const authStore = useAuthStore();
@@ -111,6 +112,26 @@ export function useFileMetadata() {
         pathChanged: pathUpdate.hasChanged,
         fileHash: fileHash.substring(0, 8) + '...',
       });
+
+      // Create corresponding Evidence document for organization
+      try {
+        const evidenceService = new EvidenceService(teamId);
+        
+        const uploadMetadata = {
+          hash: fileHash,
+          originalName: originalName,
+          size: fileData.size || 0,
+          folderPath: currentFolderPath || '/',
+          metadataHash: metadataHash
+        };
+        
+        const evidenceId = await evidenceService.createEvidenceFromUpload(uploadMetadata);
+        console.log(`[DEBUG] Evidence document created: ${evidenceId} for metadata: ${metadataHash}`);
+        
+      } catch (evidenceError) {
+        console.error('Failed to create evidence document:', evidenceError);
+        // Don't fail the upload if evidence creation fails
+      }
 
       return metadataHash;
     } catch (error) {

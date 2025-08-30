@@ -125,7 +125,7 @@ import {
   getStoredHardwarePerformanceFactor,
 } from './utils/hardwareCalibration.js';
 import { storage } from '../../services/firebase.js';
-import { ref as storageRef, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { ref as storageRef, getDownloadURL, getMetadata, uploadBytesResumable } from 'firebase/storage';
 import { useAuthStore } from '../../core/stores/auth.js';
 import { useLazyHashTooltip } from './composables/useLazyHashTooltip.js';
 import { useUploadLogger } from './composables/useUploadLogger.js';
@@ -256,10 +256,15 @@ const checkFileExists = async (fileHash, originalFileName) => {
   try {
     const storagePath = generateStoragePath(fileHash, originalFileName);
     const storageReference = storageRef(storage, storagePath);
-    await getDownloadURL(storageReference);
+    await getMetadata(storageReference);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    // Only return false for 'object-not-found' errors
+    // Re-throw other errors (permission, network, etc.)
+    if (error.code === 'storage/object-not-found') {
+      return false;
+    }
+    throw error;
   }
 };
 

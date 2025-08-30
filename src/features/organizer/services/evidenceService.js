@@ -35,10 +35,10 @@ export class EvidenceService {
         throw new Error('Missing required upload metadata: hash and originalName');
       }
 
-      // Generate display name (defaults to original, user can change via dropdown)
-      const displayName = options.displayName || uploadMetadata.originalName;
-
-      // Create evidence document
+      // Use the metadataHash from uploadMetadata (created during upload process)
+      const metadataHash = uploadMetadata.metadataHash;
+      
+      // Create evidence document with refined structure
       const evidenceData = {
         // Reference to actual file in Storage
         storageRef: {
@@ -46,8 +46,13 @@ export class EvidenceService {
           fileHash: uploadMetadata.hash
         },
         
-        // Evidence metadata
-        displayName: displayName,
+        // Display configuration (references specific metadata record)
+        displayCopy: {
+          metadataHash: metadataHash,
+          folderPath: uploadMetadata.folderPath || '/' // Default to root if no folder path
+        },
+        
+        // File properties (for quick access)
         fileSize: uploadMetadata.size || 0,
         
         // Processing status (for future Document Processing Workflow)
@@ -55,14 +60,11 @@ export class EvidenceService {
         hasAllPages: null, // null = unknown, true/false after processing
         processingStage: 'uploaded', // uploaded|splitting|merging|complete
         
-        // Organization (v1.0 focus)
-        tags: options.tags || [],
-        tagCount: (options.tags || []).length,
-        lastTaggedAt: null,
-        taggedBy: null,
+        // Organization tags (separated by source)
+        tagsByAI: [], // Empty initially - populated by AI processing
+        tagsByHuman: options.tags || [], // User-provided tags if any
         
         // Timestamps
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
@@ -71,9 +73,9 @@ export class EvidenceService {
       const docRef = await addDoc(evidenceRef, evidenceData);
 
       console.log(`[EvidenceService] Created evidence document: ${docRef.id}`, {
-        displayName,
+        metadataHash: metadataHash.substring(0, 8) + '...',
         fileHash: uploadMetadata.hash.substring(0, 8) + '...',
-        tags: evidenceData.tags,
+        tagsByHuman: evidenceData.tagsByHuman,
       });
 
       return docRef.id;
@@ -107,19 +109,20 @@ export class EvidenceService {
             fileHash: uploadMetadata.hash
           },
           
-          displayName: uploadMetadata.originalName,
+          displayCopy: {
+            metadataHash: uploadMetadata.metadataHash || 'temp-hash', // Should be provided by upload process
+            folderPath: uploadMetadata.folderPath || '/'
+          },
+          
           fileSize: uploadMetadata.size || 0,
           
           isProcessed: false,
           hasAllPages: null,
           processingStage: 'uploaded',
           
-          tags: [],
-          tagCount: 0,
-          lastTaggedAt: null,
-          taggedBy: null,
+          tagsByAI: [],
+          tagsByHuman: [],
           
-          createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         };
 
