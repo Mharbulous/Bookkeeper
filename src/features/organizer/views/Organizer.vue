@@ -159,8 +159,9 @@ const showNotification = (message, color = 'success') => {
 // Lifecycle
 onMounted(async () => {
   try {
-    // Load evidence documents
-    unsubscribe.value = await organizerStore.loadEvidence();
+    // Initialize all stores (evidence + categories)
+    const { evidenceUnsubscribe } = await organizerStore.initialize();
+    unsubscribe.value = evidenceUnsubscribe;
   } catch (error) {
     console.error('Failed to initialize organizer:', error);
     showNotification('Failed to load documents', 'error');

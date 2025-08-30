@@ -37,14 +37,13 @@
 
         <!-- Tags section -->
         <div class="tags-section">
-          <TagInput
+          <TagSelector
             v-if="!readonly"
-            :model-value="tags"
+            :evidence="evidence"
             :loading="tagUpdateLoading"
-            :placeholder="tagInputPlaceholder"
-            class="tag-input"
-            @update:model-value="handleTagsUpdate"
-            @error="handleTagError"
+            class="tag-selector"
+            @tags-updated="handleTagsUpdate"
+            @migrate-legacy="handleMigrateLegacy"
           />
           <div v-else-if="tags && tags.length > 0" class="tags-readonly">
             <v-chip
@@ -132,7 +131,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import TagInput from './TagInput.vue';
+import TagSelector from './TagSelector.vue';
 
 // Props
 const props = defineProps({
@@ -294,8 +293,14 @@ const handleClick = () => {
   emit('click', props.evidence);
 };
 
-const handleTagsUpdate = (newTags) => {
-  emit('tags-update', props.evidence.id, newTags);
+const handleTagsUpdate = () => {
+  // TagSelector handles the update internally, just emit for refresh
+  emit('tags-update', props.evidence.id, []);
+};
+
+const handleMigrateLegacy = () => {
+  // TODO: Implement migration dialog
+  console.log('Legacy tag migration requested for:', props.evidence.id);
 };
 
 const handleTagError = (error) => {

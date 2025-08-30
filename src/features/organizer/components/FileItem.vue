@@ -26,12 +26,12 @@
 
         <!-- Tags section -->
         <div class="tags-section">
-          <TagInput
-            :model-value="evidenceTags"
+          <TagSelector
+            :evidence="evidence"
             :loading="loading"
-            placeholder="Add tags..."
-            class="tag-input"
-            @update:model-value="$emit('tagsUpdate', evidence.id, $event)"
+            class="tag-selector"
+            @tags-updated="$emit('tagsUpdate', evidence.id, [])"
+            @migrate-legacy="$emit('migrateLegacy', evidence.id)"
           />
         </div>
 
@@ -80,7 +80,7 @@
 
 <script setup>
 import { computed } from 'vue';
-import TagInput from './TagInput.vue';
+import TagSelector from './TagSelector.vue';
 import { getFileExtension, getFileIcon, getFileIconColor, formatFileSize, formatDate } from '../utils/fileUtils.js';
 
 // Props
