@@ -208,7 +208,7 @@ const addSelectedTag = async () => {
   
   if (!selectedCategory || !selectedTag) return;
   
-  // Check if tag already exists
+  // Check if tag already exists (exact same tag)
   const tagExists = structuredTags.value.some(tag => 
     tag.categoryId === selectedCategoryId.value && tag.tagName === selectedTag.name
   );
@@ -228,8 +228,10 @@ const addSelectedTag = async () => {
       color: selectedTag.color
     };
     
-    // Add to existing structured tags
-    const updatedTagsByHuman = [...(props.evidence.tagsByHuman || []), newTag];
+    // Remove existing tags from same category (mutual exclusivity)
+    const updatedTagsByHuman = (props.evidence.tagsByHuman || [])
+      .filter(tag => tag.categoryId !== selectedCategoryId.value)
+      .concat(newTag);
     
     // Update via store
     await organizerStore.updateEvidenceStructuredTags(

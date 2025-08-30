@@ -48,6 +48,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/organizer/categories',
+      name: 'category-manager',
+      component: () => import('../features/organizer/views/CategoryManager.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../components/features/auth/LoginForm.vue'),

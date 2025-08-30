@@ -6,6 +6,7 @@
       :evidence-count="evidenceCount"
       :filtered-count="filteredCount"
       @search="handleSearch"
+      @manage-categories="navigateToCategories"
     />
 
     <!-- States (loading, error, empty) -->
@@ -61,13 +62,15 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useRouter } from 'vue-router';
 import { useOrganizerStore } from '../stores/organizer.js';
 import OrganizerHeader from '../components/OrganizerHeader.vue';
 import OrganizerStates from '../components/OrganizerStates.vue';
 import FileListDisplay from '../components/FileListDisplay.vue';
 
-// Store
+// Store and router
 const organizerStore = useOrganizerStore();
+const router = useRouter();
 
 // State
 const searchText = ref('');
@@ -110,6 +113,10 @@ const clearSearch = () => {
 
 const retryLoad = async () => {
   await organizerStore.loadEvidence();
+};
+
+const navigateToCategories = () => {
+  router.push('/organizer/categories');
 };
 
 // Helper methods for child components
