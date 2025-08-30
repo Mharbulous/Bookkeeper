@@ -42,6 +42,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/organizer',
+      name: 'organizer',
+      component: () => import('../features/organizer/views/Organizer.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('../components/features/auth/LoginForm.vue'),
