@@ -1,6 +1,6 @@
 # Simplified Firebase Storage Plan (KISS Edition)
 
-Last Updated: 2025-08-28
+Last Updated: 2025-08-30
 
 ## Overview
 
@@ -9,11 +9,13 @@ Last Updated: 2025-08-28
 This eliminates confusion about where files belong and simplifies security rules. Teams that need general storage simply create a "General" matter for non-client documents.
 
 **Key Principles:**
-- One storage pattern to rule them all: `/teams/{teamId}/matters/{matterId}/{sha256}.{ext}`
+- One storage pattern to rule them all: `/teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{ext}`
 - Every upload attempt is logged (successful or duplicate)
 - Simple, consistent security rules
 - Clear audit trail for compliance
 - Handles multi-client matters and pre-matter intake documents
+
+**Note**: For complete data structure specifications, see [data-structures.md](./data-structures.md) as the authoritative source.
 
 ## Naming Conventions
 
@@ -27,10 +29,12 @@ To keep things organized and queryable:
 
 ```
 Firebase Storage Root
-└── /teams/{teamId}/matters/{matterId}/{sha256}.{ext}
+└── /teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{ext}
 ```
 
 That's it. One pattern. Every file follows this structure.
+
+**Note**: Complete storage structure documentation is maintained in [data-structures.md - Firebase Storage Structure](./data-structures.md#firebase-storage-structure).
 
 ### Special System Matters
 
@@ -50,18 +54,7 @@ Example: Client ABC Corp would have:
 
 ### Multi-Client Matters
 
-Matters can have multiple clients (stored in Firestore):
-```javascript
-// In Firestore: /teams/{teamId}/matters/{matterId}
-{
-  matterId: 'matter-smith-estate-001',
-  title: 'Smith Estate Planning',
-  clients: [
-    { clientId: 'client-john-smith', name: 'John Smith', role: 'primary' },
-    { clientId: 'client-jane-smith', name: 'Jane Smith', role: 'primary' }
-  ],
-  status: 'active'
-}
+Matters can have multiple clients. For complete matter data structure, see [data-structures.md - Matters Collection](./data-structures.md#matters-collection-teamsteamidmattersmatterid).
 
 ## File Storage Implementation
 
@@ -74,19 +67,17 @@ class StorageService {
     const fileHash = await this.calculateSHA256(file)
     const extension = file.name.split('.').pop().toLowerCase()
     const fileName = `${fileHash}.${extension}`
-    const storagePath = `teams/${teamId}/matters/${matterId}/${fileName}`
+    const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${fileName}`
     
-    // 2. Create upload log record (ALWAYS, even for duplicates)
-    const logId = await this.logUploadAttempt({
-      teamId,
-      matterId,
+    // 2. Create upload event record (ALWAYS, even for duplicates)
+    const eventId = await this.logUploadEvent({
+      eventType: 'upload_success',
+      timestamp: new Date(),
       fileName: file.name,
       fileHash,
-      storagePath,
-      fileSize: file.size,
-      mimeType: file.type,
-      metadata,
-      loggedAt: new Date()
+      metadataHash: await this.calculateMetadataHash(file),
+      teamId,
+      userId: auth.currentUser.uid
     })
     
     // 3. Check if file exists
@@ -94,41 +85,40 @@ class StorageService {
     const exists = await this.checkFileExists(fileRef)
     
     if (exists) {
-      // 4a. File exists - just create a reference
-      await this.createFileReference({
+      // 4a. File exists - create evidence record
+      const evidenceId = await this.createEvidenceRecord({
         ...metadata,
         fileHash,
-        storagePath,
         isDuplicate: true,
-        originalUploadLogId: logId
+        uploadEventId: eventId
       })
       
       return { 
         success: true, 
         isDuplicate: true,
         storagePath,
-        logId
+        evidenceId,
+        eventId
       }
     }
     
     // 4b. New file - upload it
     await fileRef.put(file)
     
-    // 5. Create file reference
-    const docId = await this.createFileReference({
+    // 5. Create evidence record
+    const evidenceId = await this.createEvidenceRecord({
       ...metadata,
       fileHash,
-      storagePath,
       isDuplicate: false,
-      originalUploadAttemptId: attemptId
+      uploadEventId: eventId
     })
     
     return { 
       success: true, 
       isDuplicate: false,
       storagePath,
-      documentId: docId,
-      attemptId
+      evidenceId,
+      eventId
     }
   }
   
@@ -141,102 +131,25 @@ class StorageService {
 }
 ```
 
-### 2. Firestore Collections (Simplified)
+### 2. Data Storage Implementation
 
-#### Main Document Registry: `/teams/{teamId}/documents/{documentId}`
-```javascript
-{
-  // Core identifiers
-  fileHash: 'abc123...',           // SHA-256 hash
-  storagePath: 'teams/xyz/matters/m123/abc123.pdf',
-  
-  // User-friendly info
-  displayName: 'Contract_2024.pdf', // What users see
-  originalFileName: 'Contract ABC Corp.pdf',
-  
-  // Organization
-  matterId: 'matter-123',
-  clientIds: ['client-456', 'client-789'],  // Array for multi-client matters
-  
-  // Metadata
-  fileSize: 1048576,
-  mimeType: 'application/pdf',
-  
-  // Simple categorization
-  tags: ['contract', 'draft'],     // Simple array of tags
-  documentType: 'client-provided'  // 'client-provided', 'firm-generated', 'court-filing', 'correspondence'
-}
-```
+**Important**: All data structures are definitively documented in [data-structures.md](./data-structures.md). This implementation uses:
 
-#### Upload Logs: `/teams/{teamId}/upload_logs/{logId}`
-```javascript
-{
-  // What was attempted
-  fileName: 'Contract ABC Corp.pdf',
-  fileHash: 'abc123...',
-  fileSize: 1048576,
-  mimeType: 'application/pdf',
-  
-  // Where it was going
-  matterId: 'matter-123',
-  targetPath: 'teams/xyz/matters/m123/abc123.pdf',
-  
-  // Who and when
-  uploadedBy: 'user-123',
-  loggedAt: Timestamp,
-  
-  // Result
-  wasSuccessful: true,              // false if error
-  wasDuplicate: false,              // true if file already existed
-  error: null,                      // Error message if failed
-  
-  // User metadata from upload
-  userMetadata: {
-    notes: 'Initial draft version'
-  }
-}
-```
+- **Evidence Collection**: `/teams/{teamId}/evidence/{evidenceId}` - For document management and organization
+- **Upload Events**: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}` - For tracking upload attempts
+- **Original Metadata**: `/teams/{teamId}/matters/{matterId}/originalMetadata/{metadataHash}` - For file metadata deduplication
 
-## Security Rules (Dead Simple)
+See the data structures document for complete field specifications and examples.
 
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    // One rule: Team members can access their team's files
-    match /teams/{teamId}/matters/{matterId}/{fileName} {
-      allow read, write: if request.auth != null && 
-                           request.auth.token.teamId == teamId;
-    }
-  }
-}
-```
+## Security Rules
 
-## Firestore Security Rules
+**Security rules are maintained in [data-structures.md - Security Rules](./data-structures.md#security-rules) as the authoritative source.**
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Team members can read all team documents and upload logs
-    match /teams/{teamId}/documents/{doc} {
-      allow read: if request.auth != null && 
-                     request.auth.token.teamId == teamId;
-      allow create: if request.auth != null && 
-                       request.auth.token.teamId == teamId;
-      allow update, delete: if false;  // Documents are immutable
-    }
-    
-    match /teams/{teamId}/upload_logs/{log} {
-      allow read: if request.auth != null && 
-                     request.auth.token.teamId == teamId;
-      allow create: if request.auth != null && 
-                       request.auth.token.teamId == teamId;
-      allow update, delete: if false;  // Logs are immutable
-    }
-  }
-}
-```
+Key security principles:
+- Team members can only access their own team's files
+- Matter-based file organization provides natural access boundaries
+- Evidence records and upload events are immutable once created
+- Original metadata records use hash-based deduplication
 
 ## Client Isolation Strategy
 
@@ -319,54 +232,37 @@ associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-e
 }
 ```
 
-### Useful Queries
+### Useful Query Patterns
 
 ```javascript
-// Find all documents for a specific client (across all matters)
-const clientDocs = await db
+// Find all evidence records for a specific matter
+const matterEvidence = await db
   .collection('teams').doc(teamId)
-  .collection('documents')
-  .where('clientIds', 'array-contains', clientId)
-  .orderBy('loggedAt', 'desc')
+  .collection('evidence')
+  .where('displayCopy.matterId', '==', matterId)
+  .orderBy('updatedAt', 'desc')
   .get()
 
-// Find intake documents for a client (pre-matter)
-const intakeDocs = await db
+// Find upload events for a matter
+const uploadEvents = await db
   .collection('teams').doc(teamId)
-  .collection('documents')
-  .where('matterId', '==', `matter-client-${clientId}-general`)
-  .orderBy('loggedAt', 'desc')
+  .collection('matters').doc(matterId)
+  .collection('uploadEvents')
+  .orderBy('timestamp', 'desc')
   .get()
 
-// Find all uploads by a user (use upload_logs collection)
-const userUploads = await db
+// Find evidence by file hash (for deduplication checking)
+const existingEvidence = await db
   .collection('teams').doc(teamId)
-  .collection('upload_logs')
-  .where('uploadedBy', '==', userId)
-  .orderBy('loggedAt', 'desc')
+  .collection('evidence')
+  .where('storageRef.fileHash', '==', fileHash)
   .get()
 
-// Find duplicate uploads
-const duplicates = await db
+// Find files with specific tags
+const taggedFiles = await db
   .collection('teams').doc(teamId)
-  .collection('upload_logs')
-  .where('wasDuplicate', '==', true)
-  .get()
-
-// Get upload history for a specific file hash
-const fileHistory = await db
-  .collection('teams').doc(teamId)
-  .collection('upload_logs')
-  .where('fileHash', '==', fileHash)
-  .orderBy('loggedAt', 'desc')
-  .get()
-
-// Find all documents for a multi-client matter
-const matterDocs = await db
-  .collection('teams').doc(teamId)
-  .collection('documents')
-  .where('matterId', '==', matterId)
-  .orderBy('loggedAt', 'desc')
+  .collection('evidence')
+  .where('tagsByHuman', 'array-contains', 'important')
   .get()
 ```
 
@@ -456,29 +352,27 @@ await uploadFile(jointAssets, teamId, jointMatterId)
 ## Common Operations
 
 ```javascript
-// Upload initial consultation documents (no matter yet)
+// Upload initial consultation documents
 await storageService.uploadFile(
   file, 
   teamId, 
   'matter-client-abc-general',  // Client's general intake folder
   { 
     displayName: 'Initial Tax Returns',
-    clientIds: ['client-abc'],
     tags: ['intake', 'tax'],
-    documentType: 'client-provided'
+    folderPath: '/intake/2025'
   }
 )
 
-// Upload to a multi-client matter (husband & wife)
+// Upload to a formal matter
 await storageService.uploadFile(
   file,
   teamId,
   'matter-smith-estate-001',
   {
     displayName: 'Joint Asset Declaration',
-    clientIds: ['client-john-smith', 'client-jane-smith'],
     tags: ['estate', 'assets'],
-    documentType: 'client-provided'
+    folderPath: '/estate-planning'
   }
 )
 
@@ -486,64 +380,50 @@ await storageService.uploadFile(
 await storageService.uploadFile(
   file,
   teamId,
-  'matter-general',  // Team's general matter
+  'general',  // Team's general matter
   {
     displayName: 'Team Handbook 2024',
-    clientIds: [],  // No clients for team documents
     tags: ['handbook', 'policy'],
-    documentType: 'firm-generated'
+    folderPath: '/team-resources'
   }
 )
 
-// Move document reference from intake to formal matter (just update Firestore)
-async function associateDocumentWithMatter(documentId, fromMatterId, toMatterId) {
-  // Note: File stays in original location (no need to move in Storage)
-  // Just create a new document reference pointing to same file
-  const doc = await db
-    .collection('teams').doc(teamId)
-    .collection('documents').doc(documentId)
-    .get()
+// Create evidence record with chosen metadata
+async function createEvidenceFromMetadata(fileHash, chosenMetadataHash, tags = []) {
+  const evidenceId = db.collection('teams').doc(teamId)
+    .collection('evidence').doc().id
   
-  // Create new reference for the formal matter
-  await db
-    .collection('teams').doc(teamId)
-    .collection('documents').add({
-      ...doc.data(),
-      matterId: toMatterId,
-      associatedFrom: fromMatterId,
-      associatedAt: new Date(),
-      notes: 'Moved from client intake to formal matter'
+  await db.collection('teams').doc(teamId)
+    .collection('evidence').doc(evidenceId).set({
+      storageRef: {
+        storage: 'uploads',
+        fileHash: fileHash
+      },
+      displayCopy: {
+        metadataHash: chosenMetadataHash,
+        folderPath: '/' // User-chosen from available paths
+      },
+      fileSize: fileSize, // From original metadata
+      isProcessed: false,
+      tagsByAI: [],
+      tagsByHuman: tags,
+      updatedAt: new Date()
     })
+    
+  return evidenceId
 }
 ```
 
-## Required Indexes (Minimal)
+**Note**: These examples show the implementation pattern. Complete method signatures and error handling should follow the data structures defined in [data-structures.md](./data-structures.md).
 
-```javascript
-// Just the essentials
-[
-  {
-    collection: 'teams/{teamId}/documents',
-    fields: [
-      { field: 'matterId', order: 'ASCENDING' },
-      { field: 'loggedAt', order: 'DESCENDING' }
-    ]
-  },
-  {
-    collection: 'teams/{teamId}/documents',
-    fields: [
-      { field: 'clientIds', mode: 'ARRAY_CONTAINS' },
-      { field: 'loggedAt', order: 'DESCENDING' }
-    ]
-  },
-  {
-    collection: 'teams/{teamId}/upload_logs',
-    fields: [
-      { field: 'uploadedBy', order: 'ASCENDING' },
-      { field: 'loggedAt', order: 'DESCENDING' }
-    ]
-  }
-]
-```
+## Required Indexes
+
+**Firestore indexes are documented in [data-structures.md - Required Firestore Indexes](./data-structures.md#required-firestore-indexes) as the authoritative source.**
+
+Key indexes needed:
+- Evidence collection queries by file hash and timestamps
+- Upload events by matter and timestamp
+- Original metadata by hash lookups
+- Tag-based searches on evidence records
 
 Remember: **Start simple, add complexity only when real usage patterns demand it.**
