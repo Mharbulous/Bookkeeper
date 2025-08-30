@@ -124,8 +124,9 @@ import {
   calculateCalibratedProcessingTime,
   getStoredHardwarePerformanceFactor,
 } from './utils/hardwareCalibration.js';
-import { storage } from '../../services/firebase.js';
+import { storage, db } from '../../services/firebase.js';
 import { ref as storageRef, getDownloadURL, getMetadata, uploadBytesResumable } from 'firebase/storage';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useAuthStore } from '../../core/stores/auth.js';
 import { useLazyHashTooltip } from './composables/useLazyHashTooltip.js';
 import { useUploadLogger } from './composables/useUploadLogger.js';
@@ -254,17 +255,20 @@ const generateStoragePath = (fileHash, originalFileName) => {
 
 const checkFileExists = async (fileHash, originalFileName) => {
   try {
-    const storagePath = generateStoragePath(fileHash, originalFileName);
-    const storageReference = storageRef(storage, storagePath);
-    await getMetadata(storageReference);
-    return true;
+    // Check Firestore evidence collection for existing file hash
+    // This avoids making storage requests that generate 404 console errors
+    const evidenceRef = collection(db, 'teams', authStore.currentTeam, 'evidence');
+    const hashQuery = query(
+      evidenceRef, 
+      where('storageRef.fileHash', '==', fileHash),
+      limit(1)
+    );
+    
+    const querySnapshot = await getDocs(hashQuery);
+    return !querySnapshot.empty;
   } catch (error) {
-    // Only return false for 'object-not-found' errors
-    // Re-throw other errors (permission, network, etc.)
-    if (error.code === 'storage/object-not-found') {
-      return false;
-    }
-    throw error;
+    console.warn('Error checking file existence via Firestore, falling back to false:', error);
+    return false;
   }
 };
 
