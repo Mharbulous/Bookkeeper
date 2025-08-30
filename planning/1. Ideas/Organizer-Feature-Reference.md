@@ -50,10 +50,10 @@ The **Organizer** is an AI-powered document discovery and organization system de
 - **Unified Processing**: All file types processed through Gemini's multimodal capabilities
 - **No File-Type Optimization**: Avoid premature optimization that becomes obsolete as AI improves
 - **No Size Limits**: Large files processed normally; testing will determine practical constraints
-- **Separate Tag Arrays**: AI tags stored in `tagsByAI`, human tags in `tagsByHuman`
-- **Two-Pass Algorithm**:
-  1. **High Confidence Pass**: >90% confidence files get tags added to `tagsByAI`
-  2. **Context-Enhanced Pass**: Medium confidence files use previous examples from both tag arrays
+- **Enhanced AI Suggestions**: AI provides up to 3 tag suggestions per category with individual confidence levels
+- **Rich Data Structure**: AI suggestions stored with confidence levels, human overrides, and reviewer attribution
+- **Priority-Based Processing**: All processed documents enter review queue ordered by confidence (lowest first)
+- **Context-Enhanced Processing**: Uses previously reviewed examples to improve accuracy over time
 
 ## User Interface Design
 
@@ -75,18 +75,27 @@ The **Organizer** is an AI-powered document discovery and organization system de
 
 ## Human Review System
 
-### Uncertainty Handling
-- **Review Folder**: "Human Review Required" category for uncertain classifications
-- **Confidence Thresholds**: User-adjustable sensitivity settings
+### Priority-Based Review (No Arbitrary Thresholds)
+- **Smart Review Queue**: Documents ordered by AI confidence level (lowest first)
+- **Natural Threshold Discovery**: Users review until errors become rare, finding their own comfort level
+- **Rich AI Suggestions**: Up to 3 tag suggestions per category with individual confidence levels
 - **Review Interface**: 
-  - Top 3 AI suggestions with confidence percentages
+  - Top 3 AI suggestions with confidence percentages per category
   - "Other" option for complete misclassification
   - "Create New Category" for expanding taxonomy
+  - Human override tracking with reviewer identification
+
+### Enhanced Data Structure
+- **Multi-Suggestion Support**: AI provides multiple tag options per category instead of single suggestions
+- **Confidence Tracking**: Individual confidence levels for each suggested tag
+- **Human Override Recording**: Tracks what humans actually chose vs AI suggestions
+- **Reviewer Attribution**: Records which user made review decisions for audit trails
 
 ### Learning Approach
 - **No Model Training**: System doesn't fine-tune or retrain AI models
 - **Context Enhancement**: Uses human-reviewed examples as context for future medium-confidence decisions
 - **Human Priority**: Human classifications weighted higher than AI classifications in context examples
+- **Performance Analytics**: Rich data enables analysis of AI accuracy vs human decisions over time
 
 ## BATES Numbering System
 

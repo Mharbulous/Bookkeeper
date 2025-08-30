@@ -218,27 +218,48 @@ This document outlines the incremental implementation phases for the Organizer f
 
 ---
 
-## Version 1.4: Confidence-Based Routing
+## Version 1.4: Priority-Based Review System
 
-**Core Goal**: Automatically handle high-confidence AI results, route uncertain ones for review
+**Core Goal**: Intelligent review queue without arbitrary confidence thresholds
 
 **New Features**:
-- Confidence threshold settings (user-configurable)
-- Automatic application of high-confidence tags (>90%)
-- "Human Review Required" virtual folder for uncertain classifications
-- Three-option review interface (Accept AI suggestion, Other option, Create new category)
+- **Enhanced AI Suggestions**: Up to 3 tag suggestions per category with individual confidence levels
+- **Smart Review Queue**: All processed documents ordered by confidence (lowest confidence first)
+- **Rich Data Tracking**: Human override recording with reviewer attribution and timestamps
+- **Natural Threshold Discovery**: Users review until comfortable, finding their own stopping point
+- **Multi-option review interface**: Accept AI suggestions, choose alternatives, or create new categories
 
 **Implementation Scope**:
-- Confidence threshold configuration
-- Automatic vs manual routing logic
-- Human review queue interface
-- Enhanced suggestion interface with confidence display
+- Enhanced `tagsByAI` data structure supporting multiple suggestions per category
+- Priority-based review queue component ordered by confidence levels
+- Human override tracking with reviewer identification
+- Review interface supporting multiple AI suggestions per category
+- Analytics dashboard showing AI accuracy vs human decisions over time
 
 **User Flow**:
-1. AI processes files automatically applying high-confidence tags
-2. Medium/low confidence files appear in "Human Review Required" folder
-3. User reviews uncertain files with suggested options
-4. Can create new categories during review process
+1. AI processes files and provides up to 3 tag suggestions per category with confidence levels
+2. All processed documents appear in review queue, sorted by lowest confidence first
+3. User reviews documents starting with most uncertain, seeing AI's confidence levels
+4. User naturally discovers their comfort threshold by reviewing until errors become rare
+5. Rich tracking enables analysis of AI performance and improvement over time
+
+**Data Structure Enhancement**:
+```javascript
+tagsByAI: [
+  {
+    categoryId: "cat-1",
+    categoryName: "Document Type",
+    suggestions: [
+      { tagName: "Invoice", confidence: 0.95 },
+      { tagName: "Receipt", confidence: 0.78 },
+      { tagName: "Statement", confidence: 0.65 }
+    ],
+    humanOverride: "Invoice", // What human chose
+    reviewedBy: "user@example.com",
+    reviewedAt: timestamp
+  }
+]
+```
 
 ---
 
