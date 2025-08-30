@@ -146,7 +146,7 @@
                 <!-- Tags section -->
                 <div class="tags-section">
                   <TagInput
-                    v-model="evidence.tags"
+                    :model-value="organizerStore.getAllTags(evidence)"
                     :loading="getTagUpdateLoading(evidence.id)"
                     placeholder="Add tags..."
                     class="tag-input"
@@ -233,7 +233,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
 import TagInput from '../components/TagInput.vue';
@@ -257,7 +257,6 @@ const snackbar = ref({
 
 // Computed - use storeToRefs for reactive properties
 const {
-  evidenceList,
   filteredEvidence,
   loading,
   error,
@@ -356,15 +355,15 @@ const handleTagsUpdate = async (evidenceId, newTags) => {
   }
 };
 
-const downloadFile = (evidence) => {
+const downloadFile = () => {
   showNotification('Download functionality coming soon', 'info');
 };
 
-const renameFile = (evidence) => {
+const renameFile = () => {
   showNotification('Rename functionality coming soon', 'info');
 };
 
-const viewDetails = (evidence) => {
+const viewDetails = () => {
   showNotification('Details view coming soon', 'info');
 };
 

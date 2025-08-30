@@ -28,7 +28,7 @@
         hide-details="auto"
         clearable
         @keydown.enter="handleEnterKey"
-        @keydown.comma="handleCommaKey"
+        @keydown="handleKeydown"
         @keydown.tab="handleTabKey"
       >
         <template #append-inner>
@@ -208,9 +208,11 @@ const handleEnterKey = (event) => {
   addTag();
 };
 
-const handleCommaKey = (event) => {
-  event.preventDefault();
-  addTag();
+const handleKeydown = (event) => {
+  if (event.key === ',') {
+    event.preventDefault();
+    addTag();
+  }
 };
 
 const handleTabKey = (event) => {

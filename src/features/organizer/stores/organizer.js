@@ -250,7 +250,7 @@ export const useOrganizerStore = defineStore('organizer', () => {
         throw new Error('Evidence document not found');
       }
 
-      const currentTags = evidence.tags || [];
+      const currentTags = evidence.tagsByHuman || [];
       const newTag = tagText.toString().trim();
       
       if (!newTag) {
@@ -279,7 +279,7 @@ export const useOrganizerStore = defineStore('organizer', () => {
         throw new Error('Evidence document not found');
       }
 
-      const currentTags = evidence.tags || [];
+      const currentTags = evidence.tagsByHuman || [];
       const updatedTags = currentTags.filter(tag => tag !== tagText);
       
       await updateEvidenceTags(evidenceId, updatedTags);
@@ -317,6 +317,16 @@ export const useOrganizerStore = defineStore('organizer', () => {
     isInitialized.value = false;
   };
 
+  /**
+   * Get all tags (human + AI) for display purposes
+   */
+  const getAllTags = (evidence) => {
+    const humanTags = evidence.tagsByHuman || [];
+    const aiTags = evidence.tagsByAI || [];
+    const legacyTags = evidence.tags || []; // For backward compatibility
+    return [...humanTags, ...aiTags, ...legacyTags];
+  };
+
   return {
     // State
     evidenceList,
@@ -339,5 +349,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
     clearFilters,
     reset,
     getDisplayInfo,
+    getAllTags,
   };
 });
