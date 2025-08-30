@@ -1,8 +1,41 @@
 # Organizer v1.1 Implementation Plan: Category-Based Tag System
 
 **Version**: 1.1  
-**Target Completion**: TBD  
+**Target Completion**: 3 weeks  
 **Dependencies**: Organizer v1.0 (✅ Completed August 29, 2025)
+
+## Executive Summary
+
+### Problem Statement
+The current Organizer v1.0 uses a free-form tagging system that creates several organizational challenges:
+- **Inconsistent Tagging**: Users type variations of the same concept ("invoice", "invoices", "Invoice")
+- **Poor Visual Organization**: No visual distinction between different types of tags
+- **Limited Structure**: Cannot group related tags or enforce consistent categorization
+- **Search Inefficiency**: Difficult to filter by specific tag types or relationships
+- **AI Integration Barriers**: Unstructured data prevents effective AI categorization in future versions
+
+### Proposed Solution
+Transform the free-form tag system into a structured category-based system where:
+1. Users define categories (e.g., "Document Type", "Date", "Institution")
+2. Each category contains predefined tag options with consistent naming
+3. Visual color coding distinguishes between categories
+4. Structured data enables AI processing in v1.2
+5. Full backward compatibility preserves existing v1.0 functionality
+
+### Key Files and Current State
+- **Organizer.vue** (187 lines) - Main organizer view requiring category management integration
+- **organizer.js** (353 lines) - Pinia store requiring decomposition and category logic
+- **TagInput.vue** (275 lines) - Component to be replaced with category-based selection
+- **OrganizerHeader.vue**, **OrganizerStates.vue** - Supporting components requiring updates
+
+### Internet Research Summary
+**Vue 3 Category-Based Tagging Best Practices (2024-2025):**
+- **Composable Architecture**: Logic should be extracted into dedicated composables for tag management, category handling, and color systems
+- **Modular Design**: Large files (like 353-line organizer.js) should be decomposed into focused modules
+- **TypeScript Integration**: Strong typing prevents runtime errors in complex tag systems
+- **Performance Patterns**: Use computed properties for expensive operations, debounced search, and virtual scrolling
+- **State Management**: Pinia with Composition API provides optimal state management for category systems
+- **Testing Strategy**: Vitest enables comprehensive testing of composables and business logic
 
 ## Overview
 
@@ -104,51 +137,115 @@ Version 1.1 transforms the free-form tag system from v1.0 into a structured cate
 5. **MigrationDialog.vue** - Migrate v1.0 tags to categories
 
 #### Updated Components
-1. **Organizer.vue** - Updated layout for category management access
-2. **EvidenceCard.vue** - Updated tag display with color coding
-3. **OrganizerStore.js** - Enhanced with category management logic
+1. **Organizer.vue** (187 lines) - Updated layout for category management access
+2. **File display components** - Updated tag display with color coding (no EvidenceCard.vue found in codebase)
+3. **organizer.js store** (353 lines) - Enhanced with category management logic
+
+### Store Decomposition Plan
+**Critical**: The organizer.js store (353 lines) exceeds the 300-line guideline and must be decomposed before implementation:
+- **categoryStore.js** - Category CRUD operations and state management
+- **tagStore.js** - Tag assignment and structured tag logic
+- **migrationStore.js** - Legacy tag migration utilities
+- **organizerCore.js** - Core organizer functionality (<300 lines)
 
 ## Implementation Phases
 
-### Phase 1: Data Structure & Backend (Week 1)
-- [ ] Create categories collection schema
-- [ ] Update Evidence structure for structured tags
-- [ ] Create category service (CRUD operations)
-- [ ] Add category seeding for first-time users
-- [ ] Implement data migration utilities
+### Phase 1: Store Decomposition & Data Structure (Week 1)
+**Complexity**: High | **Breaking Risk**: Medium
 
-### Phase 2: Category Management UI (Week 1-2)
-- [ ] Build CategoryManager.vue interface
-- [ ] Create CategoryForm.vue for add/edit
-- [ ] Implement ColorPicker.vue component
-- [ ] Add category management to navigation
-- [ ] Create default categories on first visit
+#### Tasks:
+- [ ] **Decompose organizer.js store** (353 lines → 4 focused stores <300 lines each)
+  - **Granular Success Criteria**: Each new store file <300 lines, all existing functionality preserved, no breaking changes to existing components
+  - **Rollback Mechanism**: Git branch with full store backup, automated tests verify functionality before merge
+- [ ] **Create categories collection schema** with validation
+  - **Granular Success Criteria**: Schema supports minimum 50 categories, prevents duplicate names, validates color formats, supports nested tag structure
+  - **Rollback Mechanism**: Database migration script with rollback SQL
+- [ ] **Update Evidence structure** for structured tags with backward compatibility
+  - **Granular Success Criteria**: All existing evidence documents remain queryable, new structure validates correctly, search performance unchanged
+  - **Rollback Mechanism**: Database migration with rollback to original schema
+- [ ] **Create category service** (CRUD operations with error handling)
+  - **Granular Success Criteria**: All CRUD operations complete <500ms, proper error handling, comprehensive input validation
+  - **Rollback Mechanism**: Service feature flags to disable new category operations
+- [ ] **Add category seeding** for first-time users with default categories
+  - **Granular Success Criteria**: Creates 3 default categories (Document Type, Date, Institution), each with 5+ tag options, completes <2 seconds
+  - **Rollback Mechanism**: Seeding disable flag in user preferences
 
-### Phase 3: Tag Assignment Interface (Week 2)
-- [ ] Replace TagInput.vue with TagSelector.vue
-- [ ] Category dropdown with tag selection
-- [ ] Multi-category tag assignment
-- [ ] Color-coded tag display
-- [ ] Real-time tag updates
+### Phase 2: Migration & Compatibility (Week 1-2)
+**Complexity**: High | **Breaking Risk**: High
 
-### Phase 4: Migration & Compatibility (Week 2-3)
-- [ ] Build MigrationDialog.vue for v1.0 tags
-- [ ] Legacy tag display and management
-- [ ] Batch migration utilities
-- [ ] Preserve search functionality for legacy tags
+#### Tasks:
+- [ ] **Build MigrationDialog.vue** for v1.0 tags with auto-categorization
+  - **Granular Success Criteria**: Handles >1000 legacy tags, suggests categories with >80% accuracy, completes migration <30 seconds
+  - **Rollback Mechanism**: Migration undo feature, preserves original legacyTags array unchanged
+- [ ] **Implement legacy tag preservation** and display system
+  - **Granular Success Criteria**: All v1.0 tags remain searchable, display falls back to legacy when no structured tags exist, search includes both types
+  - **Rollback Mechanism**: Feature flag to disable structured tags and revert to v1.0 display
+- [ ] **Create batch migration utilities** with progress tracking
+  - **Granular Success Criteria**: Processes 100+ files per second, shows real-time progress, handles errors gracefully without data loss
+  - **Rollback Mechanism**: Migration history log with individual document rollback capability
+- [ ] **Preserve search functionality** for mixed tag types
+  - **Granular Success Criteria**: Search response time <300ms with mixed tags, returns relevant results from both legacy and structured tags
+  - **Rollback Mechanism**: Search algorithm fallback to v1.0 behavior
+
+### Phase 3: Category Management UI (Week 2)
+**Complexity**: Medium | **Breaking Risk**: Low
+
+#### Tasks:
+- [ ] **Build CategoryManager.vue** interface with full CRUD operations
+  - **Granular Success Criteria**: Supports 50+ categories, real-time updates, drag-and-drop reordering, responsive design
+- [ ] **Create CategoryForm.vue** for add/edit with validation
+  - **Granular Success Criteria**: Prevents duplicate names, validates colors, supports 20+ tags per category, auto-saves drafts
+- [ ] **Implement ColorPicker.vue** component with palette and custom colors
+  - **Granular Success Criteria**: 20+ predefined colors, custom color input, color contrast validation, accessibility compliance
+- [ ] **Add category management** to navigation with proper routing
+  - **Granular Success Criteria**: Accessible from main navigation, proper breadcrumbs, maintains state during navigation
+- [ ] **Create default categories** on first visit with intelligent detection
+  - **Granular Success Criteria**: Detects new users, creates categories only once, doesn't interfere with existing data
+
+### Phase 4: Tag Assignment Interface (Week 2-3)
+**Complexity**: Medium | **Breaking Risk**: Medium
+
+#### Tasks:
+- [ ] **Replace TagInput.vue** with TagSelector.vue using category dropdowns
+  - **Granular Success Criteria**: Maintains existing keyboard shortcuts, supports multi-selection, loads categories <100ms
+  - **Rollback Mechanism**: Feature flag to revert to original TagInput.vue component
+- [ ] **Implement category dropdown** with tag selection and search
+  - **Granular Success Criteria**: Dropdown loads <100ms, supports type-ahead search, handles 100+ tags per category
+- [ ] **Add multi-category tag assignment** with visual feedback
+  - **Granular Success Criteria**: Assigns tags across 5+ categories simultaneously, shows color-coded preview, validates assignments
+- [ ] **Create color-coded tag display** with consistent theming
+  - **Granular Success Criteria**: Colors remain consistent across app, supports high contrast mode, readable on all backgrounds
+- [ ] **Implement real-time tag updates** with optimistic UI
+  - **Granular Success Criteria**: Updates appear instantly, syncs with database <500ms, handles offline scenarios
+  - **Rollback Mechanism**: Optimistic update rollback on server errors
 
 ### Phase 5: Enhanced Search & Display (Week 3)
-- [ ] Update search to handle structured tags
-- [ ] Enhanced filtering by category
-- [ ] Color-coded tag chips in results
-- [ ] Category-based organization in results
+**Complexity**: Medium | **Breaking Risk**: Low
+
+#### Tasks:
+- [ ] **Update search** to handle structured tags with advanced filtering
+  - **Granular Success Criteria**: Search response <300ms, supports category-specific filters, maintains relevance ranking
+- [ ] **Enhanced filtering** by category with faceted search
+  - **Granular Success Criteria**: Multiple simultaneous filters, visual filter indicators, filter combination logic
+- [ ] **Color-coded tag chips** in results with consistent styling
+  - **Granular Success Criteria**: Chips load with results, maintain color coding, support removal interaction
+- [ ] **Category-based organization** in results with grouping options
+  - **Granular Success Criteria**: Supports multiple grouping modes, maintains sort preferences, loads groups progressively
 
 ### Phase 6: Testing & Polish (Week 3)
-- [ ] Comprehensive testing of category CRUD
-- [ ] Tag assignment/removal testing
-- [ ] Migration testing with v1.0 data
-- [ ] Performance testing with large datasets
-- [ ] UX polish and error handling
+**Complexity**: Low | **Breaking Risk**: Low
+
+#### Tasks:
+- [ ] **Comprehensive testing** of category CRUD with edge cases
+  - **Granular Success Criteria**: 95%+ test coverage, handles all error scenarios, performance tests pass
+- [ ] **Tag assignment/removal testing** across all scenarios
+  - **Granular Success Criteria**: Tests bulk operations, concurrent users, data consistency
+- [ ] **Migration testing** with large v1.0 datasets
+  - **Granular Success Criteria**: Successfully migrates 1000+ legacy tags, maintains data integrity, performance benchmarks met
+- [ ] **Performance testing** with realistic data volumes
+  - **Granular Success Criteria**: Page loads <2 seconds with 500+ categories, search <300ms with 10000+ documents
+- [ ] **UX polish** and error handling with user feedback
+  - **Granular Success Criteria**: All error states handled gracefully, loading states implemented, user feedback incorporated
 
 ## Detailed Implementation Specifications
 
