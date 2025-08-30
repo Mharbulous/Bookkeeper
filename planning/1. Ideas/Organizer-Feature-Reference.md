@@ -38,6 +38,9 @@ The **Organizer** is an AI-powered document discovery and organization system de
 
 ### Tag Management
 - **User-Defined Categories**: Users create custom categories with their own tag options
+- **Configurable Mutual Exclusivity**: Categories can be set as mutually exclusive (one tag per document) or allow multiple tags
+  - Examples: Document Type (mutually exclusive), Keywords (multiple allowed)
+  - User configurable per category during creation/editing
 - **Add/Delete Operations**: 
   - Adding tags prompts for reprocessing existing documents
   - Deleting tags requires reassignment decision for affected files
@@ -340,6 +343,10 @@ The **Organizer** is an AI-powered document discovery and organization system de
 - Cross-document relationship tracking
 - Bulk download with virtual folder structure preservation
 - Integration with external legal case management systems
+- **Enhanced Category Configuration**: Per-category mutual exclusivity settings with visual indicators
+  - UI toggle in category creation/editing forms
+  - Visual badges showing category behavior (exclusive vs. multiple)
+  - Bulk category behavior updates with data migration options
 
 ### Scalability
 - Multi-user team support (extending solo team architecture)

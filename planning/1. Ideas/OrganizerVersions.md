@@ -78,28 +78,89 @@ This document outlines the incremental implementation phases for the Organizer f
 
 ---
 
-## Version 1.1: Category-Based Tag System
+## Version 1.1: Category-Based Tag System ✅ **COMPLETED**
+
+**Implementation Date**: August 30, 2025  
+**Status**: Fully deployed and functional tested
 
 **Core Goal**: Structure tags into user-defined categories
 
 **New Features**:
-- Category creation interface (user defines category names like "Document Type", "Date")
-- Tags now belong to categories instead of being free-form text
-- Category management (add/edit/delete categories)
-- Tag assignment limited to predefined category options
-- Color coding by category (simple distinct colors)
+- ✅ Category creation interface (user defines category names like "Document Type", "Date")
+- ✅ Tags now belong to categories instead of being free-form text
+- ✅ Category management (add/edit/delete categories)
+- ✅ Tag assignment limited to predefined category options
+- ✅ Color coding by category (simple distinct colors)
+- ✅ Mutual exclusivity within categories (one tag per category per document)
+- ✅ Default category creation for first-time users
 
 **Implementation Scope**:
-- Category management interface
-- Update tag storage to include category reference
-- Color assignment system for categories
-- Modified tag assignment UI to show category groupings
+- ✅ Category management interface with full CRUD operations
+- ✅ Update tag storage to include category reference (structured tagsByHuman)
+- ✅ Color assignment system for categories with consistent visual theming
+- ✅ Modified tag assignment UI to show category dropdowns instead of free-form text
+- ✅ Real-time category synchronization between management and assignment interfaces
+
+**User Flow** (Implemented):
+1. ✅ System creates 3 default categories on first visit (Document Type, Date/Period, Institution)
+2. ✅ User can create additional categories with custom names and colors
+3. ✅ Each category contains predefined tag options with consistent color coding
+4. ✅ Tags files by selecting from category dropdown options (TagSelector replaces TagInput)
+5. ✅ Files display with color-coded tags grouped by category
+6. ✅ Mutual exclusivity enforced - selecting new tag from same category replaces previous
+
+**Architecture Implemented**:
+- **Store Decomposition**: Original 354-line organizer.js decomposed into 4 focused stores
+- **Category Service**: Comprehensive CRUD operations with validation and error handling
+- **TagSelector Component**: Category-based interface replacing free-form TagInput
+- **Real-time Sync**: Changes in category management immediately available in tag assignment
+- **Data Migration**: Backward compatibility with legacy v1.0 tags preserved
+
+**Key Files Created**:
+- `src/features/organizer/stores/categoryStore.js` (267 lines)
+- `src/features/organizer/stores/tagStore.js` (264 lines) 
+- `src/features/organizer/stores/migrationStore.js` (296 lines)
+- `src/features/organizer/stores/organizerCore.js` (289 lines)
+- `src/features/organizer/services/categoryService.js` (324 lines)
+- `src/features/organizer/components/TagSelector.vue` (replacement for TagInput)
+- `src/features/organizer/views/CategoryManager.vue` (category management interface)
+
+**Future Enhancement Identified**: 
+- **Configurable Mutual Exclusivity**: Allow users to configure per-category whether tags are mutually exclusive or allow multiple tags per document
+
+---
+
+## Version 1.1.1: Configurable Category Behaviors (Optional Enhancement)
+
+**Core Goal**: Allow users to configure category behavior (mutual exclusivity vs. multiple tags)
+
+**New Features**:
+- Per-category configuration for tag behavior (exclusive vs. multiple allowed)
+- UI toggles in category creation/editing forms
+- Visual indicators showing category behavior in interfaces
+- Data migration options when changing category behavior
+
+**Implementation Scope**:
+- Add `allowMultiple` boolean field to category schema
+- Update TagSelector to respect category behavior settings
+- Enhanced CategoryManager with behavior toggles
+- Visual badges/icons indicating category behavior type
+- Migration logic for existing documents when behavior changes
 
 **User Flow**:
-1. User creates categories (e.g., "Document Type", "Institution")
-2. For each category, defines available tags (e.g., "Invoice", "Statement")
-3. Tags files by selecting from category dropdown options
-4. Files display with color-coded tags grouped by category
+1. User creates/edits category with "Allow Multiple Tags" toggle
+2. Categories with multiple tags enabled show visual indicator
+3. TagSelector allows multiple tag selection for multi-tag categories
+4. Single-tag categories maintain current mutual exclusivity behavior
+5. Changing behavior offers to migrate existing document tags
+
+**Use Cases**:
+- Document Type: Single tag (mutual exclusive) - "Invoice" OR "Statement"
+- Keywords: Multiple tags allowed - "urgent", "client-meeting", "follow-up"  
+- Institution: Could be either depending on user preference
+- Date/Period: Typically single tag but user might want "Q1" AND "January"
+
+**Timeline**: 1-2 weeks (enhancement to existing v1.1 foundation)
 
 ---
 
