@@ -98,13 +98,12 @@ export const useOrganizerStore = defineStore('organizer', () => {
         return true;
       }
 
-      // Search in original name
-      if (evidence.originalName?.toLowerCase().includes(searchTerm)) {
-        return true;
-      }
-
-      // Search in file extension
-      if (evidence.fileExtension?.toLowerCase().includes(searchTerm)) {
+      // Extract and search in file extension from displayName
+      const fileExtension = evidence.displayName?.includes('.')
+        ? '.' + evidence.displayName.split('.').pop().toLowerCase()
+        : '';
+      
+      if (fileExtension.includes(searchTerm)) {
         return true;
       }
 

@@ -17,16 +17,17 @@ This document outlines the incremental implementation phases for the Organizer f
 
 **Implementation Scope**:
 - New "Organizer" view in navigation
-- File list component pulling from existing Firebase storage
-- Simple tag input field per file
-- Tags stored in Firestore as array of strings per file
-- Basic text-based filtering
+- File list component using Evidence collection with displayCopy references
+- Tag input interface for human tags (tagsByHuman array)
+- Evidence documents reference originalMetadata for display names
+- Basic text-based filtering combining tagsByAI and tagsByHuman
 
 **User Flow**:
 1. User navigates to Organizer view
-2. Sees list of all uploaded files
-3. Clicks on a file to add tags (simple text input)
-4. Can filter file list by typing tag names
+2. Sees list of evidence documents with display names from displayCopy references
+3. Clicks on a file to add human tags (tagsByHuman array)
+4. Can optionally change display name via dropdown (selects different displayCopy.metadataHash)
+5. Can filter file list by typing tag names (searches both AI and human tags)
 
 ---
 
@@ -93,8 +94,8 @@ This document outlines the incremental implementation phases for the Organizer f
 **New Features**:
 - "Process with AI" button for selected files
 - Integration with Google Gemini API for document analysis
-- AI suggests tags based on existing category structure
-- Simple approval interface - user accepts or rejects AI suggestions
+- AI adds tags to tagsByAI array based on existing category structure
+- Simple approval interface - user can move AI tags to tagsByHuman or delete them
 - Manual processing only (user must trigger)
 
 **Implementation Scope**:
@@ -107,9 +108,9 @@ This document outlines the incremental implementation phases for the Organizer f
 **User Flow**:
 1. User selects files for AI processing
 2. Chooses which categories AI should analyze
-3. AI processes files and suggests appropriate tags
-4. User reviews and approves/rejects suggestions
-5. Approved tags are applied to files
+3. AI processes files and adds tags to tagsByAI array
+4. User reviews tagsByAI and can move useful tags to tagsByHuman
+5. User can delete unwanted AI tags or leave them for reference
 
 ---
 

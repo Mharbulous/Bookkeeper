@@ -63,19 +63,20 @@ Create a simple file list view with manual tag assignment capability, providing 
 // Collection: /teams/{teamId}/evidence/{evidenceId}
 {
   evidenceId: "auto-generated", // Firestore auto-ID
-  teamId: "user-team-id",
   
   // Reference to actual file in Storage 1
   storageRef: {
     storage: "uploads", // or "split", "merged" in future versions
-    fileHash: "abc123...", // Points to file in Storage 1
-    matterId: "general", // Which matter folder in storage
+    fileHash: "abc123..." // Points to file in Storage 1
   },
   
-  // Evidence metadata
-  displayName: "Bank Statement March 2024.pdf", // User-friendly name
-  originalName: "statement_03_2024.pdf", // Original upload name
-  fileExtension: ".pdf",
+  // Display configuration (references specific metadata record and folder path)
+  displayCopy: {
+    metadataHash: "xyz789abc123def456...", // Points to chosen originalMetadata record
+    folderPath: "/2025/Statements" // User's chosen folder path from that metadata record
+  },
+  
+  // File properties (for quick access)
   fileSize: 245632,
   
   // Processing status (for future Document Processing Workflow)
@@ -83,16 +84,18 @@ Create a simple file list view with manual tag assignment capability, providing 
   hasAllPages: null, // null = unknown, true/false after processing
   processingStage: "uploaded", // uploaded|splitting|merging|complete
   
-  // Organization (v1.0 focus)
-  tags: ["bank-statement", "2024", "march"],
-  tagCount: 3,
-  lastTaggedAt: "2024-01-01T00:00:00.000Z",
-  taggedBy: "manual", // "manual" | "auto" in future
+  // Organization tags (separated by source - v1.0 focus)
+  tagsByAI: ["financial-document", "bank-statement", "pdf"], // AI-generated tags
+  tagsByHuman: ["important", "march-2024", "rbc"], // Human-applied tags
   
   // Timestamps
-  createdAt: "2024-01-01T00:00:00.000Z",
   updatedAt: "2024-01-01T00:00:00.000Z"
 }
+
+// Derived information (not stored, computed from references):
+// displayName: Retrieved from originalMetadata[displayCopy.metadataHash].originalName
+// createdDate: Retrieved from originalMetadata[displayCopy.metadataHash].lastModified
+// fileExtension: Derived from displayName
 ```
 
 ### Component Structure
@@ -110,10 +113,11 @@ components/features/organizer/
 ```javascript
 // New Pinia store for organizer functionality
 stores/organizer.js
-- fileList: [] // Array of file objects with tags
-- filteredFiles: [] // Computed filtered results
+- evidenceList: [] // Array of evidence objects
+- filteredEvidence: [] // Computed filtered results  
 - filterText: "" // Current filter string
-- actions: fetchFiles(), updateFileTags(), filterFiles()
+- actions: loadEvidence(), updateEvidenceTags(), applyFilters(), getDisplayInfo()
+// getDisplayInfo() - fetches display name/date from referenced originalMetadata
 ```
 
 ## Existing Codebase Assessment
@@ -148,10 +152,11 @@ stores/organizer.js
 - [ ] Create migration script to populate Evidence from existing uploads:
   ```javascript
   // Migration approach:
-  // 1. Query all existing files in /teams/{teamId}/matters/*/metadata/
+  // 1. Query all existing files in /teams/{teamId}/matters/*/originalMetadata/
   // 2. For each unique fileHash, create one Evidence entry
   // 3. Set storageRef to point to existing file location
-  // 4. Initialize with empty tags array and isProcessed: false
+  // 4. Set displayCopy to reference first metadata record found
+  // 5. Initialize with empty tagsByAI and tagsByHuman arrays
   ```
 - [ ] Update Firestore security rules for Evidence collection
 - [ ] Create Pinia store for evidence management (separate from upload store)
@@ -172,10 +177,11 @@ stores/organizer.js
 
 **Rollback Mechanism**: Tag functionality can be disabled via feature flag. Firestore writes for tags can be wrapped in try/catch with rollback to previous tag state on failure.
 
-- [ ] Implement tag input interface with add/remove functionality
-- [ ] Create tag display with visual indicators using Vuetify chips
-- [ ] Add tag persistence to Firestore
+- [ ] Implement tag input interface for human tags (tagsByHuman array)
+- [ ] Create tag display distinguishing AI vs human tags using Vuetify chips
+- [ ] Add tag persistence to Firestore (updates tagsByHuman array)
 - [ ] Implement optimistic UI updates for tag changes
+- [ ] Add display name selection dropdown (chooses displayCopy.metadataHash)
 
 ### Step 4: Search and Filter (Low Complexity)  
 **Breaking Risk Level**: Low
@@ -343,11 +349,12 @@ service cloud.firestore {
 ### Existing File Indexing
 ```javascript
 // On first Organizer access:
-// 1. Check if user has un-indexed files (files without taggedBy field)
-// 2. Batch create/update metadata documents with empty tags array
-// 3. Show one-time "Indexing files..." progress modal
-// 4. Set taggedBy: "manual" and tagCount: 0 for all existing files
-// 5. Cache indexing completion in localStorage to avoid re-runs
+// 1. Query originalMetadata collection for uploaded files
+// 2. For each unique fileHash, create Evidence document if not exists
+// 3. Set displayCopy to first found metadata record for each fileHash  
+// 4. Initialize tagsByAI: [] and tagsByHuman: [] arrays
+// 5. Show one-time "Indexing files..." progress modal
+// 6. Cache indexing completion in localStorage to avoid re-runs
 ```
 
 ## Integration Points

@@ -35,30 +35,19 @@ export class EvidenceService {
         throw new Error('Missing required upload metadata: hash and originalName');
       }
 
-      // Generate display name (user-friendly name, defaults to original)
+      // Generate display name (defaults to original, user can change via dropdown)
       const displayName = options.displayName || uploadMetadata.originalName;
-      
-      // Extract file extension
-      const fileExtension = uploadMetadata.originalName.includes('.')
-        ? '.' + uploadMetadata.originalName.split('.').pop().toLowerCase()
-        : '';
 
       // Create evidence document
       const evidenceData = {
-        // Team association
-        teamId: this.teamId,
-        
-        // Reference to actual file in Storage (uploads collection)
+        // Reference to actual file in Storage
         storageRef: {
-          storage: 'uploads', // Collection name in storage system
-          fileHash: uploadMetadata.hash, // Points to file in upload system
-          matterId: 'general', // Default matter folder
+          storage: 'uploads',
+          fileHash: uploadMetadata.hash
         },
         
         // Evidence metadata
         displayName: displayName,
-        originalName: uploadMetadata.originalName,
-        fileExtension: fileExtension,
         fileSize: uploadMetadata.size || 0,
         
         // Processing status (for future Document Processing Workflow)
@@ -112,23 +101,13 @@ export class EvidenceService {
         const evidenceRef = doc(collection(db, 'teams', this.teamId, 'evidence'));
         evidenceIds.push(evidenceRef.id);
 
-        // Extract file extension
-        const fileExtension = uploadMetadata.originalName.includes('.')
-          ? '.' + uploadMetadata.originalName.split('.').pop().toLowerCase()
-          : '';
-
         const evidenceData = {
-          teamId: this.teamId,
-          
           storageRef: {
             storage: 'uploads',
-            fileHash: uploadMetadata.hash,
-            matterId: 'general',
+            fileHash: uploadMetadata.hash
           },
           
           displayName: uploadMetadata.originalName,
-          originalName: uploadMetadata.originalName,
-          fileExtension: fileExtension,
           fileSize: uploadMetadata.size || 0,
           
           isProcessed: false,
@@ -375,6 +354,37 @@ export class EvidenceService {
     } catch (error) {
       console.error('[EvidenceService] Migration failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Get available original names for a file hash (for displayName dropdown)
+   * @param {string} fileHash - File hash from upload system
+   * @param {string} matterId - Matter ID (defaults to 'general')
+   * @returns {Promise<Array<string>>} - Array of original filenames
+   */
+  async getAvailableOriginalNames(fileHash, matterId = 'general') {
+    try {
+      const originalMetadataRef = collection(db, 'teams', this.teamId, 'matters', matterId, 'originalMetadata');
+      const q = query(
+        originalMetadataRef,
+        where('fileHash', '==', fileHash)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const originalNames = [];
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.originalName && !originalNames.includes(data.originalName)) {
+          originalNames.push(data.originalName);
+        }
+      });
+
+      return originalNames;
+    } catch (error) {
+      console.error('[EvidenceService] Failed to get available original names:', error);
+      return [];
     }
   }
 }

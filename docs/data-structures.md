@@ -158,7 +158,7 @@ This collection logs only the 4 essential upload events with basic information:
 - `upload_failed`: Upload failed for any reason
 - `upload_skipped_metadata_recorded`: File skipped but metadata was recorded
 
-#### File Metadata Records: `/teams/{teamId}/matters/{matterId}/metadata/{metadataHash}`
+#### File Metadata Records: `/teams/{teamId}/matters/{matterId}/originalMetadata/{metadataHash}`
 
 **Purpose**: Store unique combinations of file metadata using metadata hash as document ID
 
@@ -230,6 +230,76 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
 - **Normalization**: Leading slashes present, no trailing slashes (except root `"/"`)
 - **Empty Values**: Empty string `""` represents root-level files
 - **Multiple Contexts**: Same file content can have multiple folder contexts stored
+
+#### Evidence Collection: `/teams/{teamId}/evidence/{evidenceId}`
+
+**Purpose**: Store organizational and processing metadata for uploaded files, providing user-facing document management capabilities
+
+**Key Design Principles:**
+- **Single Source of Truth**: No redundant data - all display information references original metadata records
+- **Deduplication Aware**: Handles multiple original names and folder paths for identical files
+- **AI/Human Separation**: Distinguishes between AI-generated and human-applied tags
+
+```javascript
+{
+  // File reference (points to actual file content)
+  storageRef: {
+    storage: 'uploads',                     // Storage collection type
+    fileHash: 'abc123def456789abcdef012345'  // SHA-256 content hash (links to Firebase Storage file)
+  },
+  
+  // Display configuration (user-selectable from available metadata)
+  displayCopy: {
+    metadataHash: 'xyz789abc123def456...',  // Points to chosen originalMetadata record
+    folderPath: '/2025/Statements'          // User's chosen folder path from that metadata record
+  },
+  
+  // File properties (for quick access without metadata lookup)
+  fileSize: 2048576,                        // File size in bytes
+  
+  // Document processing status (for future Document Processing Workflow)
+  isProcessed: false,                       // Whether document has been processed
+  hasAllPages: null,                        // null=unknown, true/false after processing
+  processingStage: 'uploaded',              // 'uploaded' | 'splitting' | 'merging' | 'complete'
+  
+  // Organizational tags (separated by source)
+  tagsByAI: ['financial-document', 'bank-statement', 'pdf'],      // AI-generated tags
+  tagsByHuman: ['important', 'client-abc', 'needs-review'],       // Human-applied tags
+  
+  // Timestamps
+  updatedAt: Timestamp                      // When evidence document was last modified
+}
+```
+
+**Field Details:**
+
+**`displayCopy` Object:**
+- **Purpose**: References the specific metadata record and folder path to use for display
+- **User Choice**: Users select from available metadata records (dropdown 1) and folder paths within that record (dropdown 2)
+- **Flexibility**: Allows switching display representation without data loss
+
+**Tag Arrays:**
+- **`tagsByAI`**: System-generated tags from AI analysis (file type detection, content recognition, etc.)
+- **`tagsByHuman`**: User-applied tags for organization and search
+- **Benefits**: Separate treatment in UI, different styling, audit trails, AI training data
+
+**Derived Information:**
+```javascript
+// All information derived from referenced data
+const metadata = await getOriginalMetadata(evidence.displayCopy.metadataHash);
+const displayName = metadata.originalName;        // From chosen metadata record
+const createdDate = metadata.lastModified;        // From chosen metadata record
+const fileExtension = getExtension(displayName);  // Derived from filename
+const allTags = [...evidence.tagsByAI, ...evidence.tagsByHuman];  // Combined for search
+```
+
+**Why This Structure:**
+
+1. **No Redundancy**: `teamId` encoded in path, `originalName`/`createdAt` referenced from metadata
+2. **Deduplication Support**: Single file can have multiple evidence documents with different display choices
+3. **User Control**: Users choose which metadata record and folder path to display
+4. **Extensible**: Easy to add new organizational features without breaking existing data
+5. **Performance**: Quick access to common fields (fileSize) while maintaining data integrity
 
 ## Firebase Storage Structure
 
@@ -474,8 +544,8 @@ async function migrateSoloUserToTeam(userId, newTeamId, role) {
 }
 
 async function migrateTeamData(fromTeamId, toTeamId) {
-  // Migrate all subcollections: clients, matters, logs, metadata, etc.
-  const collections = ['clients', 'matters', 'logs', 'metadata'];
+  // Migrate all subcollections: clients, matters, logs, originalMetadata, etc.
+  const collections = ['clients', 'matters', 'logs', 'originalMetadata'];
 
   for (const collectionName of collections) {
     const docs = await db.collection('teams').doc(fromTeamId).collection(collectionName).get();
@@ -512,7 +582,7 @@ const docs = await db
   .doc(teamId)
   .collection('matters')
   .doc(matterId)
-  .collection('metadata')
+  .collection('originalMetadata')
   .where('folderPaths', '==', 'Documents/2023')
   .get();
 
@@ -522,7 +592,7 @@ const docs = await db
   .doc(teamId)
   .collection('matters')
   .doc(matterId)
-  .collection('metadata')
+  .collection('originalMetadata')
   .get();
 
 const filtered = docs.docs.filter((doc) => {

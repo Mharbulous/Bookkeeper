@@ -89,32 +89,6 @@
 
     <!-- File list -->
     <div v-else class="file-list-container">
-      <!-- Migration prompt if needed -->
-      <v-alert
-        v-if="showMigrationPrompt"
-        type="info"
-        variant="tonal"
-        closable
-        class="mb-4"
-        @click:close="dismissMigrationPrompt"
-      >
-        <template #title>
-          <v-icon start>mdi-database-import</v-icon>
-          Initialize Document Organization
-        </template>
-        <p class="mb-2">
-          This is your first time using the organizer. We need to set up your uploaded files for organization.
-        </p>
-        <v-btn 
-          color="primary" 
-          size="small"
-          :loading="migrationLoading"
-          @click="runMigration"
-        >
-          <v-icon start>mdi-cog</v-icon>
-          Initialize Now
-        </v-btn>
-      </v-alert>
 
       <!-- File list header -->
       <div class="list-header">
@@ -153,17 +127,17 @@
                 <!-- File info section -->
                 <div class="file-info">
                   <div class="file-icon">
-                    <v-icon size="32" :color="getFileIconColor(evidence.fileExtension)">
-                      {{ getFileIcon(evidence.fileExtension) }}
+                    <v-icon size="32" :color="getFileIconColor(evidence.displayName)">
+                      {{ getFileIcon(evidence.displayName) }}
                     </v-icon>
                   </div>
                   <div class="file-details">
                     <h4 class="file-name text-subtitle-1 font-weight-medium">
-                      {{ evidence.displayName || evidence.originalName }}
+                      {{ evidence.displayName }}
                     </h4>
                     <p class="file-metadata text-body-2 text-medium-emphasis">
                       {{ formatFileSize(evidence.fileSize) }} • 
-                      {{ evidence.fileExtension.toUpperCase() }} • 
+                      {{ getFileExtension(evidence.displayName).toUpperCase() }} • 
                       {{ formatDate(evidence.createdAt) }}
                     </p>
                   </div>
@@ -261,22 +235,16 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useOrganizerStore } from '../stores/organizer.js';
-import { useMigration } from '../composables/useMigration.js';
 import TagInput from '../components/TagInput.vue';
 
 // Store
 const organizerStore = useOrganizerStore();
-
-// Migration
-const migration = useMigration();
 
 // State
 const searchText = ref('');
 const viewMode = ref('list');
 const showUpdateOverlay = ref(false);
 const tagUpdateLoading = ref(new Set());
-const showMigrationPrompt = ref(false);
-const migrationLoading = ref(false);
 const unsubscribe = ref(null);
 
 const snackbar = ref({
@@ -311,8 +279,14 @@ const retryLoad = async () => {
   await organizerStore.loadEvidence();
 };
 
-const getFileIcon = (extension) => {
-  const ext = extension.toLowerCase();
+const getFileExtension = (filename) => {
+  return filename.includes('.')
+    ? '.' + filename.split('.').pop().toLowerCase()
+    : '';
+};
+
+const getFileIcon = (filename) => {
+  const ext = getFileExtension(filename);
   const iconMap = {
     '.pdf': 'mdi-file-pdf-box',
     '.doc': 'mdi-file-word-box',
@@ -332,8 +306,8 @@ const getFileIcon = (extension) => {
   return iconMap[ext] || 'mdi-file-outline';
 };
 
-const getFileIconColor = (extension) => {
-  const ext = extension.toLowerCase();
+const getFileIconColor = (filename) => {
+  const ext = getFileExtension(filename);
   const colorMap = {
     '.pdf': 'red-darken-1',
     '.doc': 'blue-darken-1',
@@ -393,32 +367,6 @@ const viewDetails = (evidence) => {
   showNotification('Details view coming soon', 'info');
 };
 
-const runMigration = async () => {
-  try {
-    migrationLoading.value = true;
-    await migration.runMigration();
-    
-    const summary = migration.getSummary();
-    if (summary) {
-      showNotification(
-        `Migration complete: ${summary.successful} documents organized`,
-        'success'
-      );
-    }
-    
-    showMigrationPrompt.value = false;
-  } catch (error) {
-    console.error('Migration failed:', error);
-    showNotification('Migration failed: ' + error.message, 'error');
-  } finally {
-    migrationLoading.value = false;
-  }
-};
-
-const dismissMigrationPrompt = () => {
-  showMigrationPrompt.value = false;
-  localStorage.setItem('organizer-migration-dismissed', 'true');
-};
 
 const showNotification = (message, color = 'success') => {
   snackbar.value = {
@@ -434,23 +382,6 @@ onMounted(async () => {
   try {
     // Load evidence documents
     unsubscribe.value = await organizerStore.loadEvidence();
-    
-    // Check if migration is needed
-    const migrationDismissed = localStorage.getItem('organizer-migration-dismissed');
-    if (!migrationDismissed) {
-      try {
-        const migrationCheck = await migration.checkMigrationNeeded();
-        if (migrationCheck.needed) {
-          showMigrationPrompt.value = true;
-        }
-      } catch (migrationError) {
-        console.warn('Failed to check migration status:', migrationError);
-        // If evidence count is 0, show prompt as fallback
-        if (evidenceCount.value === 0) {
-          showMigrationPrompt.value = true;
-        }
-      }
-    }
   } catch (error) {
     console.error('Failed to initialize organizer:', error);
     showNotification('Failed to load documents', 'error');

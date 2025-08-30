@@ -195,11 +195,14 @@ const emit = defineEmits([
 
 // Computed properties
 const displayName = computed(() => {
-  return props.evidence?.displayName || props.evidence?.originalName || 'Unnamed file';
+  return props.evidence?.displayName || 'Unnamed file';
 });
 
 const fileExtension = computed(() => {
-  return props.evidence?.fileExtension || '';
+  const filename = props.evidence?.displayName || '';
+  return filename.includes('.')
+    ? '.' + filename.split('.').pop().toLowerCase()
+    : '';
 });
 
 const tags = computed(() => {

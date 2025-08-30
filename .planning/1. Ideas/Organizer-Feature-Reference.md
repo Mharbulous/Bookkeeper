@@ -47,9 +47,10 @@ The **Organizer** is an AI-powered document discovery and organization system de
 - **Unified Processing**: All file types processed through Gemini's multimodal capabilities
 - **No File-Type Optimization**: Avoid premature optimization that becomes obsolete as AI improves
 - **No Size Limits**: Large files processed normally; testing will determine practical constraints
+- **Separate Tag Arrays**: AI tags stored in `tagsByAI`, human tags in `tagsByHuman`
 - **Two-Pass Algorithm**:
-  1. **High Confidence Pass**: >90% confidence files categorized immediately
-  2. **Context-Enhanced Pass**: Medium confidence files use previously categorized examples
+  1. **High Confidence Pass**: >90% confidence files get tags added to `tagsByAI`
+  2. **Context-Enhanced Pass**: Medium confidence files use previous examples from both tag arrays
 
 ## User Interface Design
 
@@ -127,12 +128,14 @@ The **Organizer** is an AI-powered document discovery and organization system de
 ### Data Storage
 - **Firebase Integration**: Leverage existing authentication and storage infrastructure
 - **Evidence Database**: New Firestore collection `/teams/{teamId}/evidence/`
-- **Storage References**: Evidence documents reference files in Storage 1 via:
-  - `storage`: Which storage folder (uploads/split/merged)
-  - `fileHash`: Unique file identifier
-  - `matterId`: Matter context for access control
+- **Storage References**: Evidence documents reference files via:
+  - `storageRef.storage`: Which storage folder (uploads/split/merged)
+  - `storageRef.fileHash`: Unique file identifier
+- **Display References**: Evidence points to specific metadata records via:
+  - `displayCopy.metadataHash`: Points to chosen originalMetadata record
+  - `displayCopy.folderPath`: User-chosen folder path from that record
 - **Processing Metadata**: Evidence tracks isProcessed, hasAllPages, processingStage
-- **Tag Storage**: All organizational data lives in Evidence, not upload metadata
+- **Tag Storage**: Separated by source (tagsByAI, tagsByHuman arrays)
 - **Team Isolation**: All data scoped by team ID (solo users: teamId === userId)
 
 ### Performance Considerations

@@ -71,7 +71,7 @@ export function useFileMetadata() {
       // Get existing metadata to check for existing folderPaths
       let existingFolderPaths = '';
       try {
-        const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'metadata', metadataHash);
+        const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'originalMetadata', metadataHash);
         const existingDoc = await getDoc(docRef);
         if (existingDoc.exists()) {
           existingFolderPaths = existingDoc.data().folderPaths || '';
@@ -100,8 +100,8 @@ export function useFileMetadata() {
         metadataHash: metadataHash,
       };
 
-      // Save to Firestore: /teams/{teamId}/matters/general/metadata/{metadataHash}
-      const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'metadata', metadataHash);
+      // Save to Firestore: /teams/{teamId}/matters/general/originalMetadata/{metadataHash}
+      const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'originalMetadata', metadataHash);
       await setDoc(docRef, metadataRecord);
 
       console.log(`[DEBUG] Metadata record created: ${metadataHash}`, {
@@ -158,7 +158,7 @@ export function useFileMetadata() {
       }
 
       // Try to get the document
-      const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'metadata', metadataHash);
+      const docRef = doc(db, 'teams', teamId, 'matters', 'general', 'originalMetadata', metadataHash);
       const docSnapshot = await docRef.get();
 
       return docSnapshot.exists();
