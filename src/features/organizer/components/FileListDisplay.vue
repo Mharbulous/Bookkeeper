@@ -37,7 +37,7 @@
           @download="$emit('download', $event)"
           @rename="$emit('rename', $event)"
           @view-details="$emit('viewDetails', $event)"
-          @process-with-ai="$emit('processWithAI', $event)"
+          @process-with-ai="$emit('process-with-ai', $event)"
         />
       </div>
 
@@ -82,7 +82,7 @@ const props = defineProps({
 defineEmits([
   'update:viewMode',
   'tagsUpdate',
-  'processWithAI',
+  'process-with-ai',
   'download',
   'rename',
   'viewDetails',

@@ -135,10 +135,23 @@ export class AITagService {
         throw new Error('No file hash found in evidence document');
       }
 
-      // Get file from uploads storage using hash
-      const fileRef = ref(storage, `uploads/${evidence.storageRef.fileHash}`);
+      // Get file extension from displayName
+      const displayName = evidence.displayName || '';
+      const extension = displayName.split('.').pop()?.toLowerCase() || 'pdf';
+
+      // Get file from actual storage path: teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{ext}
+      const teamId = this.getTeamId();
+      
+      // For now, assume files are in the 'general' matter
+      // TODO: Extract actual matter ID from evidence if available
+      const matterId = 'general';
+      
+      // Use the actual storage path format with extension
+      const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${evidence.storageRef.fileHash}.${extension}`;
+      const fileRef = ref(storage, storagePath);
       const downloadURL = await getDownloadURL(fileRef);
       
+      console.log(`[AITagService] Found file at: ${storagePath}`);
       return downloadURL;
     } catch (error) {
       console.error('[AITagService] Failed to get file for processing:', error);
@@ -188,6 +201,11 @@ export class AITagService {
       // Get Gemini model
       const model = getGenerativeModel(firebaseAI, { model: 'gemini-1.5-flash' });
 
+      // Fetch file content as base64 for Gemini Developer API
+      const fileBlob = await fetch(fileUrl).then(r => r.blob());
+      const arrayBuffer = await fileBlob.arrayBuffer();
+      const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
       // Build category context for AI
       const categoryContext = categories.map(cat => {
         const tagList = cat.tags.map(tag => tag.name).join(', ');
@@ -225,10 +243,10 @@ Instructions:
 Please analyze the document and provide tag suggestions:
 `;
 
-      // Generate AI response
+      // Generate AI response using inline data instead of fileUri
       const result = await model.generateContent([
         { text: prompt },
-        { fileData: { mimeType: this.getMimeType(evidence.displayName), fileUri: fileUrl } }
+        { inlineData: { mimeType: this.getMimeType(evidence.displayName), data: base64Data } }
       ]);
 
       const response = await result.response;

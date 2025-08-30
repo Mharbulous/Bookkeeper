@@ -275,6 +275,7 @@ const handleSelectionChange = (selected) => {
 };
 
 const handleProcessWithAI = () => {
+  console.log('DEBUG: handleProcessWithAI called with evidence:', props.evidence.id);
   emit('process-with-ai', props.evidence);
 };
 </script>

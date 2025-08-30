@@ -188,7 +188,11 @@ const viewDetails = () => {
 };
 
 const processWithAI = async (evidence) => {
+  console.log('DEBUG: processWithAI called with evidence:', evidence.id);
+  console.log('DEBUG: aiTagService.isAIEnabled():', aiTagService.isAIEnabled());
+  
   if (!aiTagService.isAIEnabled()) {
+    console.log('DEBUG: AI features not enabled');
     showNotification('AI features are not enabled', 'warning');
     return;
   }
