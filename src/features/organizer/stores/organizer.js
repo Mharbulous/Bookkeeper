@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
 
@@ -12,6 +12,9 @@ export const useOrganizerStore = defineStore('organizer', () => {
   const error = ref(null);
   const filterText = ref('');
   const isInitialized = ref(false);
+  
+  // Cache for display information
+  const displayInfoCache = ref(new Map());
 
   // Auth store reference
   const authStore = useAuthStore();
@@ -19,6 +22,46 @@ export const useOrganizerStore = defineStore('organizer', () => {
   // Computed
   const evidenceCount = computed(() => evidenceList.value.length);
   const filteredCount = computed(() => filteredEvidence.value.length);
+
+  /**
+   * Fetch display information from originalMetadata collection
+   */
+  const getDisplayInfo = async (metadataHash, teamId) => {
+    try {
+      // Check cache first
+      if (displayInfoCache.value.has(metadataHash)) {
+        return displayInfoCache.value.get(metadataHash);
+      }
+
+      // Fetch from Firestore
+      const metadataRef = doc(db, 'teams', teamId, 'matters', 'general', 'originalMetadata', metadataHash);
+      const metadataDoc = await getDoc(metadataRef);
+      
+      if (metadataDoc.exists()) {
+        const data = metadataDoc.data();
+        const displayInfo = {
+          displayName: data.originalName || 'Unknown File',
+          createdAt: data.lastModified || null
+        };
+        
+        // Cache the result
+        displayInfoCache.value.set(metadataHash, displayInfo);
+        return displayInfo;
+      } else {
+        console.warn(`[Organizer] Metadata not found for hash: ${metadataHash}`);
+        return {
+          displayName: 'Unknown File',
+          createdAt: null
+        };
+      }
+    } catch (error) {
+      console.error(`[Organizer] Failed to fetch display info for ${metadataHash}:`, error);
+      return {
+        displayName: 'Unknown File',
+        createdAt: null
+      };
+    }
+  };
 
   /**
    * Load evidence documents from Firestore with real-time updates
@@ -42,28 +85,40 @@ export const useOrganizerStore = defineStore('organizer', () => {
       const evidenceRef = collection(db, 'teams', teamId, 'evidence');
       const evidenceQuery = query(
         evidenceRef,
-        orderBy('createdAt', 'desc'),
+        orderBy('updatedAt', 'desc'),
         limit(1000) // Reasonable limit for v1.0
       );
 
       // Set up real-time listener
       const unsubscribe = onSnapshot(
         evidenceQuery,
-        (snapshot) => {
+        async (snapshot) => {
           const evidence = [];
-          snapshot.forEach((doc) => {
+          
+          // Process each evidence document
+          for (const doc of snapshot.docs) {
+            const evidenceData = doc.data();
+            
+            // Fetch display information from referenced metadata
+            const displayInfo = await getDisplayInfo(evidenceData.displayCopy?.metadataHash, teamId);
+            
             evidence.push({
               id: doc.id,
-              ...doc.data(),
+              ...evidenceData,
+              // Add computed display fields
+              displayName: displayInfo.displayName,
+              createdAt: displayInfo.createdAt,
             });
-          });
+          }
 
           evidenceList.value = evidence;
           applyFilters(); // Update filtered results
           loading.value = false;
           isInitialized.value = true;
 
-          console.log(`[Organizer] Loaded ${evidence.length} evidence documents`);
+          console.log(`[Organizer] Loaded ${evidence.length} evidence documents with display info`);
+          console.log(`[Organizer] Evidence list:`, evidence);
+          console.log(`[Organizer] Filtered evidence:`, filteredEvidence.value);
         },
         (err) => {
           console.error('[Organizer] Error loading evidence:', err);
@@ -283,5 +338,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
     setFilter,
     clearFilters,
     reset,
+    getDisplayInfo,
   };
 });

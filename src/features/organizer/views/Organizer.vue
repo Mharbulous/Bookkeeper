@@ -234,6 +234,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
 import TagInput from '../components/TagInput.vue';
 
@@ -254,7 +255,7 @@ const snackbar = ref({
   timeout: 4000
 });
 
-// Computed
+// Computed - use storeToRefs for reactive properties
 const {
   evidenceList,
   filteredEvidence,
@@ -263,7 +264,7 @@ const {
   evidenceCount,
   filteredCount,
   isInitialized
-} = organizerStore;
+} = storeToRefs(organizerStore);
 
 // Methods
 const handleSearch = (value) => {
