@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia';
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
 
 // Import decomposed stores
 import { useOrganizerCoreStore } from './organizerCore.js';
+import { useOrganizerQueryStore } from './organizerQueryStore.js';
 import { useCategoryStore } from './categoryStore.js';
 import { useTagStore } from './tagStore.js';
 import { useMigrationStore } from './migrationStore.js';
@@ -17,14 +18,24 @@ import { useMigrationStore } from './migrationStore.js';
 export const useOrganizerStore = defineStore('organizer', () => {
   // Get store instances
   const coreStore = useOrganizerCoreStore();
+  const queryStore = useOrganizerQueryStore();
   const categoryStore = useCategoryStore();
   const tagStore = useTagStore();
   const migrationStore = useMigrationStore();
   const authStore = useAuthStore();
 
+  // Watch core store evidence changes to update query store
+  watch(
+    () => coreStore.evidenceList,
+    () => {
+      queryStore.initializeFilters();
+    },
+    { deep: true }
+  );
+
   // Computed properties combining data from multiple stores
   const evidenceCount = computed(() => coreStore.evidenceCount);
-  const filteredCount = computed(() => coreStore.filteredCount);
+  const filteredCount = computed(() => queryStore.filteredCount);
   const isInitialized = computed(() => 
     coreStore.isInitialized && categoryStore.isInitialized
   );
@@ -152,7 +163,7 @@ export const useOrganizerStore = defineStore('organizer', () => {
    * Legacy method: Get all tags for display (backward compatibility)
    */
   const getAllTags = (evidence) => {
-    return coreStore.getAllTags(evidence);
+    return queryStore.getAllTags(evidence);
   };
 
   /**
@@ -160,6 +171,7 @@ export const useOrganizerStore = defineStore('organizer', () => {
    */
   const reset = () => {
     coreStore.reset();
+    queryStore.reset();
     categoryStore.reset();
     migrationStore.reset();
   };
@@ -167,12 +179,12 @@ export const useOrganizerStore = defineStore('organizer', () => {
   // Return interface maintaining backward compatibility + new features
   return {
     // === BACKWARD COMPATIBILITY - Existing v1.0 Interface ===
-    // State (delegated to core store)
+    // State (delegated to stores)
     evidenceList: computed(() => coreStore.evidenceList),
-    filteredEvidence: computed(() => coreStore.filteredEvidence),
+    filteredEvidence: computed(() => queryStore.filteredEvidence),
     loading: computed(() => coreStore.loading || categoryStore.loading),
     error: computed(() => coreStore.error || categoryStore.error),
-    filterText: computed(() => coreStore.filterText),
+    filterText: computed(() => queryStore.filterText),
     isInitialized,
 
     // Computed (delegated)
@@ -184,15 +196,16 @@ export const useOrganizerStore = defineStore('organizer', () => {
     updateEvidenceTags,
     addTag,
     removeTag,
-    setFilter: coreStore.setFilter,
-    clearFilters: coreStore.clearFilters,
+    setFilter: queryStore.setFilter,
+    clearFilters: queryStore.clearFilters,
     reset,
     getDisplayInfo: coreStore.getDisplayInfo,
     getAllTags,
 
     // === NEW v1.1 FEATURES ===
-    // Core store access
+    // Store access
     core: coreStore,
+    query: queryStore,
     
     // Category management
     categories: computed(() => categoryStore.categories),
@@ -214,9 +227,9 @@ export const useOrganizerStore = defineStore('organizer', () => {
     groupTagsByCategory: tagStore.groupTagsByCategory,
     
     // Advanced filtering
-    applyFiltersWithCategories: coreStore.applyFiltersWithCategories,
-    getStructuredTagsByCategory: coreStore.getStructuredTagsByCategory,
-    hasAnyTags: coreStore.hasAnyTags,
+    applyFiltersWithCategories: queryStore.applyFiltersWithCategories,
+    getStructuredTagsByCategory: queryStore.getStructuredTagsByCategory,
+    hasAnyTags: queryStore.hasAnyTags,
     
     // Migration features
     migrationStatus: computed(() => migrationStore.migrationStatus),
@@ -232,6 +245,7 @@ export const useOrganizerStore = defineStore('organizer', () => {
     // Store references for advanced usage
     stores: {
       core: coreStore,
+      query: queryStore,
       category: categoryStore,
       tag: tagStore,
       migration: migrationStore

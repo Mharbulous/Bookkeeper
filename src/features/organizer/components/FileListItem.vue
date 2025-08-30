@@ -36,84 +36,29 @@
         </div>
 
         <!-- Tags section -->
-        <div class="tags-section">
-          <TagSelector
-            v-if="!readonly"
-            :evidence="evidence"
-            :loading="tagUpdateLoading"
-            class="tag-selector"
-            @tags-updated="handleTagsUpdate"
-            @migrate-legacy="handleMigrateLegacy"
-          />
-          <div v-else-if="tags && tags.length > 0" class="tags-readonly">
-            <v-chip
-              v-for="tag in tags"
-              :key="tag"
-              size="small"
-              variant="outlined"
-              color="primary"
-              class="ma-1"
-            >
-              {{ tag }}
-            </v-chip>
-          </div>
-          <div v-else-if="readonly" class="no-tags">
-            <small class="text-medium-emphasis">No tags</small>
-          </div>
-        </div>
+        <FileListItemTags
+          :evidence="evidence"
+          :readonly="readonly"
+          :tag-update-loading="tagUpdateLoading"
+          :tag-input-placeholder="tagInputPlaceholder"
+          @tags-update="handleTagsUpdate"
+          @migrate-legacy="handleMigrateLegacy"
+          @tag-error="handleTagError"
+        />
 
         <!-- Actions section -->
-        <div v-if="showActions" class="file-actions">
-          <v-btn
-            icon
-            variant="text"
-            size="small"
-            :disabled="actionLoading"
-            @click.stop="handleDownload"
-          >
-            <v-icon>mdi-download</v-icon>
-            <v-tooltip activator="parent">Download</v-tooltip>
-          </v-btn>
-          <v-menu>
-            <template #activator="{ props }">
-              <v-btn
-                icon
-                variant="text"
-                size="small"
-                :disabled="actionLoading"
-                v-bind="props"
-                @click.stop
-              >
-                <v-icon>mdi-dots-vertical</v-icon>
-              </v-btn>
-            </template>
-            <v-list>
-              <v-list-item @click="handleRename">
-                <template #prepend>
-                  <v-icon>mdi-pencil</v-icon>
-                </template>
-                <v-list-item-title>Rename</v-list-item-title>
-              </v-list-item>
-              <v-list-item @click="handleViewDetails">
-                <template #prepend>
-                  <v-icon>mdi-information</v-icon>
-                </template>
-                <v-list-item-title>Details</v-list-item-title>
-              </v-list-item>
-              <v-divider />
-              <v-list-item
-                v-if="!readonly"
-                @click="handleDelete"
-                class="text-error"
-              >
-                <template #prepend>
-                  <v-icon color="error">mdi-delete</v-icon>
-                </template>
-                <v-list-item-title>Delete</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-        </div>
+        <FileListItemActions
+          :evidence="evidence"
+          :readonly="readonly"
+          :show-actions="showActions"
+          :action-loading="actionLoading"
+          :ai-processing="aiProcessing"
+          @download="handleDownload"
+          @rename="handleRename"
+          @view-details="handleViewDetails"
+          @delete="handleDelete"
+          @process-with-ai="handleProcessWithAI"
+        />
       </div>
     </v-card-text>
 
@@ -131,7 +76,8 @@
 
 <script setup>
 import { computed } from 'vue';
-import TagSelector from './TagSelector.vue';
+import FileListItemTags from './FileListItemTags.vue';
+import FileListItemActions from './FileListItemActions.vue';
 
 // Props
 const props = defineProps({
@@ -172,6 +118,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  aiProcessing: {
+    type: Boolean,
+    default: false,
+  },
   
   // Customization
   tagInputPlaceholder: {
@@ -184,12 +134,14 @@ const props = defineProps({
 const emit = defineEmits([
   'tags-update',
   'tag-error',
+  'migrate-legacy',
   'click',
   'download',
   'rename',
   'view-details',
   'delete',
   'selection-change',
+  'process-with-ai',
 ]);
 
 // Computed properties
@@ -204,9 +156,6 @@ const fileExtension = computed(() => {
     : '';
 });
 
-const tags = computed(() => {
-  return props.evidence?.tags || [];
-});
 
 const processingStage = computed(() => {
   return props.evidence?.processingStage || 'uploaded';
@@ -293,14 +242,12 @@ const handleClick = () => {
   emit('click', props.evidence);
 };
 
-const handleTagsUpdate = () => {
-  // TagSelector handles the update internally, just emit for refresh
-  emit('tags-update', props.evidence.id, []);
+const handleTagsUpdate = (evidenceId, tags) => {
+  emit('tags-update', evidenceId, tags);
 };
 
-const handleMigrateLegacy = () => {
-  // TODO: Implement migration dialog
-  console.log('Legacy tag migration requested for:', props.evidence.id);
+const handleMigrateLegacy = (evidenceId) => {
+  emit('migrate-legacy', evidenceId);
 };
 
 const handleTagError = (error) => {
@@ -325,6 +272,10 @@ const handleDelete = () => {
 
 const handleSelectionChange = (selected) => {
   emit('selection-change', props.evidence.id, selected);
+};
+
+const handleProcessWithAI = () => {
+  emit('process-with-ai', props.evidence);
 };
 </script>
 
@@ -389,31 +340,6 @@ const handleSelectionChange = (selected) => {
   margin-top: 4px;
 }
 
-.tags-section {
-  flex: 2;
-  min-width: 200px;
-}
-
-.tags-readonly {
-  min-height: 32px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.no-tags {
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-}
-
-.file-actions {
-  flex-shrink: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-}
 
 .selection-indicator {
   position: absolute;
@@ -432,14 +358,6 @@ const handleSelectionChange = (selected) => {
     gap: 16px;
   }
   
-  .tags-section {
-    min-width: 0;
-  }
-  
-  .file-actions {
-    align-self: stretch;
-    justify-content: flex-end;
-  }
 }
 
 /* Compact mode */
@@ -456,7 +374,4 @@ const handleSelectionChange = (selected) => {
   gap: 2px;
 }
 
-.file-list-item.compact .tags-section {
-  min-width: 150px;
-}
 </style>

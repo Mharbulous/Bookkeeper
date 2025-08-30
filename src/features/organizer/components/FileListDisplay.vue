@@ -7,7 +7,7 @@
       </div>
       <div class="list-controls">
         <v-btn-toggle
-          :model-value="viewMode"
+          :model-value="props.viewMode"
           mandatory
           variant="outlined"
           size="small"
@@ -26,17 +26,18 @@
     <!-- File list/grid -->
     <div class="file-display">
       <!-- List view -->
-      <div v-if="viewMode === 'list'" class="file-list">
-        <FileItem
-          v-for="evidence in filteredEvidence"
+      <div v-if="props.viewMode === 'list'" class="file-list">
+        <FileListItem
+          v-for="evidence in props.filteredEvidence"
           :key="evidence.id"
           :evidence="evidence"
-          :evidence-tags="getEvidenceTags(evidence)"
-          :loading="getTagUpdateLoading(evidence.id)"
+          :tagUpdateLoading="props.getTagUpdateLoading(evidence.id)"
+          :aiProcessing="props.getAIProcessing(evidence.id)"
           @tags-update="(evidenceId, newTags) => $emit('tagsUpdate', evidenceId, newTags)"
           @download="$emit('download', $event)"
           @rename="$emit('rename', $event)"
           @view-details="$emit('viewDetails', $event)"
+          @process-with-ai="$emit('processWithAI', $event)"
         />
       </div>
 
@@ -51,10 +52,10 @@
 </template>
 
 <script setup>
-import FileItem from './FileItem.vue';
+import FileListItem from './FileListItem.vue';
 
 // Props
-defineProps({
+const props = defineProps({
   filteredEvidence: {
     type: Array,
     default: () => [],
@@ -71,12 +72,17 @@ defineProps({
     type: Function,
     required: true,
   },
+  getAIProcessing: {
+    type: Function,
+    required: true,
+  },
 });
 
 // Emits
 defineEmits([
   'update:viewMode',
   'tagsUpdate',
+  'processWithAI',
   'download',
   'rename',
   'viewDetails',

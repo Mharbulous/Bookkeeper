@@ -6,17 +6,13 @@ import {
   updateDoc, 
   deleteDoc, 
   getDoc, 
-  getDocs,
-  query, 
-  where, 
-  orderBy, 
   serverTimestamp,
   writeBatch
 } from 'firebase/firestore';
 
 /**
- * Evidence Service - Manages evidence documents in Firestore
- * Handles creation, updating, and management of evidence entries that reference uploaded files
+ * Evidence Service - Manages core CRUD operations for evidence documents in Firestore
+ * Handles creation, updating, deletion, and basic retrieval of evidence entries
  */
 export class EvidenceService {
   constructor(teamId) {
@@ -267,127 +263,6 @@ export class EvidenceService {
     } catch (error) {
       console.error('[EvidenceService] Failed to get evidence:', error);
       throw error;
-    }
-  }
-
-  /**
-   * Find evidence documents by file hash
-   * @param {string} fileHash - File hash from upload system
-   * @returns {Promise<Array>} - Array of evidence documents
-   */
-  async findEvidenceByHash(fileHash) {
-    try {
-      const evidenceRef = collection(db, 'teams', this.teamId, 'evidence');
-      const q = query(
-        evidenceRef,
-        where('storageRef.fileHash', '==', fileHash),
-        orderBy('createdAt', 'desc')
-      );
-
-      const querySnapshot = await getDocs(q);
-      const evidenceList = [];
-
-      querySnapshot.forEach((doc) => {
-        evidenceList.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-
-      return evidenceList;
-    } catch (error) {
-      console.error('[EvidenceService] Failed to find evidence by hash:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Migrate existing upload metadata to evidence documents
-   * @param {Array} uploadMetadataList - List of existing upload metadata
-   * @returns {Promise<Object>} - Migration results
-   */
-  async migrateUploadsToEvidence(uploadMetadataList) {
-    try {
-      console.log(`[EvidenceService] Starting migration of ${uploadMetadataList.length} uploads`);
-
-      const results = {
-        successful: [],
-        skipped: [],
-        failed: []
-      };
-
-      for (const uploadMeta of uploadMetadataList) {
-        try {
-          // Check if evidence already exists for this file hash
-          const existingEvidence = await this.findEvidenceByHash(uploadMeta.hash);
-          
-          if (existingEvidence.length > 0) {
-            results.skipped.push({
-              hash: uploadMeta.hash,
-              reason: 'Evidence already exists'
-            });
-            continue;
-          }
-
-          // Create evidence document
-          const evidenceId = await this.createEvidenceFromUpload(uploadMeta);
-          results.successful.push({
-            evidenceId,
-            hash: uploadMeta.hash,
-            originalName: uploadMeta.originalName
-          });
-
-        } catch (error) {
-          console.error(`[EvidenceService] Failed to migrate ${uploadMeta.originalName}:`, error);
-          results.failed.push({
-            hash: uploadMeta.hash,
-            originalName: uploadMeta.originalName,
-            error: error.message
-          });
-        }
-      }
-
-      console.log(`[EvidenceService] Migration complete:`, {
-        successful: results.successful.length,
-        skipped: results.skipped.length,
-        failed: results.failed.length
-      });
-
-      return results;
-    } catch (error) {
-      console.error('[EvidenceService] Migration failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get available original names for a file hash (for displayName dropdown)
-   * @param {string} fileHash - File hash from upload system
-   * @param {string} matterId - Matter ID (defaults to 'general')
-   * @returns {Promise<Array<string>>} - Array of original filenames
-   */
-  async getAvailableOriginalNames(fileHash, matterId = 'general') {
-    try {
-      const originalMetadataRef = collection(db, 'teams', this.teamId, 'matters', matterId, 'originalMetadata');
-      const q = query(
-        originalMetadataRef,
-        where('fileHash', '==', fileHash)
-      );
-
-      const querySnapshot = await getDocs(q);
-      const originalNames = [];
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.originalName && !originalNames.includes(data.originalName)) {
-          originalNames.push(data.originalName);
-        }
-      });
-
-      return originalNames;
-    } catch (error) {
-      console.error('[EvidenceService] Failed to get available original names:', error);
-      return [];
     }
   }
 }

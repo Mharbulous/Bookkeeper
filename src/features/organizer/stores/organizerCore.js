@@ -7,10 +7,8 @@ import { useAuthStore } from '../../../core/stores/auth.js';
 export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   // State
   const evidenceList = ref([]);
-  const filteredEvidence = ref([]);
   const loading = ref(false);
   const error = ref(null);
-  const filterText = ref('');
   const isInitialized = ref(false);
   
   // Cache for display information
@@ -21,7 +19,6 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
 
   // Computed
   const evidenceCount = computed(() => evidenceList.value.length);
-  const filteredCount = computed(() => filteredEvidence.value.length);
 
   /**
    * Fetch display information from originalMetadata collection
@@ -112,11 +109,13 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
           }
 
           evidenceList.value = evidence;
-          applyFilters(); // Update filtered results
           loading.value = false;
           isInitialized.value = true;
 
           console.log(`[OrganizerCore] Loaded ${evidence.length} evidence documents with display info`);
+          
+          // Notify query store to update filters if it exists
+          notifyDataChange();
         },
         (err) => {
           console.error('[OrganizerCore] Error loading evidence:', err);
@@ -135,155 +134,17 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   };
 
   /**
-   * Apply text-based filtering to evidence list
+   * Notify external stores that data has changed
+   * This allows the query store to update its filters
    */
-  const applyFilters = () => {
-    if (!filterText.value.trim()) {
-      filteredEvidence.value = [...evidenceList.value];
-      return;
-    }
-
-    const searchTerm = filterText.value.toLowerCase().trim();
-    
-    filteredEvidence.value = evidenceList.value.filter((evidence) => {
-      // Search in display name
-      if (evidence.displayName?.toLowerCase().includes(searchTerm)) {
-        return true;
-      }
-
-      // Extract and search in file extension from displayName
-      const fileExtension = evidence.displayName?.includes('.')
-        ? '.' + evidence.displayName.split('.').pop().toLowerCase()
-        : '';
-      
-      if (fileExtension.includes(searchTerm)) {
-        return true;
-      }
-
-      // Search in structured tags (tagsByHuman and tagsByAI)
-      const structuredTags = [...(evidence.tagsByHuman || []), ...(evidence.tagsByAI || [])];
-      if (structuredTags.some(tag => 
-        tag.tagName?.toLowerCase().includes(searchTerm) ||
-        tag.categoryName?.toLowerCase().includes(searchTerm)
-      )) {
-        return true;
-      }
-
-      // Search in legacy tags for backward compatibility
-      if (evidence.tags && Array.isArray(evidence.tags)) {
-        if (evidence.tags.some(tag => 
-          tag.toLowerCase().includes(searchTerm)
-        )) {
-          return true;
-        }
-      }
-
-      // Search in legacy tags array
-      if (evidence.legacyTags && Array.isArray(evidence.legacyTags)) {
-        if (evidence.legacyTags.some(tag => 
-          tag.toLowerCase().includes(searchTerm)
-        )) {
-          return true;
-        }
-      }
-
-      return false;
-    });
-
-    console.log(`[OrganizerCore] Filtered ${filteredEvidence.value.length} from ${evidenceList.value.length} documents`);
+  const notifyDataChange = () => {
+    // This will be called when evidence data changes
+    // Query store can watch evidenceList to respond to changes
+    console.log(`[OrganizerCore] Data change notification sent`);
   };
 
-  /**
-   * Apply category-based filtering
-   */
-  const applyFiltersWithCategories = (categoryFilters = {}) => {
-    if (!filterText.value.trim() && Object.keys(categoryFilters).length === 0) {
-      filteredEvidence.value = [...evidenceList.value];
-      return;
-    }
 
-    let filtered = [...evidenceList.value];
 
-    // Apply text search first
-    if (filterText.value.trim()) {
-      const searchTerm = filterText.value.toLowerCase().trim();
-      filtered = filtered.filter((evidence) => {
-        return evidence.displayName?.toLowerCase().includes(searchTerm) ||
-          getAllTags(evidence).some(tag => tag.toLowerCase().includes(searchTerm));
-      });
-    }
-
-    // Apply category filters
-    Object.entries(categoryFilters).forEach(([categoryId, selectedTags]) => {
-      if (selectedTags.length > 0) {
-        filtered = filtered.filter(evidence => {
-          const structuredTags = [...(evidence.tagsByHuman || []), ...(evidence.tagsByAI || [])];
-          return structuredTags.some(tag => 
-            tag.categoryId === categoryId && selectedTags.includes(tag.tagName)
-          );
-        });
-      }
-    });
-
-    filteredEvidence.value = filtered;
-    console.log(`[OrganizerCore] Applied category filters: ${filtered.length} results`);
-  };
-
-  /**
-   * Set filter text and apply filters
-   */
-  const setFilter = (text) => {
-    filterText.value = text;
-    applyFilters();
-  };
-
-  /**
-   * Clear all filters
-   */
-  const clearFilters = () => {
-    filterText.value = '';
-    applyFilters();
-  };
-
-  /**
-   * Get all tags (structured + legacy) for display purposes
-   */
-  const getAllTags = (evidence) => {
-    const structuredTags = [...(evidence.tagsByHuman || []), ...(evidence.tagsByAI || [])];
-    const structuredTagNames = structuredTags.map(tag => tag.tagName);
-    const legacyTags = evidence.legacyTags || evidence.tags || [];
-    
-    return [...structuredTagNames, ...legacyTags];
-  };
-
-  /**
-   * Get structured tags grouped by category for an evidence document
-   */
-  const getStructuredTagsByCategory = (evidence) => {
-    const allStructuredTags = [...(evidence.tagsByHuman || []), ...(evidence.tagsByAI || [])];
-    const grouped = {};
-    
-    allStructuredTags.forEach(tag => {
-      if (!grouped[tag.categoryId]) {
-        grouped[tag.categoryId] = {
-          categoryName: tag.categoryName,
-          tags: []
-        };
-      }
-      grouped[tag.categoryId].tags.push(tag);
-    });
-    
-    return grouped;
-  };
-
-  /**
-   * Check if evidence has any tags (structured or legacy)
-   */
-  const hasAnyTags = (evidence) => {
-    const hasStructured = (evidence.tagsByHuman?.length || 0) + (evidence.tagsByAI?.length || 0) > 0;
-    const hasLegacy = (evidence.legacyTags?.length || 0) + (evidence.tags?.length || 0) > 0;
-    return hasStructured || hasLegacy;
-  };
 
   /**
    * Get evidence document by ID
@@ -293,14 +154,61 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   };
 
   /**
+   * Update evidence data after external changes
+   * Called when evidence documents are modified externally
+   */
+  const refreshEvidence = async (evidenceId) => {
+    try {
+      const teamId = authStore.currentTeam;
+      if (!teamId || !evidenceId) return;
+
+      // Find the evidence in current list
+      const evidenceIndex = evidenceList.value.findIndex(e => e.id === evidenceId);
+      if (evidenceIndex === -1) return;
+
+      // Re-fetch display info to ensure cache is fresh
+      const evidence = evidenceList.value[evidenceIndex];
+      const displayInfo = await getDisplayInfo(evidence.displayCopy?.metadataHash, teamId);
+      
+      // Update the evidence with fresh display info
+      evidenceList.value[evidenceIndex] = {
+        ...evidence,
+        displayName: displayInfo.displayName,
+        createdAt: displayInfo.createdAt
+      };
+      
+      notifyDataChange();
+      console.log(`[OrganizerCore] Refreshed evidence ${evidenceId}`);
+    } catch (err) {
+      console.error('[OrganizerCore] Failed to refresh evidence:', err);
+    }
+  };
+
+  /**
+   * Clear display info cache
+   */
+  const clearDisplayCache = () => {
+    displayInfoCache.value.clear();
+    console.log('[OrganizerCore] Display info cache cleared');
+  };
+
+  /**
+   * Get cache statistics for monitoring
+   */
+  const getCacheStats = () => {
+    return {
+      size: displayInfoCache.value.size,
+      entries: Array.from(displayInfoCache.value.keys())
+    };
+  };
+
+  /**
    * Reset store to initial state
    */
   const reset = () => {
     evidenceList.value = [];
-    filteredEvidence.value = [];
     loading.value = false;
     error.value = null;
-    filterText.value = '';
     isInitialized.value = false;
     displayInfoCache.value.clear();
   };
@@ -308,27 +216,27 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   return {
     // State
     evidenceList,
-    filteredEvidence,
     loading,
     error,
-    filterText,
     isInitialized,
 
     // Computed
     evidenceCount,
-    filteredCount,
 
-    // Actions
+    // Core data management actions
     loadEvidence,
-    applyFilters,
-    applyFiltersWithCategories,
-    setFilter,
-    clearFilters,
     getDisplayInfo,
-    getAllTags,
-    getStructuredTagsByCategory,
-    hasAnyTags,
     getEvidenceById,
+    refreshEvidence,
+    
+    // Cache management
+    clearDisplayCache,
+    getCacheStats,
+    
+    // Data change notification
+    notifyDataChange,
+    
+    // Utility
     reset
   };
 });
