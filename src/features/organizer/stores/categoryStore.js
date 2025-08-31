@@ -1,304 +1,167 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import { collection, query, where, orderBy, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../../services/firebase.js';
-import { useAuthStore } from '../../../core/stores/auth.js';
-import { CategoryService } from '../services/categoryService.js';
+import { useCategoryCore } from './categoryCore.js';
+import { useCategoryColors } from './categoryColors.js';
+import { useCategoryValidation } from './categoryValidation.js';
+import { useCategoryComposables } from './categoryComposables.js';
 
+/**
+ * Main Category Store
+ * Integrates all category-related modules into a single Pinia store
+ */
 export const useCategoryStore = defineStore('category', () => {
-  // State
-  const categories = ref([]);
-  const loading = ref(false);
-  const error = ref(null);
-  const isInitialized = ref(false);
+  // Core functionality (state, CRUD operations)
+  const core = useCategoryCore();
   
-  // Auth store reference
-  const authStore = useAuthStore();
-
-  // Computed
-  const categoryCount = computed(() => categories.value.length);
-  const activeCategories = computed(() => categories.value.filter(cat => cat.isActive));
+  // Color management and utilities
+  const colors = useCategoryColors(core.categories);
   
-  // Default category colors palette
-  const defaultColors = [
-    '#1976d2', // Blue - Document Type
-    '#388e3c', // Green - Date/Period  
-    '#f57c00', // Orange - Institution
-    '#7b1fa2', // Purple
-    '#d32f2f', // Red
-    '#455a64', // Blue Grey
-    '#00796b', // Teal
-    '#f57f17', // Yellow
-    '#e91e63', // Pink
-    '#795548', // Brown
-  ];
+  // Validation and business rules
+  const validation = useCategoryValidation(core.categories);
 
-  /**
-   * Load categories from Firestore with real-time updates
-   */
-  const loadCategories = async () => {
-    if (!authStore.isAuthenticated) {
-      error.value = 'User not authenticated';
-      return;
-    }
-
+  // Enhanced createCategory with color and validation integration
+  const createCategoryWithEnhancements = async (categoryData) => {
     try {
-      loading.value = true;
-      error.value = null;
-
-      const teamId = authStore.currentTeam;
-      if (!teamId) {
-        throw new Error('No team ID available');
+      // Validate the category data
+      const validationErrors = validation.validateCategoryData(categoryData);
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join(', '));
       }
 
-      // Create query for categories collection
-      const categoriesRef = collection(db, 'teams', teamId, 'categories');
-      const categoriesQuery = query(
-        categoriesRef,
-        where('isActive', '==', true),
-        orderBy('createdAt', 'asc')
-      );
-
-      // Set up real-time listener
-      const unsubscribe = onSnapshot(
-        categoriesQuery,
-        async (snapshot) => {
-          const loadedCategories = [];
-          
-          snapshot.docs.forEach(doc => {
-            loadedCategories.push({
-              id: doc.id,
-              ...doc.data()
-            });
-          });
-
-          // If no categories exist, create default categories for first-time users
-          if (loadedCategories.length === 0) {
-            console.log('[CategoryStore] No categories found, creating defaults...');
-            try {
-              await CategoryService.createDefaultCategories(teamId);
-              // The onSnapshot will fire again after categories are created
-              return;
-            } catch (error) {
-              console.error('[CategoryStore] Failed to create default categories:', error);
-            }
-          }
-
-          categories.value = loadedCategories;
-          loading.value = false;
-          isInitialized.value = true;
-
-          console.log(`[CategoryStore] Loaded ${loadedCategories.length} categories`);
-        },
-        (err) => {
-          console.error('[CategoryStore] Error loading categories:', err);
-          error.value = err.message;
-          loading.value = false;
-        }
-      );
-
-      return unsubscribe;
-    } catch (err) {
-      console.error('[CategoryStore] Failed to load categories:', err);
-      error.value = err.message;
-      loading.value = false;
-    }
-  };
-
-  /**
-   * Create a new category
-   */
-  const createCategory = async (categoryData) => {
-    try {
-      if (!authStore.isAuthenticated) {
-        throw new Error('User not authenticated');
+      // Check category limit
+      const limitCheck = validation.validateCategoryLimit(core.categoryCount.value);
+      if (!limitCheck.canCreate) {
+        throw new Error(limitCheck.errors.join(', '));
       }
 
-      const teamId = authStore.currentTeam;
-      if (!teamId) {
-        throw new Error('No team ID available');
-      }
+      // Assign a safe color if not provided
+      const color = categoryData.color || colors.getSafeColor(categoryData.preferredColor);
 
-      // Validate required fields
-      if (!categoryData.name || !categoryData.name.trim()) {
-        throw new Error('Category name is required');
-      }
-
-      // Check for duplicate names
-      const existingCategory = categories.value.find(
-        cat => cat.name.toLowerCase() === categoryData.name.trim().toLowerCase()
-      );
-      if (existingCategory) {
-        throw new Error('Category name already exists');
-      }
-
-      // Assign default color if not provided
-      const color = categoryData.color || getNextDefaultColor();
-
-      const newCategory = {
-        name: categoryData.name.trim(),
+      // Sanitize the data
+      const sanitizedData = {
+        name: validation.sanitizeCategoryName(categoryData.name),
         color,
-        tags: categoryData.tags || [],
-        isActive: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        tags: (categoryData.tags || []).map(tag => ({
+          ...tag,
+          name: validation.sanitizeTagName(tag.name),
+          id: tag.id || crypto.randomUUID()
+        }))
       };
 
-      const categoriesRef = collection(db, 'teams', teamId, 'categories');
-      const docRef = await addDoc(categoriesRef, newCategory);
-
-      console.log(`[CategoryStore] Created category: ${categoryData.name}`);
-      return docRef.id;
-    } catch (err) {
-      console.error('[CategoryStore] Failed to create category:', err);
-      throw err;
-    }
-  };
-
-  /**
-   * Update an existing category
-   */
-  const updateCategory = async (categoryId, updates) => {
-    try {
-      if (!authStore.isAuthenticated) {
-        throw new Error('User not authenticated');
-      }
-
-      const teamId = authStore.currentTeam;
-      if (!teamId) {
-        throw new Error('No team ID available');
-      }
-
-      // Validate name if being updated
-      if (updates.name) {
-        const existingCategory = categories.value.find(
-          cat => cat.id !== categoryId && 
-          cat.name.toLowerCase() === updates.name.trim().toLowerCase()
-        );
-        if (existingCategory) {
-          throw new Error('Category name already exists');
+      // Validate tags if provided
+      if (sanitizedData.tags.length > 0) {
+        const tagErrors = validation.validateCategoryTags(sanitizedData.tags);
+        if (tagErrors.length > 0) {
+          throw new Error(tagErrors.join(', '));
         }
       }
 
-      const categoryRef = doc(db, 'teams', teamId, 'categories', categoryId);
-      await updateDoc(categoryRef, {
-        ...updates,
-        updatedAt: serverTimestamp()
-      });
-
-      console.log(`[CategoryStore] Updated category: ${categoryId}`);
-      return true;
-    } catch (err) {
-      console.error('[CategoryStore] Failed to update category:', err);
-      throw err;
+      // Create the category using core functionality
+      return await core.createCategory(sanitizedData);
+    } catch (error) {
+      console.error('[CategoryStore] Enhanced create failed:', error);
+      throw error;
     }
   };
 
-  /**
-   * Delete a category (soft delete)
-   */
-  const deleteCategory = async (categoryId) => {
+  // Enhanced updateCategory with validation
+  const updateCategoryWithEnhancements = async (categoryId, updates) => {
     try {
-      if (!authStore.isAuthenticated) {
-        throw new Error('User not authenticated');
+      // Validate updates if provided
+      if (Object.keys(updates).length > 0) {
+        const validationErrors = validation.validateCategoryData(updates, categoryId);
+        if (validationErrors.length > 0) {
+          throw new Error(validationErrors.join(', '));
+        }
       }
 
-      const teamId = authStore.currentTeam;
-      if (!teamId) {
-        throw new Error('No team ID available');
+      // Sanitize updates
+      const sanitizedUpdates = { ...updates };
+      if (updates.name) {
+        sanitizedUpdates.name = validation.sanitizeCategoryName(updates.name);
+      }
+      if (updates.tags) {
+        sanitizedUpdates.tags = updates.tags.map(tag => ({
+          ...tag,
+          name: validation.sanitizeTagName(tag.name),
+          id: tag.id || crypto.randomUUID()
+        }));
       }
 
-      const categoryRef = doc(db, 'teams', teamId, 'categories', categoryId);
-      await updateDoc(categoryRef, {
-        isActive: false,
-        updatedAt: serverTimestamp()
-      });
-
-      console.log(`[CategoryStore] Deleted category: ${categoryId}`);
-      return true;
-    } catch (err) {
-      console.error('[CategoryStore] Failed to delete category:', err);
-      throw err;
+      // Use core functionality
+      return await core.updateCategory(categoryId, sanitizedUpdates);
+    } catch (error) {
+      console.error('[CategoryStore] Enhanced update failed:', error);
+      throw error;
     }
   };
 
-  /**
-   * Get next available default color
-   */
-  const getNextDefaultColor = () => {
-    const usedColors = categories.value.map(cat => cat.color);
-    const availableColor = defaultColors.find(color => !usedColors.includes(color));
-    return availableColor || defaultColors[0]; // Fallback to first color if all used
+  // Enhanced deleteCategory with validation
+  const deleteCategoryWithEnhancements = async (categoryId) => {
+    try {
+      // Check if category can be deleted
+      const deleteCheck = validation.canDeleteCategory(categoryId);
+      if (!deleteCheck.canDelete) {
+        throw new Error(deleteCheck.errors.join(', '));
+      }
+
+      // Use core functionality
+      return await core.deleteCategory(categoryId);
+    } catch (error) {
+      console.error('[CategoryStore] Enhanced delete failed:', error);
+      throw error;
+    }
   };
 
-  /**
-   * Generate color variation for tags within a category
-   */
-  const generateTagColor = (baseColor, index = 0) => {
-    // Simple color variation by adjusting lightness
-    const variations = [
-      baseColor, // Original color
-      adjustColor(baseColor, -20), // Darker
-      adjustColor(baseColor, 20),  // Lighter
-      adjustColor(baseColor, -40), // Much darker
-      adjustColor(baseColor, 40),  // Much lighter
-    ];
-    
-    return variations[index % variations.length] || baseColor;
+  // Create store instance for composables
+  const storeInstance = {
+    ...core,
+    // Override with enhanced methods
+    createCategory: createCategoryWithEnhancements,
+    updateCategory: updateCategoryWithEnhancements,
+    deleteCategory: deleteCategoryWithEnhancements
   };
 
-  /**
-   * Adjust color brightness
-   */
-  const adjustColor = (hexColor, percent) => {
-    const num = parseInt(hexColor.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = (num >> 16) + amt;
-    const G = (num >> 8 & 0x00FF) + amt;
-    const B = (num & 0x0000FF) + amt;
-    
-    return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-      (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
-  };
-
-  /**
-   * Get category by ID
-   */
-  const getCategoryById = (categoryId) => {
-    return categories.value.find(cat => cat.id === categoryId);
-  };
-
-  /**
-   * Reset store to initial state
-   */
-  const reset = () => {
-    categories.value = [];
-    loading.value = false;
-    error.value = null;
-    isInitialized.value = false;
-  };
+  // Advanced composables (only expose the functions, not all returned values)
+  const composables = useCategoryComposables(storeInstance);
 
   return {
-    // State
-    categories,
-    loading,
-    error,
-    isInitialized,
+    // Core state and computed
+    categories: core.categories,
+    loading: core.loading,
+    error: core.error,
+    isInitialized: core.isInitialized,
+    categoryCount: core.categoryCount,
+    activeCategories: core.activeCategories,
 
-    // Computed
-    categoryCount,
-    activeCategories,
-    defaultColors,
+    // Core actions (enhanced versions)
+    loadCategories: core.loadCategories,
+    createCategory: createCategoryWithEnhancements,
+    updateCategory: updateCategoryWithEnhancements,
+    deleteCategory: deleteCategoryWithEnhancements,
+    getCategoryById: core.getCategoryById,
+    reset: core.reset,
 
-    // Actions
-    loadCategories,
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    getCategoryById,
-    generateTagColor,
-    getNextDefaultColor,
-    reset
+    // Color utilities
+    defaultColors: colors.defaultColors,
+    getNextDefaultColor: colors.getNextDefaultColor,
+    generateTagColor: colors.generateTagColor,
+    adjustColor: colors.adjustColor,
+    isValidHexColor: colors.isValidHexColor,
+    getContrastingTextColor: colors.getContrastingTextColor,
+    getSafeColor: colors.getSafeColor,
+
+    // Validation utilities
+    validateCategoryData: validation.validateCategoryData,
+    validateCategoryName: validation.validateCategoryName,
+    sanitizeCategoryName: validation.sanitizeCategoryName,
+    sanitizeTagName: validation.sanitizeTagName,
+    canDeleteCategory: validation.canDeleteCategory,
+    hasChanges: validation.hasChanges,
+
+    // Advanced composables
+    useFilteredCategories: composables.useFilteredCategories,
+    useCategoryStats: composables.useCategoryStats,
+    useCategoryForm: composables.useCategoryForm,
+    useCategorySelection: composables.useCategorySelection
   };
 });
