@@ -1,7 +1,7 @@
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { EvidenceDocumentService } from './evidenceDocumentService.js';
-import { TagSubcollectionService } from './tagSubcollectionService.js';
+import tagSubcollectionService from './tagSubcollectionService.js';
 
 /**
  * Tag Operation Service - Handles tag approval/rejection workflow operations
@@ -11,7 +11,7 @@ export class TagOperationService {
   constructor(teamId = null) {
     this.teamId = teamId;
     this.evidenceService = new EvidenceDocumentService(teamId);
-    this.tagService = new TagSubcollectionService(teamId);
+    this.tagService = tagSubcollectionService;
   }
 
   /**

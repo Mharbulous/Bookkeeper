@@ -3,10 +3,12 @@ import { AIProcessingService } from './aiProcessingService.js';
 import { EvidenceDocumentService } from './evidenceDocumentService.js';
 import { TagOperationService } from './tagOperationService.js';
 import { FileProcessingService } from './fileProcessingService.js';
+import tagSubcollectionService from './tagSubcollectionService.js';
 
 /**
  * AI Tag Service - Handles AI-powered document categorization using Firebase Vertex AI
- * Orchestrates between specialized services for single document processing with manual triggers and approval workflow
+ * Orchestrates between specialized services for single document processing with confidence-based auto-approval
+ * Uses subcollection-based tag storage for improved scalability and performance
  */
 export class AITagService {
   constructor(teamId = null) {
@@ -43,9 +45,9 @@ export class AITagService {
   }
 
   /**
-   * Process a single document with AI to suggest tags within existing categories
+   * Process a single document with AI to suggest tags with confidence-based auto-approval
    * @param {string} evidenceId - Evidence document ID
-   * @returns {Promise<Object>} - Processing result with suggested tags
+   * @returns {Promise<Object>} - Processing result with suggested tags and approval stats
    */
   async processSingleDocument(evidenceId) {
     try {
@@ -71,17 +73,22 @@ export class AITagService {
       const extension = this.fileProcessingService.getFileExtension(evidence);
       const aiSuggestions = await this.aiProcessingService.generateTagSuggestions(fileContent, categories, evidence, extension);
 
-      // Store AI suggestions in evidence document
-      await this.evidenceService.storeAISuggestions(evidenceId, teamId, aiSuggestions);
+      // Store AI suggestions in subcollection with confidence-based auto-approval
+      const storedTags = await this.storeAISuggestionsWithConfidence(evidenceId, aiSuggestions);
 
-      console.log(`[AITagService] Processed document ${evidenceId}: ${aiSuggestions.length} suggestions`);
+      // Get approval statistics
+      const stats = await tagSubcollectionService.getTagStats(evidenceId);
+
+      console.log(`[AITagService] Processed document ${evidenceId}: ${aiSuggestions.length} suggestions, ${stats.autoApproved} auto-approved`);
 
       return {
         success: true,
         evidenceId,
-        suggestedTags: aiSuggestions,
+        suggestedTags: storedTags,
+        stats,
         processedAt: new Date(),
-        categories: categories.length
+        categories: categories.length,
+        autoApprovalThreshold: tagSubcollectionService.getConfidenceThreshold()
       };
 
     } catch (error) {
@@ -142,7 +149,37 @@ export class AITagService {
   }
 
   /**
-   * Store AI suggestions in evidence document
+   * Store AI suggestions in subcollection with confidence-based approval
+   * @param {string} evidenceId - Evidence document ID
+   * @param {Array} suggestions - AI tag suggestions with confidence scores
+   * @returns {Promise<Array>} - Array of stored tag documents
+   */
+  async storeAISuggestionsWithConfidence(evidenceId, suggestions) {
+    try {
+      // Transform suggestions to include confidence and metadata
+      const tagData = suggestions.map(suggestion => ({
+        tagName: suggestion.tagName || suggestion.name,
+        confidence: Math.round(suggestion.confidence || 0),
+        source: 'ai',
+        metadata: {
+          model: 'vertex-ai',
+          processingTime: suggestion.processingTime || 0,
+          context: suggestion.reasoning || ''
+        }
+      }));
+
+      // Store tags in subcollection (auto-approval handled by service)
+      const storedTags = await tagSubcollectionService.addTagsBatch(evidenceId, tagData);
+      
+      return storedTags;
+    } catch (error) {
+      console.error('[AITagService] Error storing AI suggestions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Store AI suggestions in evidence document (legacy method for compatibility)
    * @param {string} evidenceId - Evidence document ID
    * @param {string} teamId - Team ID
    * @param {Array} suggestions - AI tag suggestions
@@ -162,29 +199,99 @@ export class AITagService {
   }
 
   /**
-   * Approve an AI suggested tag - moves it from tagsByAI to tagsByHuman
+   * Get all tags for a document grouped by status
    * @param {string} evidenceId - Evidence document ID
-   * @param {Object} aiTag - AI tag to approve
-   * @returns {Promise<Object>} - Operation result
+   * @returns {Promise<Object>} - Tags grouped by status (pending, approved, rejected)
    */
-  async approveAITag(evidenceId, aiTag) {
-    const teamId = this.getTeamId();
-    return this.tagOperationService.approveAITag(evidenceId, teamId, aiTag);
+  async getTagsByStatus(evidenceId) {
+    return tagSubcollectionService.getTagsByStatus(evidenceId);
   }
 
   /**
-   * Reject an AI suggested tag - updates its status to rejected
+   * Get approved tags for a document
+   * @param {string} evidenceId - Evidence document ID
+   * @returns {Promise<Array>} - Array of approved tags
+   */
+  async getApprovedTags(evidenceId) {
+    return tagSubcollectionService.getApprovedTags(evidenceId);
+  }
+
+  /**
+   * Get pending tags for a document
+   * @param {string} evidenceId - Evidence document ID
+   * @returns {Promise<Array>} - Array of pending tags
+   */
+  async getPendingTags(evidenceId) {
+    return tagSubcollectionService.getPendingTags(evidenceId);
+  }
+
+  /**
+   * Approve an AI suggested tag using subcollection service
+   * @param {string} evidenceId - Evidence document ID
+   * @param {string} tagId - Tag ID to approve
+   * @returns {Promise<Object>} - Operation result
+   */
+  async approveAITag(evidenceId, tagId) {
+    return tagSubcollectionService.approveTag(evidenceId, tagId);
+  }
+
+  /**
+   * Reject an AI suggested tag using subcollection service
    * @param {string} evidenceId - Evidence document ID  
-   * @param {Object} aiTag - AI tag to reject
+   * @param {string} tagId - Tag ID to reject
    * @returns {Promise<Object>} - Operation result
    */
-  async rejectAITag(evidenceId, aiTag) {
-    const teamId = this.getTeamId();
-    return this.tagOperationService.rejectAITag(evidenceId, teamId, aiTag);
+  async rejectAITag(evidenceId, tagId) {
+    return tagSubcollectionService.rejectTag(evidenceId, tagId);
   }
 
   /**
-   * Process review changes from the AI review modal
+   * Bulk approve multiple tags
+   * @param {string} evidenceId - Evidence document ID
+   * @param {Array} tagIds - Array of tag IDs to approve
+   * @returns {Promise<Object>} - Operation result
+   */
+  async approveTagsBatch(evidenceId, tagIds) {
+    return tagSubcollectionService.approveTagsBatch(evidenceId, tagIds);
+  }
+
+  /**
+   * Bulk reject multiple tags
+   * @param {string} evidenceId - Evidence document ID
+   * @param {Array} tagIds - Array of tag IDs to reject
+   * @returns {Promise<Object>} - Operation result
+   */
+  async rejectTagsBatch(evidenceId, tagIds) {
+    return tagSubcollectionService.rejectTagsBatch(evidenceId, tagIds);
+  }
+
+  /**
+   * Get tag statistics for a document
+   * @param {string} evidenceId - Evidence document ID
+   * @returns {Promise<Object>} - Tag statistics
+   */
+  async getTagStats(evidenceId) {
+    return tagSubcollectionService.getTagStats(evidenceId);
+  }
+
+  /**
+   * Set confidence threshold for auto-approval
+   * @param {number} threshold - Confidence threshold (0-100)
+   */
+  setConfidenceThreshold(threshold) {
+    tagSubcollectionService.setConfidenceThreshold(threshold);
+  }
+
+  /**
+   * Get current confidence threshold
+   * @returns {number} - Current confidence threshold
+   */
+  getConfidenceThreshold() {
+    return tagSubcollectionService.getConfidenceThreshold();
+  }
+
+  /**
+   * Process review changes from the AI review modal (legacy compatibility)
    * @param {string} evidenceId - Evidence document ID
    * @param {Object} changes - Changes object with approved and rejected arrays
    * @returns {Promise<Object>} - Operation result

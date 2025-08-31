@@ -2,311 +2,413 @@ import {
   collection, 
   doc, 
   getDocs, 
-  getDoc, 
   addDoc, 
-  deleteDoc, 
   updateDoc, 
+  deleteDoc, 
   query, 
   where, 
   orderBy, 
   serverTimestamp,
-  onSnapshot,
-  writeBatch 
-} from 'firebase/firestore';
-import { db } from '../../../services/firebase.js';
-import { useAuthStore } from '../../../core/stores/auth.js';
+  writeBatch,
+  getDoc
+} from 'firebase/firestore'
+import { db } from '../../../services/firebase.js'
 
 /**
- * Tag Subcollection Service - Handles CRUD operations for tag subcollections
- * Provides operations for the new subcollection-based tag architecture
+ * Service for managing AI-generated tags in Firestore subcollections
+ * 
+ * Data Structure:
+ * /evidence/{docId}/aiTags/{tagId}
+ * 
+ * Tag Document Structure:
+ * {
+ *   tagName: string,           // The actual tag text
+ *   confidence: number,        // AI confidence score (0-100)
+ *   status: string,           // 'pending' | 'approved' | 'rejected'
+ *   autoApproved: boolean,    // Whether auto-approved by confidence threshold
+ *   createdAt: timestamp,     // When tag was generated
+ *   reviewedAt: timestamp,    // When tag was manually reviewed (if applicable)
+ *   source: string,          // 'ai' | 'manual' | 'bulk_import'
+ *   metadata: {              // Optional AI processing metadata
+ *     model: string,         // AI model used
+ *     processingTime: number,// Time taken to generate
+ *     context: string        // Additional context used
+ *   }
+ * }
  */
-export class TagSubcollectionService {
-  constructor(teamId = null) {
-    this.teamId = teamId;
+
+class TagSubcollectionService {
+  constructor() {
+    this.confidenceThreshold = 85 // Default auto-approval threshold
   }
 
   /**
-   * Get the current team ID from auth store if not provided in constructor
-   * @returns {string} - Current team ID
+   * Get reference to tags subcollection for a document
    */
-  getTeamId() {
-    if (this.teamId) {
-      return this.teamId;
-    }
-    
-    const authStore = useAuthStore();
-    if (!authStore.isAuthenticated) {
-      throw new Error('User not authenticated');
-    }
-    
-    return authStore.currentTeam;
+  getTagsCollection(docId) {
+    return collection(db, 'evidence', docId, 'aiTags')
   }
 
   /**
-   * Add a tag to an evidence document's subcollection
-   * @param {string} evidenceId - Evidence document ID
-   * @param {Object} tagData - Tag data object
-   * @returns {Promise<Object>} - Created tag with ID
+   * Get reference to a specific tag document
    */
-  async addTag(evidenceId, tagData) {
+  getTagDoc(docId, tagId) {
+    return doc(db, 'evidence', docId, 'aiTags', tagId)
+  }
+
+  /**
+   * Add a new AI-generated tag to a document
+   */
+  async addTag(docId, tagData) {
     try {
-      const teamId = this.getTeamId();
-      const tagsCollectionRef = collection(db, 'teams', teamId, 'evidence', evidenceId, 'tags');
+      const tagsCollection = this.getTagsCollection(docId)
       
-      const tagToAdd = {
-        categoryId: tagData.categoryId,
-        categoryName: tagData.categoryName,
+      // Determine if tag should be auto-approved based on confidence
+      const autoApproved = tagData.confidence >= this.confidenceThreshold
+      const status = autoApproved ? 'approved' : 'pending'
+      
+      const tagDoc = {
         tagName: tagData.tagName,
-        color: tagData.color,
-        source: tagData.source || 'human', // 'human' | 'ai'
+        confidence: tagData.confidence,
+        status: status,
+        autoApproved: autoApproved,
         createdAt: serverTimestamp(),
-        createdBy: tagData.createdBy || 'user-id',
-        ...(tagData.confidence && { confidence: tagData.confidence }), // Only for AI tags
-        ...(tagData.metadata && { metadata: tagData.metadata })
-      };
-
-      const docRef = await addDoc(tagsCollectionRef, tagToAdd);
-      
-      // Update evidence document's tag count and last tagged timestamp
-      await this.updateEvidenceTagMetadata(evidenceId, teamId);
-      
-      console.log(`[TagSubcollectionService] Added tag ${tagData.tagName} to ${evidenceId}`);
-      
-      return {
-        id: docRef.id,
-        ...tagToAdd
-      };
-    } catch (error) {
-      console.error('[TagSubcollectionService] Failed to add tag:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Remove a tag from an evidence document's subcollection
-   * @param {string} evidenceId - Evidence document ID
-   * @param {string} tagId - Tag document ID to remove
-   * @returns {Promise<void>}
-   */
-  async removeTag(evidenceId, tagId) {
-    try {
-      const teamId = this.getTeamId();
-      const tagDocRef = doc(db, 'teams', teamId, 'evidence', evidenceId, 'tags', tagId);
-      
-      await deleteDoc(tagDocRef);
-      
-      // Update evidence document's tag count and last tagged timestamp
-      await this.updateEvidenceTagMetadata(evidenceId, teamId);
-      
-      console.log(`[TagSubcollectionService] Removed tag ${tagId} from ${evidenceId}`);
-    } catch (error) {
-      console.error('[TagSubcollectionService] Failed to remove tag:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update a tag in an evidence document's subcollection
-   * @param {string} evidenceId - Evidence document ID
-   * @param {string} tagId - Tag document ID to update
-   * @param {Object} updates - Fields to update
-   * @returns {Promise<Object>} - Updated tag data
-   */
-  async updateTag(evidenceId, tagId, updates) {
-    try {
-      const teamId = this.getTeamId();
-      const tagDocRef = doc(db, 'teams', teamId, 'evidence', evidenceId, 'tags', tagId);
-      
-      const updateData = {
-        ...updates,
-        updatedAt: serverTimestamp()
-      };
-      
-      await updateDoc(tagDocRef, updateData);
-      
-      // Get updated tag data
-      const updatedTagSnap = await getDoc(tagDocRef);
-      
-      console.log(`[TagSubcollectionService] Updated tag ${tagId} in ${evidenceId}`);
-      
-      return {
-        id: updatedTagSnap.id,
-        ...updatedTagSnap.data()
-      };
-    } catch (error) {
-      console.error('[TagSubcollectionService] Failed to update tag:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get all tags for an evidence document
-   * @param {string} evidenceId - Evidence document ID
-   * @param {Object} options - Query options
-   * @returns {Promise<Array>} - Array of tag objects
-   */
-  async getTagsForEvidence(evidenceId, options = {}) {
-    try {
-      const teamId = this.getTeamId();
-      const tagsCollectionRef = collection(db, 'teams', teamId, 'evidence', evidenceId, 'tags');
-      
-      let q = query(tagsCollectionRef);
-      
-      // Apply filters if provided
-      if (options.source) {
-        q = query(q, where('source', '==', options.source));
+        source: tagData.source || 'ai',
+        metadata: tagData.metadata || {}
       }
-      
-      if (options.categoryId) {
-        q = query(q, where('categoryId', '==', options.categoryId));
+
+      // Add reviewed timestamp if auto-approved
+      if (autoApproved) {
+        tagDoc.reviewedAt = serverTimestamp()
       }
+
+      const docRef = await addDoc(tagsCollection, tagDoc)
+      return { id: docRef.id, ...tagDoc }
+    } catch (error) {
+      console.error('Error adding tag:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Add multiple tags in a batch operation
+   */
+  async addTagsBatch(docId, tagsArray) {
+    try {
+      const batch = writeBatch(db)
+      const tagsCollection = this.getTagsCollection(docId)
+      const addedTags = []
+
+      for (const tagData of tagsArray) {
+        // Determine if tag should be auto-approved based on confidence
+        const autoApproved = tagData.confidence >= this.confidenceThreshold
+        const status = autoApproved ? 'approved' : 'pending'
+        
+        const tagDoc = {
+          tagName: tagData.tagName,
+          confidence: tagData.confidence,
+          status: status,
+          autoApproved: autoApproved,
+          createdAt: serverTimestamp(),
+          source: tagData.source || 'ai',
+          metadata: tagData.metadata || {}
+        }
+
+        // Add reviewed timestamp if auto-approved
+        if (autoApproved) {
+          tagDoc.reviewedAt = serverTimestamp()
+        }
+
+        const newTagRef = doc(tagsCollection)
+        batch.set(newTagRef, tagDoc)
+        addedTags.push({ id: newTagRef.id, ...tagDoc })
+      }
+
+      await batch.commit()
+      return addedTags
+    } catch (error) {
+      console.error('Error adding tags batch:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Get all tags for a document
+   */
+  async getTags(docId, options = {}) {
+    try {
+      const tagsCollection = this.getTagsCollection(docId)
+      let q = query(tagsCollection, orderBy('createdAt', 'desc'))
+
+      // Filter by status if specified
+      if (options.status) {
+        q = query(tagsCollection, where('status', '==', options.status), orderBy('createdAt', 'desc'))
+      }
+
+      const querySnapshot = await getDocs(q)
+      const tags = []
       
-      // Default order by creation date
-      q = query(q, orderBy('createdAt', 'desc'));
-      
-      const querySnapshot = await getDocs(q);
-      
-      const tags = [];
       querySnapshot.forEach((doc) => {
         tags.push({
           id: doc.id,
           ...doc.data()
-        });
-      });
-      
-      console.log(`[TagSubcollectionService] Retrieved ${tags.length} tags for ${evidenceId}`);
-      return tags;
+        })
+      })
+
+      return tags
     } catch (error) {
-      console.error('[TagSubcollectionService] Failed to get tags for evidence:', error);
-      throw error;
+      console.error('Error getting tags:', error)
+      throw error
     }
   }
 
   /**
-   * Get human tags for an evidence document
-   * @param {string} evidenceId - Evidence document ID
-   * @returns {Promise<Array>} - Array of human tag objects
+   * Get tags grouped by status
    */
-  async getHumanTags(evidenceId) {
-    return await this.getTagsForEvidence(evidenceId, { source: 'human' });
-  }
-
-  /**
-   * Get AI tags for an evidence document
-   * @param {string} evidenceId - Evidence document ID
-   * @returns {Promise<Array>} - Array of AI tag objects
-   */
-  async getAITags(evidenceId) {
-    return await this.getTagsForEvidence(evidenceId, { source: 'ai' });
-  }
-
-  /**
-   * Update evidence document's tag metadata (count and last tagged timestamp)
-   * @param {string} evidenceId - Evidence document ID
-   * @param {string} teamId - Team ID
-   * @returns {Promise<void>}
-   */
-  async updateEvidenceTagMetadata(evidenceId, teamId) {
+  async getTagsByStatus(docId) {
     try {
-      const evidenceRef = doc(db, 'teams', teamId, 'evidence', evidenceId);
-      const tagsCollectionRef = collection(db, 'teams', teamId, 'evidence', evidenceId, 'tags');
+      const allTags = await this.getTags(docId)
       
-      // Get current tag count
-      const tagsSnapshot = await getDocs(tagsCollectionRef);
-      const tagCount = tagsSnapshot.size;
-      
-      // Update evidence document with tag count and timestamp
-      await updateDoc(evidenceRef, {
-        tagCount: tagCount,
-        lastTaggedAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error('[TagSubcollectionService] Failed to update evidence tag metadata:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Listen to real-time changes for tags in an evidence document
-   * @param {string} evidenceId - Evidence document ID
-   * @param {Function} callback - Callback function to handle updates
-   * @param {Object} options - Query options
-   * @returns {Function} - Unsubscribe function
-   */
-  subscribeToTags(evidenceId, callback, options = {}) {
-    try {
-      const teamId = this.getTeamId();
-      const tagsCollectionRef = collection(db, 'teams', teamId, 'evidence', evidenceId, 'tags');
-      
-      let q = query(tagsCollectionRef, orderBy('createdAt', 'desc'));
-      
-      // Apply filters if provided
-      if (options.source) {
-        q = query(q, where('source', '==', options.source));
+      return {
+        pending: allTags.filter(tag => tag.status === 'pending'),
+        approved: allTags.filter(tag => tag.status === 'approved'),
+        rejected: allTags.filter(tag => tag.status === 'rejected')
       }
-      
-      return onSnapshot(q, (querySnapshot) => {
-        const tags = [];
-        querySnapshot.forEach((doc) => {
-          tags.push({
-            id: doc.id,
-            ...doc.data()
-          });
-        });
-        
-        callback(tags);
-      });
     } catch (error) {
-      console.error('[TagSubcollectionService] Failed to subscribe to tags:', error);
-      throw error;
+      console.error('Error getting tags by status:', error)
+      throw error
     }
   }
 
   /**
-   * Batch add multiple tags to an evidence document
-   * @param {string} evidenceId - Evidence document ID
-   * @param {Array} tagDataArray - Array of tag data objects
-   * @returns {Promise<Array>} - Array of created tag IDs
+   * Get only approved tags for a document
    */
-  async addTagsBatch(evidenceId, tagDataArray) {
+  async getApprovedTags(docId) {
+    return await this.getTags(docId, { status: 'approved' })
+  }
+
+  /**
+   * Get only pending tags for a document
+   */
+  async getPendingTags(docId) {
+    return await this.getTags(docId, { status: 'pending' })
+  }
+
+  /**
+   * Update a tag's status (approve/reject)
+   */
+  async updateTagStatus(docId, tagId, newStatus) {
     try {
-      const teamId = this.getTeamId();
-      const batch = writeBatch(db);
-      const createdTagIds = [];
+      const tagRef = this.getTagDoc(docId, tagId)
       
-      for (const tagData of tagDataArray) {
-        const tagsCollectionRef = collection(db, 'teams', teamId, 'evidence', evidenceId, 'tags');
-        const newTagRef = doc(tagsCollectionRef);
-        
-        const tagToAdd = {
-          categoryId: tagData.categoryId,
-          categoryName: tagData.categoryName,
-          tagName: tagData.tagName,
-          color: tagData.color,
-          source: tagData.source || 'human',
-          createdAt: serverTimestamp(),
-          createdBy: tagData.createdBy || 'user-id',
-          ...(tagData.confidence && { confidence: tagData.confidence }),
-          ...(tagData.metadata && { metadata: tagData.metadata })
-        };
-        
-        batch.set(newTagRef, tagToAdd);
-        createdTagIds.push(newTagRef.id);
+      const updateData = {
+        status: newStatus,
+        reviewedAt: serverTimestamp()
       }
-      
-      await batch.commit();
-      
-      // Update evidence document's tag count and timestamp
-      await this.updateEvidenceTagMetadata(evidenceId, teamId);
-      
-      console.log(`[TagSubcollectionService] Batch added ${tagDataArray.length} tags to ${evidenceId}`);
-      return createdTagIds;
+
+      await updateDoc(tagRef, updateData)
+      return { id: tagId, ...updateData }
     } catch (error) {
-      console.error('[TagSubcollectionService] Failed to batch add tags:', error);
-      throw error;
+      console.error('Error updating tag status:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Approve a tag
+   */
+  async approveTag(docId, tagId) {
+    return await this.updateTagStatus(docId, tagId, 'approved')
+  }
+
+  /**
+   * Reject a tag
+   */
+  async rejectTag(docId, tagId) {
+    return await this.updateTagStatus(docId, tagId, 'rejected')
+  }
+
+  /**
+   * Bulk approve multiple tags
+   */
+  async approveTagsBatch(docId, tagIds) {
+    try {
+      const batch = writeBatch(db)
+      
+      for (const tagId of tagIds) {
+        const tagRef = this.getTagDoc(docId, tagId)
+        batch.update(tagRef, {
+          status: 'approved',
+          reviewedAt: serverTimestamp()
+        })
+      }
+
+      await batch.commit()
+      return { approved: tagIds.length }
+    } catch (error) {
+      console.error('Error approving tags batch:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Bulk reject multiple tags
+   */
+  async rejectTagsBatch(docId, tagIds) {
+    try {
+      const batch = writeBatch(db)
+      
+      for (const tagId of tagIds) {
+        const tagRef = this.getTagDoc(docId, tagId)
+        batch.update(tagRef, {
+          status: 'rejected',
+          reviewedAt: serverTimestamp()
+        })
+      }
+
+      await batch.commit()
+      return { rejected: tagIds.length }
+    } catch (error) {
+      console.error('Error rejecting tags batch:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete a tag
+   */
+  async deleteTag(docId, tagId) {
+    try {
+      const tagRef = this.getTagDoc(docId, tagId)
+      await deleteDoc(tagRef)
+      return { id: tagId, deleted: true }
+    } catch (error) {
+      console.error('Error deleting tag:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete all tags for a document
+   */
+  async deleteAllTags(docId) {
+    try {
+      const tags = await this.getTags(docId)
+      const batch = writeBatch(db)
+      
+      for (const tag of tags) {
+        const tagRef = this.getTagDoc(docId, tag.id)
+        batch.delete(tagRef)
+      }
+
+      await batch.commit()
+      return { deleted: tags.length }
+    } catch (error) {
+      console.error('Error deleting all tags:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Get tag statistics for a document
+   */
+  async getTagStats(docId) {
+    try {
+      const tags = await this.getTags(docId)
+      
+      const stats = {
+        total: tags.length,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        autoApproved: 0,
+        manuallyReviewed: 0,
+        avgConfidence: 0,
+        highConfidence: 0 // Count of tags above threshold
+      }
+
+      if (tags.length === 0) return stats
+
+      let confidenceSum = 0
+      
+      for (const tag of tags) {
+        stats[tag.status]++
+        
+        if (tag.autoApproved) {
+          stats.autoApproved++
+        }
+        
+        if (tag.reviewedAt && !tag.autoApproved) {
+          stats.manuallyReviewed++
+        }
+        
+        confidenceSum += tag.confidence
+        
+        if (tag.confidence >= this.confidenceThreshold) {
+          stats.highConfidence++
+        }
+      }
+
+      stats.avgConfidence = Math.round(confidenceSum / tags.length)
+      
+      return stats
+    } catch (error) {
+      console.error('Error getting tag stats:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Update confidence threshold for auto-approval
+   */
+  setConfidenceThreshold(threshold) {
+    this.confidenceThreshold = Math.max(0, Math.min(100, threshold))
+  }
+
+  /**
+   * Get current confidence threshold
+   */
+  getConfidenceThreshold() {
+    return this.confidenceThreshold
+  }
+
+  /**
+   * Check if a tag document exists
+   */
+  async tagExists(docId, tagId) {
+    try {
+      const tagRef = this.getTagDoc(docId, tagId)
+      const doc = await getDoc(tagRef)
+      return doc.exists()
+    } catch (error) {
+      console.error('Error checking tag existence:', error)
+      return false
+    }
+  }
+
+  /**
+   * Find duplicate tags by name
+   */
+  async findDuplicateTags(docId, tagName) {
+    try {
+      const tagsCollection = this.getTagsCollection(docId)
+      const q = query(tagsCollection, where('tagName', '==', tagName))
+      const querySnapshot = await getDocs(q)
+      
+      const duplicates = []
+      querySnapshot.forEach((doc) => {
+        duplicates.push({
+          id: doc.id,
+          ...doc.data()
+        })
+      })
+
+      return duplicates
+    } catch (error) {
+      console.error('Error finding duplicate tags:', error)
+      throw error
     }
   }
 }
 
-export default TagSubcollectionService;
+export default new TagSubcollectionService()

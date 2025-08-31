@@ -1,16 +1,16 @@
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { useCategoryStore } from '../stores/categoryStore.js';
-import { TagSubcollectionService } from './tagSubcollectionService.js';
+import tagSubcollectionService from './tagSubcollectionService.js';
 
 /**
  * Evidence Document Service - Handles evidence document operations and Firestore data retrieval
- * Provides document access, category management, and AI suggestion storage
+ * Provides document access, category management, and AI suggestion storage with subcollection support
  */
 export class EvidenceDocumentService {
   constructor(teamId = null) {
     this.teamId = teamId;
-    this.tagService = new TagSubcollectionService(teamId);
+    this.tagService = tagSubcollectionService;
   }
 
   /**
@@ -65,7 +65,7 @@ export class EvidenceDocumentService {
   }
 
   /**
-   * Store AI suggestions as subcollection tags with source: 'ai'
+   * Store AI suggestions as subcollection tags with confidence-based auto-approval
    * @param {string} evidenceId - Evidence document ID
    * @param {string} teamId - Team ID
    * @param {Array} suggestions - AI tag suggestions
@@ -73,25 +73,29 @@ export class EvidenceDocumentService {
    */
   async storeAISuggestions(evidenceId, teamId, suggestions) {
     try {
-      // Convert AI suggestions to subcollection tag format
+      // Convert AI suggestions to new subcollection tag format
       const aiTagsData = suggestions.map(suggestion => ({
-        categoryId: suggestion.categoryId,
-        categoryName: suggestion.categoryName,
-        tagName: suggestion.tagName,
-        color: suggestion.color,
+        tagName: suggestion.tagName || suggestion.name,
+        confidence: Math.round((suggestion.confidence || 0.8) * 100), // Convert to 0-100 scale
         source: 'ai',
-        confidence: suggestion.confidence || 0.8,
-        createdBy: 'ai-system',
         metadata: {
+          categoryId: suggestion.categoryId,
+          categoryName: suggestion.categoryName,
+          color: suggestion.color,
           reasoning: suggestion.reasoning,
-          status: suggestion.status || 'suggested',
-          suggestedAt: new Date()
+          model: 'vertex-ai',
+          processingTime: suggestion.processingTime || 0,
+          context: suggestion.reasoning || 'AI suggested based on document content'
         }
       }));
 
-      // Add tags to subcollection in batch
+      // Add tags to subcollection with auto-approval logic
       if (aiTagsData.length > 0) {
-        await this.tagService.addTagsBatch(evidenceId, aiTagsData);
+        const storedTags = await this.tagService.addTagsBatch(evidenceId, aiTagsData);
+        
+        // Get stats to log approval information
+        const stats = await this.tagService.getTagStats(evidenceId);
+        console.log(`[EvidenceDocumentService] Stored ${suggestions.length} AI suggestions: ${stats.autoApproved} auto-approved, ${stats.pending} pending review`);
       }
 
       // Update evidence document with AI processing metadata
@@ -101,7 +105,6 @@ export class EvidenceDocumentService {
         updatedAt: serverTimestamp()
       });
 
-      console.log(`[EvidenceDocumentService] Stored ${suggestions.length} AI suggestions as subcollection tags for ${evidenceId}`);
     } catch (error) {
       console.error('[EvidenceDocumentService] Failed to store AI suggestions:', error);
       throw error;
@@ -163,14 +166,70 @@ export class EvidenceDocumentService {
   }
 
   /**
-   * Get AI suggestions from subcollection (replaces embedded tagsByAI)
+   * Get all tags grouped by status from subcollection
    * @param {string} evidenceId - Evidence document ID
-   * @param {string} teamId - Team ID
-   * @returns {Promise<Array>} - Array of AI tag suggestions
+   * @returns {Promise<Object>} - Tags grouped by status {pending, approved, rejected}
+   */
+  async getTagsByStatus(evidenceId) {
+    try {
+      return await this.tagService.getTagsByStatus(evidenceId);
+    } catch (error) {
+      console.error('[EvidenceDocumentService] Failed to get tags by status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get approved tags from subcollection (replaces embedded tagsByHuman and approved AI tags)
+   * @param {string} evidenceId - Evidence document ID
+   * @returns {Promise<Array>} - Array of approved tags
+   */
+  async getApprovedTags(evidenceId) {
+    try {
+      return await this.tagService.getApprovedTags(evidenceId);
+    } catch (error) {
+      console.error('[EvidenceDocumentService] Failed to get approved tags:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get pending AI tags from subcollection
+   * @param {string} evidenceId - Evidence document ID
+   * @returns {Promise<Array>} - Array of pending AI tags
+   */
+  async getPendingAITags(evidenceId) {
+    try {
+      return await this.tagService.getPendingTags(evidenceId);
+    } catch (error) {
+      console.error('[EvidenceDocumentService] Failed to get pending AI tags:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get tag statistics for a document
+   * @param {string} evidenceId - Evidence document ID
+   * @returns {Promise<Object>} - Tag statistics
+   */
+  async getTagStats(evidenceId) {
+    try {
+      return await this.tagService.getTagStats(evidenceId);
+    } catch (error) {
+      console.error('[EvidenceDocumentService] Failed to get tag stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Legacy compatibility: Get AI suggestions (now returns pending tags)
+   * @param {string} evidenceId - Evidence document ID
+   * @param {string} teamId - Team ID (unused but kept for compatibility)
+   * @returns {Promise<Array>} - Array of pending AI tag suggestions
    */
   async getAISuggestions(evidenceId, teamId) {
     try {
-      return await this.tagService.getAITags(evidenceId);
+      return await this.tagService.getPendingTags(evidenceId);
     } catch (error) {
       console.error('[EvidenceDocumentService] Failed to get AI suggestions:', error);
       throw error;
@@ -178,14 +237,15 @@ export class EvidenceDocumentService {
   }
 
   /**
-   * Get human tags from subcollection (replaces embedded tagsByHuman)
+   * Legacy compatibility: Get human tags (now returns approved manual tags)
    * @param {string} evidenceId - Evidence document ID
-   * @param {string} teamId - Team ID
-   * @returns {Promise<Array>} - Array of human tags
+   * @param {string} teamId - Team ID (unused but kept for compatibility)
+   * @returns {Promise<Array>} - Array of approved manual tags
    */
   async getHumanTags(evidenceId, teamId) {
     try {
-      return await this.tagService.getHumanTags(evidenceId);
+      const approvedTags = await this.tagService.getApprovedTags(evidenceId);
+      return approvedTags.filter(tag => tag.source === 'manual');
     } catch (error) {
       console.error('[EvidenceDocumentService] Failed to get human tags:', error);
       throw error;

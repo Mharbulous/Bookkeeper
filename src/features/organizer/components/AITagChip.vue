@@ -51,8 +51,9 @@
         </div>
         <div class="tooltip-content">
           <div><strong>Category:</strong> {{ tag.categoryName }}</div>
-          <div v-if="tag.confidence">
-            <strong>Confidence:</strong> {{ Math.round(tag.confidence * 100) }}%
+          <div v-if="getConfidence()">
+            <strong>Confidence:</strong> {{ getConfidence() }}%
+            <span v-if="isAutoApproved()" class="auto-approved-badge">(Auto-approved)</span>
           </div>
           <div v-if="tag.reasoning">
             <strong>Reasoning:</strong> {{ tag.reasoning }}
@@ -100,11 +101,16 @@ const props = defineProps({
 // Computed properties
 const displayColor = computed(() => {
   const status = getTagStatus();
+  const confidence = getConfidence();
+  
   switch (status) {
     case 'suggested':
-      return 'orange-lighten-1';
+      // Color intensity based on confidence level
+      if (confidence >= 90) return 'orange-darken-1';
+      if (confidence >= 70) return 'orange-lighten-1';
+      return 'orange-lighten-2';
     case 'approved':
-      return props.tag.color || 'primary';
+      return isAutoApproved() ? 'green-lighten-1' : (props.tag.color || 'primary');
     case 'rejected':
       return 'grey-lighten-1';
     default:
@@ -125,11 +131,16 @@ const chipVariant = computed(() => {
 
 const aiIcon = computed(() => {
   const status = getTagStatus();
+  const confidence = getConfidence();
+  
   switch (status) {
     case 'suggested':
-      return 'mdi-robot-outline';
+      // Different icons based on confidence
+      if (confidence >= 85) return 'mdi-robot-excited';
+      if (confidence >= 70) return 'mdi-robot-outline';
+      return 'mdi-robot-confused';
     case 'approved':
-      return 'mdi-robot-happy';
+      return isAutoApproved() ? 'mdi-robot-industrial' : 'mdi-robot-happy';
     case 'rejected':
       return 'mdi-robot-off';
     default:
@@ -140,10 +151,12 @@ const aiIcon = computed(() => {
 const statusText = computed(() => {
   const status = getTagStatus();
   switch (status) {
-    case 'suggested':
+    case 'pending':
       return 'Awaiting Review';
+    case 'suggested':
+      return 'Awaiting Review'; // Legacy compatibility
     case 'approved':
-      return 'Approved';
+      return isAutoApproved() ? 'Auto-approved' : 'Approved';
     case 'rejected':
       return 'Rejected';
     default:
@@ -152,22 +165,23 @@ const statusText = computed(() => {
 });
 
 /**
- * Get tag status from either embedded format or subcollection format
+ * Get tag status from subcollection format (new) or embedded format (legacy)
  */
 const getTagStatus = () => {
-  // Check subcollection format first (metadata.status)
+  // Subcollection format - direct status property
+  if (props.tag.status) {
+    // Map 'pending' to 'suggested' for UI compatibility
+    return props.tag.status === 'pending' ? 'suggested' : props.tag.status;
+  }
+  
+  // Legacy embedded format - metadata.status
   if (props.tag.metadata?.status) {
     return props.tag.metadata.status;
   }
   
-  // Check if it's a human tag (source: 'human') that was approved from AI
+  // Check if it's a human tag that was approved from AI (legacy)
   if (props.tag.source === 'human' && props.tag.metadata?.originallyFromAI) {
     return 'approved';
-  }
-  
-  // Check embedded format (direct status property)
-  if (props.tag.status) {
-    return props.tag.status;
   }
   
   // Default for AI tags without explicit status
@@ -176,6 +190,30 @@ const getTagStatus = () => {
   }
   
   return 'unknown';
+};
+
+/**
+ * Get confidence score from either format
+ */
+const getConfidence = () => {
+  // Direct confidence property (subcollection format)
+  if (typeof props.tag.confidence === 'number') {
+    return Math.round(props.tag.confidence);
+  }
+  
+  // Legacy format with decimal confidence
+  if (props.tag.confidence && props.tag.confidence <= 1) {
+    return Math.round(props.tag.confidence * 100);
+  }
+  
+  return null;
+};
+
+/**
+ * Check if tag was auto-approved based on confidence
+ */
+const isAutoApproved = () => {
+  return props.tag.autoApproved === true;
 };
 
 // Helper functions
@@ -286,6 +324,13 @@ const getCreatedAt = () => {
 
 .ai-tag-chip--suggested:hover {
   animation: pulse-ai 1.5s infinite;
+}
+
+.auto-approved-badge {
+  font-size: 0.75em;
+  font-weight: 600;
+  color: rgba(76, 175, 80, 0.9);
+  margin-left: 4px;
 }
 
 /* Responsive adjustments */

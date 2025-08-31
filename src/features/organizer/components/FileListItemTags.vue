@@ -9,15 +9,28 @@
       @migrate-legacy="handleMigrateLegacy"
     />
     
-    <!-- Readonly view with both human and AI tags -->
+    <!-- Readonly view with confidence-based visual indicators -->
     <div v-else-if="hasAnyTags" class="tags-readonly">
-      <!-- Human tags -->
+      <!-- Pending AI tags notification (if any high confidence tags) -->
+      <div v-if="hasHighConfidencePendingTags && readonly" class="pending-tags-indicator">
+        <v-chip
+          size="small"
+          color="orange-lighten-1"
+          variant="tonal"
+          class="ma-1"
+        >
+          <v-icon size="14" class="mr-1">mdi-clock-fast</v-icon>
+          {{ pendingAITagsCount }} pending
+        </v-chip>
+      </div>
+      
+      <!-- Manual/Human tags -->
       <v-chip
         v-for="tag in structuredHumanTags"
-        :key="`human-${tag.categoryId}-${tag.tagName}`"
+        :key="`human-${tag.metadata?.categoryId || 'manual'}-${tag.tagName}`"
         size="small"
         variant="outlined"
-        :color="tag.color || 'primary'"
+        :color="tag.metadata?.color || 'primary'"
         class="ma-1 human-tag"
       >
         {{ tag.tagName }}
@@ -35,12 +48,18 @@
         {{ tag }}
       </v-chip>
       
-      <!-- AI tags with special styling -->
+      <!-- AI tags with confidence-based styling -->
       <AITagChip
         v-for="tag in structuredAITags"
-        :key="`ai-${tag.categoryId}-${tag.tagName}`"
+        :key="`ai-${tag.id || tag.tagName}-${tag.confidence}`"
         :tag="tag"
-        class="ma-1"
+        :show-status-actions="!readonly"
+        class="ma-1 ai-tag-item"
+        :class="{
+          'high-confidence': tag.confidence >= 85,
+          'medium-confidence': tag.confidence >= 70 && tag.confidence < 85,
+          'low-confidence': tag.confidence < 70
+        }"
       />
     </div>
     
@@ -54,7 +73,7 @@
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import TagSelector from './TagSelector.vue';
 import AITagChip from './AITagChip.vue';
-import { TagSubcollectionService } from '../services/tagSubcollectionService.js';
+import tagSubcollectionService from '../services/tagSubcollectionService.js';
 
 // Props
 const props = defineProps({
@@ -91,35 +110,47 @@ const emit = defineEmits([
 ]);
 
 // Services and local state
-const tagService = new TagSubcollectionService();
-const subcollectionTags = ref([]);
+const tagService = tagSubcollectionService;
+const pendingTags = ref([]);
+const approvedTags = ref([]);
+const rejectedTags = ref([]);
 const loadingTags = ref(false);
-const unsubscribeTags = ref(null);
 
 // Computed properties
 const structuredHumanTags = computed(() => {
-  if (subcollectionTags.value.length > 0) {
-    return subcollectionTags.value.filter(tag => tag.source === 'human');
+  // Get manually added tags (source: 'manual') and approved AI tags that should show as approved
+  const manualTags = approvedTags.value.filter(tag => tag.source === 'manual');
+  
+  // If no subcollection tags, fallback to embedded arrays for backward compatibility
+  if (manualTags.length === 0 && approvedTags.value.length === 0) {
+    return props.evidence?.tagsByHuman || [];
   }
-  // Fallback to embedded arrays for backward compatibility
-  return props.evidence?.tagsByHuman || [];
+  
+  return manualTags;
 });
 
 const structuredAITags = computed(() => {
-  if (subcollectionTags.value.length > 0) {
-    return subcollectionTags.value
-      .filter(tag => tag.source === 'ai')
-      .map(tag => ({
-        ...tag,
-        // Map subcollection format to expected AI tag format
-        status: tag.metadata?.status || 'suggested',
-        confidence: tag.confidence || 0.8,
-        reasoning: tag.metadata?.reasoning || 'AI suggested',
-        suggestedAt: tag.createdAt
-      }));
+  // Get all AI tags (pending, approved, rejected) with proper status mapping
+  const allAITags = [
+    ...pendingTags.value.map(tag => ({ ...tag, displayStatus: 'pending' })),
+    ...approvedTags.value.filter(tag => tag.source === 'ai').map(tag => ({ ...tag, displayStatus: 'approved' })),
+    ...rejectedTags.value.map(tag => ({ ...tag, displayStatus: 'rejected' }))
+  ];
+  
+  // If no subcollection tags, fallback to embedded arrays for backward compatibility
+  if (allAITags.length === 0) {
+    return props.evidence?.tagsByAI || [];
   }
-  // Fallback to embedded arrays for backward compatibility
-  return props.evidence?.tagsByAI || [];
+  
+  // Map to format expected by AITagChip component
+  return allAITags.map(tag => ({
+    ...tag,
+    status: tag.displayStatus || tag.status,
+    confidence: tag.confidence || 80,
+    reasoning: tag.metadata?.context || tag.reasoning || 'AI suggested',
+    suggestedAt: tag.createdAt,
+    categoryName: tag.metadata?.categoryName || 'Unknown Category'
+  }));
 });
 
 const legacyTags = computed(() => {
@@ -127,10 +158,25 @@ const legacyTags = computed(() => {
   return props.evidence?.tags || props.evidence?.legacyTags || [];
 });
 
+// Additional computed properties for confidence-based visual indicators
+const pendingAITagsCount = computed(() => pendingTags.value.length);
+
+const highConfidenceAITags = computed(() => {
+  return structuredAITags.value.filter(tag => tag.confidence >= 85);
+});
+
+const lowConfidenceAITags = computed(() => {
+  return structuredAITags.value.filter(tag => tag.confidence < 70);
+});
+
 const hasAnyTags = computed(() => {
   return structuredHumanTags.value.length > 0 || 
          structuredAITags.value.length > 0 || 
          legacyTags.value.length > 0;
+});
+
+const hasHighConfidencePendingTags = computed(() => {
+  return pendingTags.value.some(tag => tag.confidence >= 85);
 });
 
 // Event handlers
@@ -157,23 +203,16 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (unsubscribeTags.value) {
-    unsubscribeTags.value();
-    unsubscribeTags.value = null;
-  }
+  // Cleanup handled by TagSelector component
 });
 
 // Watch for evidence changes to reload tags
 watch(() => props.evidence.id, async () => {
-  if (unsubscribeTags.value) {
-    unsubscribeTags.value();
-    unsubscribeTags.value = null;
-  }
   await loadSubcollectionTags();
 });
 
 /**
- * Load tags from subcollection with real-time updates
+ * Load tags from subcollection grouped by status for confidence-based display
  */
 const loadSubcollectionTags = async () => {
   if (!props.evidence.id) return;
@@ -181,20 +220,22 @@ const loadSubcollectionTags = async () => {
   try {
     loadingTags.value = true;
     
-    // Subscribe to real-time tag updates
-    unsubscribeTags.value = tagService.subscribeToTags(
-      props.evidence.id,
-      (tags) => {
-        subcollectionTags.value = tags;
-        loadingTags.value = false;
-      }
-    );
+    // Load tags grouped by status for better performance and organization
+    const tagsByStatus = await tagService.getTagsByStatus(props.evidence.id);
+    
+    pendingTags.value = tagsByStatus.pending || [];
+    approvedTags.value = tagsByStatus.approved || [];
+    rejectedTags.value = tagsByStatus.rejected || [];
+    
+    loadingTags.value = false;
     
   } catch (error) {
     console.error('Failed to load subcollection tags:', error);
     loadingTags.value = false;
-    // Fallback to embedded arrays in case of error
-    subcollectionTags.value = [];
+    // Fallback to empty arrays in case of error
+    pendingTags.value = [];
+    approvedTags.value = [];
+    rejectedTags.value = [];
   }
 };
 </script>
@@ -229,5 +270,43 @@ const loadSubcollectionTags = async () => {
 /* Compact mode */
 .file-list-item.compact .tags-section {
   min-width: 150px;
+}
+
+/* Confidence-based visual indicators */
+.pending-tags-indicator {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.ai-tag-item.high-confidence {
+  border: 2px solid rgba(76, 175, 80, 0.3);
+  box-shadow: 0 1px 3px rgba(76, 175, 80, 0.2);
+}
+
+.ai-tag-item.medium-confidence {
+  border: 2px solid rgba(255, 152, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(255, 152, 0, 0.1);
+}
+
+.ai-tag-item.low-confidence {
+  border: 2px solid rgba(244, 67, 54, 0.3);
+  opacity: 0.8;
+}
+
+.ai-tag-item:hover {
+  transform: translateY(-1px);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Visual feedback for different tag sources */
+.human-tag {
+  border-color: rgba(63, 81, 181, 0.5);
+  background-color: rgba(63, 81, 181, 0.05);
+}
+
+.legacy-tag {
+  border-style: dashed;
+  opacity: 0.7;
 }
 </style>

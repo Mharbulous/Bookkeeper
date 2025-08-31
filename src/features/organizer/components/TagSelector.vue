@@ -43,7 +43,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
-import { TagSubcollectionService } from '../services/tagSubcollectionService.js';
+import tagSubcollectionService from '../services/tagSubcollectionService.js';
 import TagDisplaySection from './TagDisplaySection.vue';
 import LegacyTagDisplay from './LegacyTagDisplay.vue';
 import CategoryTagSelector from './CategoryTagSelector.vue';
@@ -64,33 +64,53 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['tags-updated', 'migrate-legacy']);
+const emit = defineEmits([
+  'tags-updated', 
+  'migrate-legacy', 
+  'approve-ai-tag', 
+  'reject-ai-tag', 
+  'bulk-approve-ai-tags', 
+  'bulk-reject-ai-tags'
+]);
 
 // Store
 const organizerStore = useOrganizerStore();
 const { categories } = storeToRefs(organizerStore);
 
 // Services
-const tagService = new TagSubcollectionService();
+const tagService = tagSubcollectionService;
 
 // Local state
 const hideMigrationPrompt = ref(false);
-const subcollectionTags = ref([]);
+const pendingTags = ref([]);
+const approvedTags = ref([]);
+const rejectedTags = ref([]);
 const loadingTags = ref(false);
 const unsubscribeTags = ref(null);
 const categoryTagSelector = ref(null);
 
 // Computed properties
 const structuredTags = computed(() => {
-  // Use subcollection tags if available, fallback to embedded arrays
-  if (subcollectionTags.value.length > 0) {
-    return subcollectionTags.value;
+  // Combine approved tags (including auto-approved AI tags) with manually added tags
+  const allApprovedTags = approvedTags.value;
+  
+  // If no subcollection tags, fallback to embedded arrays for backward compatibility
+  if (allApprovedTags.length === 0 && pendingTags.value.length === 0) {
+    return [
+      ...(props.evidence.tagsByHuman || []),
+      ...(props.evidence.tagsByAI || [])
+    ];
   }
-  // Fallback to embedded arrays for backward compatibility
-  return [
-    ...(props.evidence.tagsByHuman || []),
-    ...(props.evidence.tagsByAI || [])
-  ];
+  
+  return allApprovedTags;
+});
+
+// Computed property for AI pending tags (awaiting review)
+const aiPendingTags = computed(() => pendingTags.value);
+
+// Computed property for all AI tags (pending + approved + rejected)
+const allAITags = computed(() => {
+  return [...pendingTags.value, ...approvedTags.value.filter(tag => tag.source === 'ai'), ...rejectedTags.value];
 });
 
 const legacyTags = computed(() => props.evidence.legacyTags || props.evidence.tags || []);
@@ -113,7 +133,7 @@ const addSelectedTag = async (selection) => {
   
   // Check if tag already exists (exact same tag)
   const tagExists = structuredTags.value.some(tag => 
-    tag.categoryId === selectedCategory.id && tag.tagName === selectedTag.name
+    tag.metadata?.categoryId === selectedCategory.id && tag.tagName === selectedTag.name
   );
   
   if (tagExists) {
@@ -124,24 +144,29 @@ const addSelectedTag = async (selection) => {
   try {
     // Remove existing tags from same category (mutual exclusivity) first
     const existingTagsInCategory = structuredTags.value.filter(tag => 
-      tag.categoryId === selectedCategory.id
+      tag.metadata?.categoryId === selectedCategory.id
     );
     
     for (const existingTag of existingTagsInCategory) {
-      await tagService.removeTag(props.evidence.id, existingTag.id);
+      if (existingTag.id) {
+        await tagService.deleteTag(props.evidence.id, existingTag.id);
+      }
     }
     
     // Create new structured tag data
     const newTagData = {
-      categoryId: selectedCategory.id,
-      categoryName: selectedCategory.name,
       tagName: selectedTag.name,
-      color: selectedTag.color,
-      source: 'human',
-      createdBy: 'user-id' // TODO: Get actual user ID from auth store
+      confidence: 100, // Manual tags have 100% confidence
+      source: 'manual',
+      metadata: {
+        categoryId: selectedCategory.id,
+        categoryName: selectedCategory.name,
+        color: selectedTag.color,
+        createdBy: 'user-id' // TODO: Get actual user ID from auth store
+      }
     };
     
-    // Add tag using subcollection service
+    // Add tag using subcollection service (auto-approved since it's manual)
     await tagService.addTag(props.evidence.id, newTagData);
     
     emit('tags-updated');
@@ -161,7 +186,7 @@ const removeStructuredTag = async (tagToRemove) => {
     // Use subcollection service to remove tag
     if (tagToRemove.id) {
       // Tag has subcollection ID - use subcollection service
-      await tagService.removeTag(props.evidence.id, tagToRemove.id);
+      await tagService.deleteTag(props.evidence.id, tagToRemove.id);
     } else {
       // Fallback to embedded array method for backward compatibility
       const freshEvidence = organizerStore.stores.core.getEvidenceById(props.evidence.id);
@@ -183,6 +208,51 @@ const removeStructuredTag = async (tagToRemove) => {
     
   } catch (error) {
     console.error('Failed to remove structured tag:', error);
+  }
+};
+
+// New methods for handling AI tag approvals
+const approveAITag = async (tagId) => {
+  try {
+    await tagService.approveTag(props.evidence.id, tagId);
+    await loadSubcollectionTags(); // Reload to update state
+    emit('tags-updated');
+    emit('approve-ai-tag', tagId);
+  } catch (error) {
+    console.error('Failed to approve AI tag:', error);
+  }
+};
+
+const rejectAITag = async (tagId) => {
+  try {
+    await tagService.rejectTag(props.evidence.id, tagId);
+    await loadSubcollectionTags(); // Reload to update state
+    emit('tags-updated');
+    emit('reject-ai-tag', tagId);
+  } catch (error) {
+    console.error('Failed to reject AI tag:', error);
+  }
+};
+
+const bulkApproveAITags = async (tagIds) => {
+  try {
+    await tagService.approveTagsBatch(props.evidence.id, tagIds);
+    await loadSubcollectionTags(); // Reload to update state
+    emit('tags-updated');
+    emit('bulk-approve-ai-tags', tagIds);
+  } catch (error) {
+    console.error('Failed to bulk approve AI tags:', error);
+  }
+};
+
+const bulkRejectAITags = async (tagIds) => {
+  try {
+    await tagService.rejectTagsBatch(props.evidence.id, tagIds);
+    await loadSubcollectionTags(); // Reload to update state
+    emit('tags-updated');
+    emit('bulk-reject-ai-tags', tagIds);
+  } catch (error) {
+    console.error('Failed to bulk reject AI tags:', error);
   }
 };
 
@@ -221,7 +291,7 @@ watch(() => props.evidence.id, async () => {
 });
 
 /**
- * Load tags from subcollection with real-time updates
+ * Load tags from subcollection grouped by status
  */
 const loadSubcollectionTags = async () => {
   if (!props.evidence.id) return;
@@ -229,22 +299,35 @@ const loadSubcollectionTags = async () => {
   try {
     loadingTags.value = true;
     
-    // Subscribe to real-time tag updates
-    unsubscribeTags.value = tagService.subscribeToTags(
-      props.evidence.id,
-      (tags) => {
-        subcollectionTags.value = tags;
-        loadingTags.value = false;
-      }
-    );
+    // Load tags grouped by status
+    const tagsByStatus = await tagService.getTagsByStatus(props.evidence.id);
+    
+    pendingTags.value = tagsByStatus.pending || [];
+    approvedTags.value = tagsByStatus.approved || [];
+    rejectedTags.value = tagsByStatus.rejected || [];
+    
+    loadingTags.value = false;
     
   } catch (error) {
     console.error('Failed to load subcollection tags:', error);
     loadingTags.value = false;
-    // Fallback to embedded arrays in case of error
-    subcollectionTags.value = [];
+    // Fallback to empty arrays in case of error
+    pendingTags.value = [];
+    approvedTags.value = [];
+    rejectedTags.value = [];
   }
 };
+
+// Expose methods for parent component access
+defineExpose({
+  approveAITag,
+  rejectAITag,
+  bulkApproveAITags,
+  bulkRejectAITags,
+  aiPendingTags,
+  allAITags,
+  loadSubcollectionTags
+});
 
 </script>
 
