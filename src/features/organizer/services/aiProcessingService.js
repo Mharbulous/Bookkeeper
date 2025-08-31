@@ -157,11 +157,10 @@ Please analyze the document and provide tag suggestions:
           continue;
         }
 
-        // Create validated suggestion with proper tagId
+        // Create validated suggestion using categoryId as constraint (no separate tagId needed)
         validatedSuggestions.push({
           categoryId: category.id,
           categoryName: category.name,
-          tagId: `ai-tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate unique ID
           tagName: suggestion.tagName.trim(),
           color: category.color,
           confidence: Math.min(suggestion.confidence || 0.8, 1.0),

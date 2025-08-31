@@ -158,7 +158,7 @@ export class AITagService {
     try {
       const teamId = this.getTeamId();
       
-      // Transform suggestions to include confidence and metadata
+      // Transform suggestions to include confidence and metadata with proper constraint fields
       const tagData = suggestions.map(suggestion => {
         // Convert decimal confidence (0.9) to percentage (90)
         let confidence = suggestion.confidence || 0;
@@ -168,12 +168,21 @@ export class AITagService {
           confidence = Math.round(confidence);
         }
         
+        // Determine auto-approval based on confidence threshold
+        const autoApproved = confidence >= tagSubcollectionService.getConfidenceThreshold();
+        
         return {
+          categoryId: suggestion.categoryId,           // Required for constraint-based deduplication
+          categoryName: suggestion.categoryName,       // Category display name
           tagName: suggestion.tagName || suggestion.name,
+          color: suggestion.color,                     // Category color
           confidence: confidence,
           source: 'ai',
+          autoApproved: autoApproved,
+          reviewRequired: !autoApproved,               // High confidence tags don't need review
+          createdBy: this.getTeamId(),                 // Use team ID as creator for AI tags
           metadata: {
-            model: 'vertex-ai',
+            model: 'gemini-pro',                       // Updated to match actual model
             processingTime: suggestion.processingTime || 0,
             context: suggestion.reasoning || ''
           }

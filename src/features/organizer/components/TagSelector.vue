@@ -144,10 +144,11 @@ const addSelectedTag = async (selection) => {
       categoryId: selectedCategory.id,
       categoryName: selectedCategory.name,
       tagName: selectedTag.name,
-      color: selectedTag.color,
+      color: selectedCategory.color, // Use category color for consistency with AI tags
       source: 'human',
-      confidence: 1.0, // Human tags have 100% confidence (1.0 scale)
-      autoApproved: null, // Not applicable for human tags
+      confidence: 100, // Human tags have 100% confidence (percentage format to match AI tags)
+      status: 'approved', // Manual tags are immediately approved
+      autoApproved: false, // Manual tags are not auto-approved by AI
       reviewRequired: false, // Human tags don't need review
       createdBy: authStore.user?.uid || 'unknown-user',
       metadata: {

@@ -75,6 +75,10 @@ class TagSubcollectionService {
         throw new Error('categoryId is required for new tag structure')
       }
       
+      // Determine status based on auto-approval (for consistency with previous batch logic)
+      const autoApproved = tagData.autoApproved ?? (tagData.confidence >= this.confidenceThreshold)
+      const status = autoApproved ? 'approved' : 'pending'
+      
       // Create the tag document with NEW structure from migration plan
       const tagDoc = {
         categoryId: tagData.categoryId,
@@ -83,7 +87,8 @@ class TagSubcollectionService {
         color: tagData.color,
         source: tagData.source,
         confidence: tagData.confidence,
-        autoApproved: tagData.autoApproved,
+        status: status,
+        autoApproved: autoApproved,
         reviewRequired: tagData.reviewRequired,
         createdAt: serverTimestamp(),
         createdBy: tagData.createdBy,
@@ -91,7 +96,7 @@ class TagSubcollectionService {
       }
 
       // Add reviewedAt timestamp if this is an auto-approved AI tag
-      if (tagData.autoApproved && tagData.source !== 'human') {
+      if (autoApproved && tagData.source !== 'human') {
         tagDoc.reviewedAt = serverTimestamp()
       }
 
@@ -107,40 +112,19 @@ class TagSubcollectionService {
   }
 
   /**
-   * Add multiple tags in a batch operation
+   * Add multiple tags by calling addTag() for each one
+   * This ensures consistency and reduces code duplication
    */
   async addTagsBatch(docId, tagsArray, teamId) {
     try {
-      const batch = writeBatch(db)
-      const tagsCollection = this.getTagsCollection(docId, teamId)
       const addedTags = []
-
+      
+      // Process each tag individually using the single addTag method
       for (const tagData of tagsArray) {
-        // Determine if tag should be auto-approved based on confidence
-        const autoApproved = tagData.confidence >= this.confidenceThreshold
-        const status = autoApproved ? 'approved' : 'pending'
-        
-        const tagDoc = {
-          tagName: tagData.tagName,
-          confidence: tagData.confidence,
-          status: status,
-          autoApproved: autoApproved,
-          createdAt: serverTimestamp(),
-          source: tagData.source || 'ai',
-          metadata: tagData.metadata || {}
-        }
-
-        // Add reviewed timestamp if auto-approved
-        if (autoApproved) {
-          tagDoc.reviewedAt = serverTimestamp()
-        }
-
-        const newTagRef = doc(tagsCollection)
-        batch.set(newTagRef, tagDoc)
-        addedTags.push({ id: newTagRef.id, ...tagDoc })
+        const addedTag = await this.addTag(docId, tagData, teamId)
+        addedTags.push(addedTag)
       }
 
-      await batch.commit()
       return addedTags
     } catch (error) {
       console.error('Error adding tags batch:', error)
