@@ -41,7 +41,7 @@
           :readonly="readonly"
           :tag-update-loading="tagUpdateLoading"
           :tag-input-placeholder="tagInputPlaceholder"
-          @tags-update="handleTagsUpdate"
+          @tags-updated="handleTagsUpdated"
           @migrate-legacy="handleMigrateLegacy"
           @tag-error="handleTagError"
         />
@@ -132,7 +132,7 @@ const props = defineProps({
 
 // Emits
 const emit = defineEmits([
-  'tags-update',
+  'tags-updated',
   'tag-error',
   'migrate-legacy',
   'click',
@@ -242,8 +242,8 @@ const handleClick = () => {
   emit('click', props.evidence);
 };
 
-const handleTagsUpdate = (evidenceId, tags) => {
-  emit('tags-update', evidenceId, tags);
+const handleTagsUpdated = () => {
+  emit('tags-updated');
 };
 
 const handleMigrateLegacy = (evidenceId) => {

@@ -5,7 +5,7 @@
       :evidence="evidence"
       :loading="tagUpdateLoading"
       class="tag-selector"
-      @tags-updated="handleTagsUpdate"
+      @tags-updated="handleTagsUpdated"
       @migrate-legacy="handleMigrateLegacy"
     />
     
@@ -94,7 +94,7 @@ const props = defineProps({
 
 // Emits
 const emit = defineEmits([
-  'tags-update',
+  'tags-updated',
   'migrate-legacy',
   'tag-error',
 ]);
@@ -162,9 +162,9 @@ const hasHighConfidencePendingTags = computed(() => {
 });
 
 // Event handlers
-const handleTagsUpdate = () => {
+const handleTagsUpdated = () => {
   // TagSelector handles the update internally, just emit for refresh
-  emit('tags-update', props.evidence.id, []);
+  emit('tags-updated');
   // Reload subcollection tags after update
   loadSubcollectionTags();
 };

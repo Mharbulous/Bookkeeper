@@ -28,7 +28,7 @@
       :getEvidenceTags="getEvidenceTags"
       :getTagUpdateLoading="getTagUpdateLoading"
       :getAIProcessing="getAIProcessing"
-      @tags-update="handleTagsUpdate"
+      @tags-updated="handleTagsUpdated"
       @download="downloadFile"
       @rename="renameFile"
       @view-details="viewDetails"
@@ -141,18 +141,10 @@ const getAIProcessing = (evidenceId) => {
   return aiProcessing.value.has(evidenceId);
 };
 
-const handleTagsUpdate = async (evidenceId, newTags) => {
-  try {
-    tagUpdateLoading.value.add(evidenceId);
-    await organizerStore.updateEvidenceTags(evidenceId, newTags);
-    
-    showNotification('Tags updated successfully', 'success');
-  } catch (error) {
-    console.error('Failed to update tags:', error);
-    showNotification('Failed to update tags', 'error');
-  } finally {
-    tagUpdateLoading.value.delete(evidenceId);
-  }
+const handleTagsUpdated = async () => {
+  // Tags are now handled by the TagSelector component using TagSubcollectionService
+  // This is just a notification that tags were updated
+  showNotification('Tags updated successfully', 'success');
 };
 
 const downloadFile = () => {

@@ -33,7 +33,7 @@
           :evidence="evidence"
           :tagUpdateLoading="props.getTagUpdateLoading(evidence.id)"
           :aiProcessing="props.getAIProcessing(evidence.id)"
-          @tags-update="(evidenceId, newTags) => $emit('tagsUpdate', evidenceId, newTags)"
+          @tags-updated="$emit('tagsUpdated')"
           @download="$emit('download', $event)"
           @rename="$emit('rename', $event)"
           @view-details="$emit('viewDetails', $event)"
@@ -81,7 +81,7 @@ const props = defineProps({
 // Emits
 defineEmits([
   'update:viewMode',
-  'tagsUpdate',
+  'tagsUpdated',
   'process-with-ai',
   'download',
   'rename',

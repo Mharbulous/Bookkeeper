@@ -30,7 +30,7 @@
             :evidence="evidence"
             :loading="loading"
             class="tag-selector"
-            @tags-updated="$emit('tagsUpdate', evidence.id, [])"
+            @tags-updated="$emit('tagsUpdated')"
             @migrate-legacy="$emit('migrateLegacy', evidence.id)"
           />
         </div>
@@ -101,7 +101,7 @@ const props = defineProps({
 
 // Emits
 defineEmits([
-  'tagsUpdate',
+  'tagsUpdated',
   'download',
   'rename',
   'viewDetails',
