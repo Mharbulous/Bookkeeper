@@ -1,5 +1,5 @@
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, getDownloadURL } from 'firebase/storage';
+import { ref, getDownloadURL, getBytes } from 'firebase/storage';
 import { getGenerativeModel } from 'firebase/ai';
 import { db, storage, firebaseAI } from '../../../services/firebase.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
@@ -77,8 +77,10 @@ export class AITagService {
         throw new Error('No categories found. Please create categories before using AI tagging.');
       }
 
-      // Generate AI suggestions
-      const aiSuggestions = await this.generateTagSuggestions(fileContent, categories, evidence);
+      // Generate AI suggestions (pass file extension as fallback)
+      const displayName = evidence.displayName || '';
+      const extension = displayName.split('.').pop()?.toLowerCase() || 'pdf';
+      const aiSuggestions = await this.generateTagSuggestions(fileContent, categories, evidence, extension);
 
       // Store AI suggestions in evidence document
       await this.storeAISuggestions(evidenceId, teamId, aiSuggestions);
@@ -127,7 +129,7 @@ export class AITagService {
   /**
    * Retrieve file content from Firebase Storage for AI processing
    * @param {Object} evidence - Evidence document
-   * @returns {Promise<string>} - File download URL for AI processing
+   * @returns {Promise<string>} - Base64 encoded file content for AI processing
    */
   async getFileForProcessing(evidence) {
     try {
@@ -149,10 +151,20 @@ export class AITagService {
       // Use the actual storage path format with extension
       const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${evidence.storageRef.fileHash}.${extension}`;
       const fileRef = ref(storage, storagePath);
-      const downloadURL = await getDownloadURL(fileRef);
       
-      console.log(`[AITagService] Found file at: ${storagePath}`);
-      return downloadURL;
+      // Get file bytes directly from Firebase Storage
+      const arrayBuffer = await getBytes(fileRef);
+      
+      // Convert ArrayBuffer to base64 efficiently (avoid stack overflow for large files)
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binaryString = '';
+      for (let i = 0; i < uint8Array.length; i++) {
+        binaryString += String.fromCharCode(uint8Array[i]);
+      }
+      const base64Data = btoa(binaryString);
+      
+      console.log(`[AITagService] Retrieved file content from: ${storagePath}`);
+      return base64Data;
     } catch (error) {
       console.error('[AITagService] Failed to get file for processing:', error);
       throw error;
@@ -187,12 +199,13 @@ export class AITagService {
 
   /**
    * Generate tag suggestions using Firebase Vertex AI
-   * @param {string} fileUrl - File download URL
+   * @param {string} base64Data - Base64 encoded file content
    * @param {Array} categories - User's categories
    * @param {Object} evidence - Evidence document
+   * @param {string} extension - File extension as fallback for MIME type
    * @returns {Promise<Array>} - Array of suggested tags
    */
-  async generateTagSuggestions(fileUrl, categories, evidence) {
+  async generateTagSuggestions(base64Data, categories, evidence, extension = 'pdf') {
     try {
       if (!firebaseAI) {
         throw new Error('Firebase AI Logic not initialized');
@@ -201,10 +214,7 @@ export class AITagService {
       // Get Gemini model
       const model = getGenerativeModel(firebaseAI, { model: 'gemini-1.5-flash' });
 
-      // Fetch file content as base64 for Gemini Developer API
-      const fileBlob = await fetch(fileUrl).then(r => r.blob());
-      const arrayBuffer = await fileBlob.arrayBuffer();
-      const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      console.log('[AITagService] Using full document content analysis');
 
       // Build category context for AI
       const categoryContext = categories.map(cat => {
@@ -243,10 +253,18 @@ Instructions:
 Please analyze the document and provide tag suggestions:
 `;
 
-      // Generate AI response using inline data instead of fileUri
+      // Get MIME type with fallback to passed extension
+      let mimeType = this.getMimeType(evidence.displayName);
+      if (mimeType === 'application/octet-stream') {
+        // Use passed extension as fallback
+        mimeType = this.getMimeType(`dummy.${extension}`);
+      }
+      console.log(`[AITagService] File: ${evidence.displayName}, Extension: ${extension}, MIME type: ${mimeType}`);
+      
+      // Generate AI response using inline data (full content analysis)
       const result = await model.generateContent([
         { text: prompt },
-        { inlineData: { mimeType: this.getMimeType(evidence.displayName), data: base64Data } }
+        { inlineData: { mimeType: mimeType, data: base64Data } }
       ]);
 
       const response = await result.response;
@@ -293,10 +311,11 @@ Please analyze the document and provide tag suggestions:
           continue;
         }
 
-        // Create validated suggestion
+        // Create validated suggestion with proper tagId
         validatedSuggestions.push({
           categoryId: category.id,
           categoryName: category.name,
+          tagId: `ai-tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate unique ID
           tagName: suggestion.tagName.trim(),
           color: category.color,
           confidence: Math.min(suggestion.confidence || 0.8, 1.0),
@@ -395,7 +414,7 @@ Please analyze the document and provide tag suggestions:
       const approvedTag = {
         categoryId: aiTag.categoryId,
         categoryName: aiTag.categoryName,
-        tagId: aiTag.tagId || `tag-${Date.now()}`, // Generate ID if not present
+        tagId: aiTag.tagId || `approved-tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate ID if not present
         tagName: aiTag.tagName,
         color: aiTag.color,
         approvedAt: serverTimestamp(),

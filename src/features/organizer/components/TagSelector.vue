@@ -253,13 +253,19 @@ const addSelectedTag = async () => {
 
 const removeStructuredTag = async (tagToRemove) => {
   try {
-    const updatedTagsByHuman = (props.evidence.tagsByHuman || [])
+    // Get fresh evidence data from core store to avoid stale props
+    const freshEvidence = organizerStore.stores.core.getEvidenceById(props.evidence.id);
+    if (!freshEvidence) {
+      throw new Error('Evidence not found in store');
+    }
+    
+    const updatedTagsByHuman = (freshEvidence.tagsByHuman || [])
       .filter(tag => !(tag.categoryId === tagToRemove.categoryId && tag.tagId === tagToRemove.tagId));
     
     await organizerStore.updateEvidenceStructuredTags(
       props.evidence.id,
       updatedTagsByHuman,
-      props.evidence.tagsByAI || []
+      freshEvidence.tagsByAI || []
     );
     
     emit('tags-updated');

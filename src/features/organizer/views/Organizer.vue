@@ -206,19 +206,9 @@ const processWithAI = async (evidence) => {
     if (result.success) {
       if (result.suggestedTags.length > 0) {
         showNotification(
-          `AI processing complete! ${result.suggestedTags.length} tags suggested.`, 
+          `AI processing complete! ${result.suggestedTags.length} tags applied.`, 
           'success'
         );
-        
-        // Open review modal with the processed evidence
-        // Wait a moment for Firestore to update with new AI tags
-        setTimeout(() => {
-          const updatedEvidence = organizerStore.getEvidenceById(evidence.id);
-          if (updatedEvidence) {
-            currentReviewEvidence.value = updatedEvidence;
-            showAIReview.value = true;
-          }
-        }, 500);
       } else {
         showNotification('AI processing complete, but no tags were suggested.', 'info');
       }

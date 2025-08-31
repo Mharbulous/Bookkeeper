@@ -73,27 +73,28 @@ The **Organizer** is an AI-powered document discovery and organization system de
 - **Print to PDF**: BATES-stamped output (not raw download)
 - **No Thumbnails**: Keep interface fast and simple for document-focused workflow
 
-## Human Review System
+## Streamlined AI Workflow (Updated August 30, 2025)
 
-### Priority-Based Review (No Arbitrary Thresholds)
-- **Smart Review Queue**: Documents ordered by AI confidence level (lowest first)
-- **Natural Threshold Discovery**: Users review until errors become rare, finding their own comfort level
-- **Rich AI Suggestions**: Up to 3 tag suggestions per category with individual confidence levels
-- **Review Interface**: 
-  - Top 3 AI suggestions with confidence percentages per category
-  - "Other" option for complete misclassification
-  - "Create New Category" for expanding taxonomy
-  - Human override tracking with reviewer identification
+### Immediate AI Tag Application
+- **Direct Application**: AI processes documents and applies tags immediately without interrupting user workflow
+- **Visual Distinction**: Clear visual differentiation between AI-applied and human-reviewed tags
+- **Non-Disruptive Experience**: Users receive immediate value while maintaining natural review opportunities
+
+### AI Tag Visual Design System
+- **AI-Applied Tags**: Colored text and border with white background for unreviewed AI suggestions
+- **Human-Reviewed Tags**: White text and border with colored background after human approval
+- **In-Context Review**: Users can review and approve tags naturally within the document interface
+- **Status Indicators**: Clear visual cues indicate tag source and review status
 
 ### Enhanced Data Structure
-- **Multi-Suggestion Support**: AI provides multiple tag options per category instead of single suggestions
-- **Confidence Tracking**: Individual confidence levels for each suggested tag
-- **Human Override Recording**: Tracks what humans actually chose vs AI suggestions
-- **Reviewer Attribution**: Records which user made review decisions for audit trails
+- **Multi-Suggestion Support**: AI provides multiple tag options per category with individual confidence levels
+- **Confidence Tracking**: Individual confidence levels stored for each suggested tag
+- **Human Override Recording**: Tracks approval decisions and reviewer attribution for audit trails
+- **Status Tracking**: Records tag lifecycle from AI suggestion to human approval
 
 ### Learning Approach
 - **No Model Training**: System doesn't fine-tune or retrain AI models
-- **Context Enhancement**: Uses human-reviewed examples as context for future medium-confidence decisions
+- **Context Enhancement**: Uses human-reviewed examples as context for future processing
 - **Human Priority**: Human classifications weighted higher than AI classifications in context examples
 - **Performance Analytics**: Rich data enables analysis of AI accuracy vs human decisions over time
 

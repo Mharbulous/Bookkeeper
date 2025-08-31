@@ -1,0 +1,8 @@
+[
+  {
+    "_comment": "Firebase Storage CORS configuration for AI document processing. Applied with: gsutil cors set cors.json gs://coryphaeus-ed11a.firebasestorage.app. Allows cross-origin requests from localhost development servers. Required for AI tag service to analyze document content from Firebase Storage. Last updated: 2025-08-30",
+    "origin": ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]
