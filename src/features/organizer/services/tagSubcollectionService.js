@@ -84,7 +84,7 @@ class TagSubcollectionService {
         categoryId: tagData.categoryId,
         categoryName: tagData.categoryName,
         tagName: tagData.tagName,
-        color: tagData.color,
+        // Removed color field - use category color as single source of truth
         source: tagData.source,
         confidence: tagData.confidence,
         status: status,

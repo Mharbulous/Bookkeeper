@@ -175,7 +175,7 @@ export class AITagService {
           categoryId: suggestion.categoryId,           // Required for constraint-based deduplication
           categoryName: suggestion.categoryName,       // Category display name
           tagName: suggestion.tagName || suggestion.name,
-          color: suggestion.color,                     // Category color
+          // Removed color field - use category color as single source of truth
           confidence: confidence,
           source: 'ai',
           autoApproved: autoApproved,

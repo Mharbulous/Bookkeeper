@@ -104,7 +104,7 @@ const tagOptions = computed(() => {
   return selectedCategory.tags.map(tag => ({
     id: tag.id || crypto.randomUUID(),
     name: tag.name,
-    color: tag.color || selectedCategory.color
+    color: selectedCategory.color // Use category color as single source of truth
   }));
 });
 

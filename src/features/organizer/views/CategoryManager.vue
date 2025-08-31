@@ -111,7 +111,7 @@
                       <v-chip
                         v-for="tag in category.tags"
                         :key="tag.id || tag.name"
-                        :color="tag.color || category.color"
+                        :color="category.color"
                         size="small"
                         class="ma-1"
                       >

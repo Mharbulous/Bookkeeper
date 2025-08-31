@@ -51,9 +51,7 @@ export class CategoryService {
         if (tag.name && tag.name.trim().length > 30) {
           errors.push(`Tag ${index + 1}: name must be 30 characters or less`);
         }
-        if (tag.color && !/^#[0-9A-Fa-f]{6}$/.test(tag.color)) {
-          errors.push(`Tag ${index + 1}: color must be a valid hex color`);
-        }
+        // Removed tag.color validation - tags no longer store individual colors
       });
 
       // Check for duplicate tag names

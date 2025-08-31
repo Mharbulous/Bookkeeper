@@ -162,7 +162,7 @@ Please analyze the document and provide tag suggestions:
           categoryId: category.id,
           categoryName: category.name,
           tagName: suggestion.tagName.trim(),
-          color: category.color,
+          // Removed color field - use category color as single source of truth
           confidence: Math.min(suggestion.confidence || 0.8, 1.0),
           reasoning: suggestion.reasoning || 'AI suggested',
           suggestedAt: new Date(),

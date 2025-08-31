@@ -72,6 +72,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useTagColor } from '../composables/useTagColor.js';
 
 // Props
 const props = defineProps({
@@ -98,6 +99,9 @@ const props = defineProps({
   }
 });
 
+// Use tag color composable for centralized color resolution
+const { getTagColor } = useTagColor();
+
 // Computed properties
 const displayColor = computed(() => {
   const status = getTagStatus();
@@ -110,7 +114,7 @@ const displayColor = computed(() => {
       if (confidence >= 70) return 'orange-lighten-1';
       return 'orange-lighten-2';
     case 'approved':
-      return isAutoApproved() ? 'green-lighten-1' : (props.tag.color || 'primary');
+      return isAutoApproved() ? 'green-lighten-1' : getTagColor(props.tag);
     case 'rejected':
       return 'grey-lighten-1';
     default:

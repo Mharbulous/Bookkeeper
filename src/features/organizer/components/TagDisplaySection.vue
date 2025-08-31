@@ -6,11 +6,11 @@
       size="small"
       closable
       variant="outlined"
-      :color="tag.color"
+      :color="getTagColor(tag)"
       class="ma-1"
       @click:close="handleRemoveTag(tag)"
     >
-      <v-icon start size="14" :color="tag.color">mdi-tag</v-icon>
+      <v-icon start size="14" :color="getTagColor(tag)">mdi-tag</v-icon>
       {{ tag.tagName }}
     </v-chip>
   </div>
@@ -18,6 +18,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useTagColor } from '../composables/useTagColor.js';
 
 const props = defineProps({
   structuredTags: {
@@ -35,6 +36,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['remove-tag']);
+
+// Use tag color composable for centralized color resolution
+const { getTagColor } = useTagColor();
 
 // Computed properties
 const hasStructuredTags = computed(() => props.structuredTags.length > 0);
