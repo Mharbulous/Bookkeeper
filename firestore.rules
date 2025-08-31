@@ -37,6 +37,20 @@ service cloud.firestore {
                              request.auth.token.teamId == teamId);
     }
     
+    // Evidence documents and their data
+    match /teams/{teamId}/evidence/{docId} {
+      allow read, write: if request.auth != null && 
+                           (request.auth.uid == teamId || 
+                            request.auth.token.teamId == teamId);
+      
+      // AI tags subcollection
+      match /aiTags/{tagId} {
+        allow read, write: if request.auth != null && 
+                             (request.auth.uid == teamId || 
+                              request.auth.token.teamId == teamId);
+      }
+    }
+    
     // Team subcollections (fallback for other collections)
     match /teams/{teamId}/{collection}/{document} {
       allow read, write: if request.auth != null && 

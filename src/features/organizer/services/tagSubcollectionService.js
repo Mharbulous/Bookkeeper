@@ -18,7 +18,7 @@ import { db } from '../../../services/firebase.js'
  * Service for managing AI-generated tags in Firestore subcollections
  * 
  * Data Structure:
- * /evidence/{docId}/aiTags/{tagId}
+ * /teams/{teamId}/evidence/{docId}/aiTags/{tagId}
  * 
  * Tag Document Structure:
  * {
@@ -45,23 +45,29 @@ class TagSubcollectionService {
   /**
    * Get reference to tags subcollection for a document
    */
-  getTagsCollection(docId) {
-    return collection(db, 'evidence', docId, 'aiTags')
+  getTagsCollection(docId, teamId) {
+    if (!teamId) {
+      throw new Error('Team ID is required for tag operations')
+    }
+    return collection(db, 'teams', teamId, 'evidence', docId, 'aiTags')
   }
 
   /**
    * Get reference to a specific tag document
    */
-  getTagDoc(docId, tagId) {
-    return doc(db, 'evidence', docId, 'aiTags', tagId)
+  getTagDoc(docId, tagId, teamId) {
+    if (!teamId) {
+      throw new Error('Team ID is required for tag operations')
+    }
+    return doc(db, 'teams', teamId, 'evidence', docId, 'aiTags', tagId)
   }
 
   /**
    * Add a new AI-generated tag to a document
    */
-  async addTag(docId, tagData) {
+  async addTag(docId, tagData, teamId) {
     try {
-      const tagsCollection = this.getTagsCollection(docId)
+      const tagsCollection = this.getTagsCollection(docId, teamId)
       
       // Determine if tag should be auto-approved based on confidence
       const autoApproved = tagData.confidence >= this.confidenceThreshold
@@ -93,10 +99,10 @@ class TagSubcollectionService {
   /**
    * Add multiple tags in a batch operation
    */
-  async addTagsBatch(docId, tagsArray) {
+  async addTagsBatch(docId, tagsArray, teamId) {
     try {
       const batch = writeBatch(db)
-      const tagsCollection = this.getTagsCollection(docId)
+      const tagsCollection = this.getTagsCollection(docId, teamId)
       const addedTags = []
 
       for (const tagData of tagsArray) {
@@ -135,9 +141,9 @@ class TagSubcollectionService {
   /**
    * Get all tags for a document
    */
-  async getTags(docId, options = {}) {
+  async getTags(docId, options = {}, teamId) {
     try {
-      const tagsCollection = this.getTagsCollection(docId)
+      const tagsCollection = this.getTagsCollection(docId, teamId)
       let q = query(tagsCollection, orderBy('createdAt', 'desc'))
 
       // Filter by status if specified
@@ -165,9 +171,9 @@ class TagSubcollectionService {
   /**
    * Get tags grouped by status
    */
-  async getTagsByStatus(docId) {
+  async getTagsByStatus(docId, teamId) {
     try {
-      const allTags = await this.getTags(docId)
+      const allTags = await this.getTags(docId, {}, teamId)
       
       return {
         pending: allTags.filter(tag => tag.status === 'pending'),
@@ -183,23 +189,23 @@ class TagSubcollectionService {
   /**
    * Get only approved tags for a document
    */
-  async getApprovedTags(docId) {
+  async getApprovedTags(docId, teamId) {
     return await this.getTags(docId, { status: 'approved' })
   }
 
   /**
    * Get only pending tags for a document
    */
-  async getPendingTags(docId) {
+  async getPendingTags(docId, teamId) {
     return await this.getTags(docId, { status: 'pending' })
   }
 
   /**
    * Update a tag's status (approve/reject)
    */
-  async updateTagStatus(docId, tagId, newStatus) {
+  async updateTagStatus(docId, tagId, newStatus, teamId) {
     try {
-      const tagRef = this.getTagDoc(docId, tagId)
+      const tagRef = this.getTagDoc(docId, tagId, teamId)
       
       const updateData = {
         status: newStatus,
@@ -217,26 +223,26 @@ class TagSubcollectionService {
   /**
    * Approve a tag
    */
-  async approveTag(docId, tagId) {
+  async approveTag(docId, tagId, teamId) {
     return await this.updateTagStatus(docId, tagId, 'approved')
   }
 
   /**
    * Reject a tag
    */
-  async rejectTag(docId, tagId) {
+  async rejectTag(docId, tagId, teamId) {
     return await this.updateTagStatus(docId, tagId, 'rejected')
   }
 
   /**
    * Bulk approve multiple tags
    */
-  async approveTagsBatch(docId, tagIds) {
+  async approveTagsBatch(docId, tagIds, teamId) {
     try {
       const batch = writeBatch(db)
       
       for (const tagId of tagIds) {
-        const tagRef = this.getTagDoc(docId, tagId)
+        const tagRef = this.getTagDoc(docId, tagId, teamId)
         batch.update(tagRef, {
           status: 'approved',
           reviewedAt: serverTimestamp()
@@ -254,12 +260,12 @@ class TagSubcollectionService {
   /**
    * Bulk reject multiple tags
    */
-  async rejectTagsBatch(docId, tagIds) {
+  async rejectTagsBatch(docId, tagIds, teamId) {
     try {
       const batch = writeBatch(db)
       
       for (const tagId of tagIds) {
-        const tagRef = this.getTagDoc(docId, tagId)
+        const tagRef = this.getTagDoc(docId, tagId, teamId)
         batch.update(tagRef, {
           status: 'rejected',
           reviewedAt: serverTimestamp()
@@ -277,9 +283,9 @@ class TagSubcollectionService {
   /**
    * Delete a tag
    */
-  async deleteTag(docId, tagId) {
+  async deleteTag(docId, tagId, teamId) {
     try {
-      const tagRef = this.getTagDoc(docId, tagId)
+      const tagRef = this.getTagDoc(docId, tagId, teamId)
       await deleteDoc(tagRef)
       return { id: tagId, deleted: true }
     } catch (error) {
@@ -291,9 +297,9 @@ class TagSubcollectionService {
   /**
    * Delete all tags for a document
    */
-  async deleteAllTags(docId) {
+  async deleteAllTags(docId, teamId) {
     try {
-      const tags = await this.getTags(docId)
+      const tags = await this.getTags(docId, {}, teamId)
       const batch = writeBatch(db)
       
       for (const tag of tags) {
@@ -312,9 +318,9 @@ class TagSubcollectionService {
   /**
    * Get tag statistics for a document
    */
-  async getTagStats(docId) {
+  async getTagStats(docId, teamId) {
     try {
-      const tags = await this.getTags(docId)
+      const tags = await this.getTags(docId, {}, teamId)
       
       const stats = {
         total: tags.length,
@@ -375,9 +381,9 @@ class TagSubcollectionService {
   /**
    * Check if a tag document exists
    */
-  async tagExists(docId, tagId) {
+  async tagExists(docId, tagId, teamId) {
     try {
-      const tagRef = this.getTagDoc(docId, tagId)
+      const tagRef = this.getTagDoc(docId, tagId, teamId)
       const doc = await getDoc(tagRef)
       return doc.exists()
     } catch (error) {
@@ -389,9 +395,9 @@ class TagSubcollectionService {
   /**
    * Find duplicate tags by name
    */
-  async findDuplicateTags(docId, tagName) {
+  async findDuplicateTags(docId, tagName, teamId) {
     try {
-      const tagsCollection = this.getTagsCollection(docId)
+      const tagsCollection = this.getTagsCollection(docId, teamId)
       const q = query(tagsCollection, where('tagName', '==', tagName))
       const querySnapshot = await getDocs(q)
       

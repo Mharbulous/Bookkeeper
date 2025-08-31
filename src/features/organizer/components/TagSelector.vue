@@ -43,6 +43,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
+import { useAuthStore } from '../../../core/stores/auth.js';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
 import TagDisplaySection from './TagDisplaySection.vue';
 import LegacyTagDisplay from './LegacyTagDisplay.vue';
@@ -73,8 +74,9 @@ const emit = defineEmits([
   'bulk-reject-ai-tags'
 ]);
 
-// Store
+// Stores
 const organizerStore = useOrganizerStore();
+const authStore = useAuthStore();
 const { categories } = storeToRefs(organizerStore);
 
 // Services
@@ -300,7 +302,13 @@ const loadSubcollectionTags = async () => {
     loadingTags.value = true;
     
     // Load tags grouped by status
-    const tagsByStatus = await tagService.getTagsByStatus(props.evidence.id);
+    const teamId = authStore.currentTeam;
+    if (!teamId) {
+      console.error('[TagSelector] No team ID available');
+      return;
+    }
+    
+    const tagsByStatus = await tagService.getTagsByStatus(props.evidence.id, teamId);
     
     pendingTags.value = tagsByStatus.pending || [];
     approvedTags.value = tagsByStatus.approved || [];

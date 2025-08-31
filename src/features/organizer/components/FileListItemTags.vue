@@ -71,6 +71,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
+import { useAuthStore } from '../../../core/stores/auth.js';
 import TagSelector from './TagSelector.vue';
 import AITagChip from './AITagChip.vue';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
@@ -109,7 +110,8 @@ const emit = defineEmits([
   'tag-error',
 ]);
 
-// Services and local state
+// Services and local state  
+const authStore = useAuthStore();
 const tagService = tagSubcollectionService;
 const pendingTags = ref([]);
 const approvedTags = ref([]);
@@ -221,7 +223,13 @@ const loadSubcollectionTags = async () => {
     loadingTags.value = true;
     
     // Load tags grouped by status for better performance and organization
-    const tagsByStatus = await tagService.getTagsByStatus(props.evidence.id);
+    const teamId = authStore.currentTeam;
+    if (!teamId) {
+      console.error('[FileListItemTags] No team ID available');
+      return;
+    }
+    
+    const tagsByStatus = await tagService.getTagsByStatus(props.evidence.id, teamId);
     
     pendingTags.value = tagsByStatus.pending || [];
     approvedTags.value = tagsByStatus.approved || [];
