@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { computed, watch } from 'vue';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
 

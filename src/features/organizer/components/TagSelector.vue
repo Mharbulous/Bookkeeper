@@ -81,8 +81,7 @@ const structuredTags = computed(() => {
   // If no subcollection tags, fallback to embedded arrays for backward compatibility
   if (allApprovedTags.length === 0 && pendingTags.value.length === 0) {
     return [
-      ...(props.evidence.tagsByHuman || []),
-      ...(props.evidence.tagsByAI || [])
+      // Legacy embedded tags no longer supported - using subcollection only
     ];
   }
   
@@ -199,14 +198,8 @@ const removeStructuredTag = async (tagToRemove) => {
         throw new Error('Evidence not found in store');
       }
       
-      const updatedTagsByHuman = (freshEvidence.tagsByHuman || [])
-        .filter(tag => !(tag.categoryId === tagToRemove.categoryId && tag.tagId === tagToRemove.tagId));
-      
-      await organizerStore.updateEvidenceStructuredTags(
-        props.evidence.id,
-        updatedTagsByHuman,
-        freshEvidence.tagsByAI || []
-      );
+      // Legacy embedded tag updates no longer supported - using subcollection only
+      console.warn('Legacy embedded tag removal attempted - use subcollection service instead');
     }
     
     // Small delay to ensure Firestore operation is committed before reloading
