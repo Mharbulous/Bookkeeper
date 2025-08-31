@@ -79,7 +79,7 @@ This document defines the Evidence document structure for Organizer v1.1, featur
     // AI processing details
     aiSelection: string,                   // AI's selected tag
     originalConfidence: number,            // Original AI confidence score
-    aiAlternatives: string[],               // Top 3 AI suggestions
+    aiAlternatives: string[],               // All alternative tags AI considered, rank-ordered by confidence (excludes chosen tag)
     processingModel: string,               // AI model used ('claude-3-sonnet')
     contentMatch: string,                  // Why AI suggested this
 
@@ -99,6 +99,26 @@ Since we are starting with a clean database:
 2. **No migration required** - this is the optimal implementation
 3. **Tag counters** will be maintained in evidence documents for quick access
 4. **Clean, scalable data structure** across all documents
+
+### AI Alternatives Architecture
+
+The `aiAlternatives` field implements a no-cap approach that balances UX simplicity with AI transparency:
+
+**Data Storage:**
+- Stores ALL alternative tags the AI considered (no arbitrary limit)
+- Rank-ordered by AI confidence/relevance score
+- Excludes the AI's final selected tag (stored separately in `aiSelection`)
+
+**UI Implementation:**
+- Displays only top 2 alternatives as quick-click options
+- "Other" button reveals complete ranked list when needed
+- Optimal decision tree: AI choice → Alt 1 → Alt 2 → Other
+
+**Benefits:**
+- Maximum AI transparency for debugging and analysis
+- Optimal user experience with minimal cognitive load
+- Future-proof for multi-select categories and advanced features
+- Rich data for machine learning and system improvements
 
 ## Validation Rules
 

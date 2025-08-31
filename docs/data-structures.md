@@ -351,7 +351,7 @@ const fileExtension = evidence.storageRef.fileTypes; // From storageRef or deriv
   AIanalysis: {
     aiSelection: 'Contract',                     // AI's selected tag
     originalConfidence: 95,                     // Original AI confidence score (percentage)
-    aiAlternatives: ['Contract', 'Agreement', 'Legal Document'], // Top 3 AI suggestions
+    aiAlternatives: ['Agreement', 'Legal Document', 'Report', 'Memo'], // All alternative tags AI considered (rank-ordered, excludes chosen tag)
     processingModel: 'gemini-pro',              // AI model used (via Firebase AI Logic)
     contentMatch: 'signature block detected',   // Why AI suggested this
 
