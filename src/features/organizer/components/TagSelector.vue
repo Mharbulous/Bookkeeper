@@ -1,132 +1,53 @@
 <template>
   <div class="tag-selector">
     <!-- Display existing structured tags as colored chips -->
-    <div v-if="hasStructuredTags" class="tags-display mb-2">
-      <v-chip
-        v-for="tag in structuredTags"
-        :key="`${tag.categoryId}-${tag.tagId}`"
-        size="small"
-        closable
-        variant="outlined"
-        :color="tag.color"
-        class="ma-1"
-        @click:close="removeStructuredTag(tag)"
-      >
-        <v-icon start size="14" :color="tag.color">mdi-tag</v-icon>
-        {{ tag.tagName }}
-      </v-chip>
-    </div>
+    <TagDisplaySection
+      :structured-tags="structuredTags"
+      :disabled="disabled"
+      :loading="loading"
+      @remove-tag="removeStructuredTag"
+    />
 
     <!-- Display legacy tags if they exist -->
-    <div v-if="hasLegacyTags" class="legacy-tags-display mb-2">
-      <v-chip
-        v-for="tag in legacyTags"
-        :key="`legacy-${tag}`"
-        size="small"
-        closable
-        variant="outlined"
-        color="grey"
-        class="ma-1"
-        @click:close="removeLegacyTag(tag)"
-      >
-        <v-icon start size="14">mdi-tag-outline</v-icon>
-        {{ tag }}
-        <v-tooltip activator="parent" location="top">
-          Legacy tag (v1.0) - Consider migrating to categories
-        </v-tooltip>
-      </v-chip>
-    </div>
+    <LegacyTagDisplay
+      :legacy-tags="legacyTags"
+      :disabled="disabled"
+      :loading="loading"
+      @remove-legacy-tag="removeLegacyTag"
+    />
 
     <!-- Category-based tag assignment -->
-    <div class="category-selection">
-      <v-row no-gutters class="align-center">
-        <v-col cols="12" md="5">
-          <v-select
-            v-model="selectedCategoryId"
-            :items="categoryOptions"
-            item-title="name"
-            item-value="id"
-            label="Select Category"
-            variant="outlined"
-            density="compact"
-            :disabled="disabled || loading"
-            @update:model-value="onCategoryChange"
-          >
-            <template #item="{ props, item }">
-              <v-list-item v-bind="props">
-                <template #prepend>
-                  <v-icon :color="item.raw.color" size="16">mdi-folder</v-icon>
-                </template>
-              </v-list-item>
-            </template>
-          </v-select>
-        </v-col>
-        
-        <v-col cols="12" md="5" class="ml-md-2">
-          <v-select
-            v-model="selectedTagId"
-            :items="tagOptions"
-            item-title="name"
-            item-value="id"
-            label="Select Tag"
-            variant="outlined"
-            density="compact"
-            :disabled="disabled || loading || !selectedCategoryId"
-            @update:model-value="onTagChange"
-          >
-            <template #item="{ props, item }">
-              <v-list-item v-bind="props">
-                <template #prepend>
-                  <v-icon :color="item.raw.color" size="16">mdi-tag</v-icon>
-                </template>
-              </v-list-item>
-            </template>
-          </v-select>
-        </v-col>
-        
-        <v-col cols="12" md="2" class="ml-md-2">
-          <v-btn
-            :disabled="!canAddTag || disabled || loading"
-            :loading="loading"
-            color="primary"
-            variant="elevated"
-            @click="addSelectedTag"
-          >
-            <v-icon>mdi-plus</v-icon>
-            Add
-          </v-btn>
-        </v-col>
-      </v-row>
-    </div>
+    <CategoryTagSelector
+      ref="categoryTagSelector"
+      :categories="categories"
+      :disabled="disabled"
+      :loading="loading"
+      @add-tag="addSelectedTag"
+      @category-change="onCategoryChange"
+      @tag-change="onTagChange"
+    />
 
     <!-- Migration prompt for legacy tags -->
-    <div v-if="hasLegacyTags && !hideMigrationPrompt" class="migration-prompt mt-3">
-      <v-alert
-        type="info"
-        variant="tonal"
-        closable
-        @click:close="hideMigrationPrompt = true"
-      >
-        <template #title>Migrate Legacy Tags</template>
-        You have {{ legacyTags.length }} legacy tags. 
-        <v-btn
-          size="small"
-          variant="text"
-          color="primary"
-          class="ml-2"
-          @click="$emit('migrate-legacy')"
-        >
-          Organize into Categories
-        </v-btn>
-      </v-alert>
-    </div>
+    <TagMigrationPrompt
+      :legacy-tag-count="legacyTags.length"
+      :disabled="disabled"
+      :loading="loading"
+      :hide-prompt="hideMigrationPrompt"
+      @migrate-legacy="$emit('migrate-legacy')"
+      @hide-prompt="hideMigrationPrompt = true"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
+import { TagSubcollectionService } from '../services/tagSubcollectionService.js';
+import TagDisplaySection from './TagDisplaySection.vue';
+import LegacyTagDisplay from './LegacyTagDisplay.vue';
+import CategoryTagSelector from './CategoryTagSelector.vue';
+import TagMigrationPrompt from './TagMigrationPrompt.vue';
 
 const props = defineProps({
   evidence: {
@@ -149,68 +70,50 @@ const emit = defineEmits(['tags-updated', 'migrate-legacy']);
 const organizerStore = useOrganizerStore();
 const { categories } = storeToRefs(organizerStore);
 
+// Services
+const tagService = new TagSubcollectionService();
+
 // Local state
-const selectedCategoryId = ref('');
-const selectedTagId = ref('');
 const hideMigrationPrompt = ref(false);
+const subcollectionTags = ref([]);
+const loadingTags = ref(false);
+const unsubscribeTags = ref(null);
+const categoryTagSelector = ref(null);
 
 // Computed properties
-const structuredTags = computed(() => [
-  ...(props.evidence.tagsByHuman || []),
-  ...(props.evidence.tagsByAI || [])
-]);
+const structuredTags = computed(() => {
+  // Use subcollection tags if available, fallback to embedded arrays
+  if (subcollectionTags.value.length > 0) {
+    return subcollectionTags.value;
+  }
+  // Fallback to embedded arrays for backward compatibility
+  return [
+    ...(props.evidence.tagsByHuman || []),
+    ...(props.evidence.tagsByAI || [])
+  ];
+});
 
 const legacyTags = computed(() => props.evidence.legacyTags || props.evidence.tags || []);
 
-const hasStructuredTags = computed(() => structuredTags.value.length > 0);
-const hasLegacyTags = computed(() => legacyTags.value.length > 0);
-
-const categoryOptions = computed(() => 
-  categories.value.map(cat => ({
-    id: cat.id,
-    name: cat.name,
-    color: cat.color,
-    tags: cat.tags || []
-  }))
-);
-
-const tagOptions = computed(() => {
-  if (!selectedCategoryId.value) return [];
-  
-  const selectedCategory = categories.value.find(cat => cat.id === selectedCategoryId.value);
-  if (!selectedCategory || !selectedCategory.tags) return [];
-  
-  return selectedCategory.tags.map(tag => ({
-    id: tag.id || crypto.randomUUID(),
-    name: tag.name,
-    color: tag.color || selectedCategory.color
-  }));
-});
-
-const canAddTag = computed(() => {
-  return selectedCategoryId.value && selectedTagId.value;
-});
-
 // Methods
-const onCategoryChange = () => {
-  selectedTagId.value = ''; // Reset tag selection when category changes
+const onCategoryChange = (categoryId) => {
+  // Category change is now handled by child component
+  console.log('Category changed:', categoryId);
 };
 
-const onTagChange = () => {
-  // Could add logic here if needed
+const onTagChange = (tagId) => {
+  // Tag change is now handled by child component
+  console.log('Tag changed:', tagId);
 };
 
-const addSelectedTag = async () => {
-  if (!canAddTag.value) return;
+const addSelectedTag = async (selection) => {
+  if (!selection || !selection.category || !selection.tag) return;
   
-  const selectedCategory = categories.value.find(cat => cat.id === selectedCategoryId.value);
-  const selectedTag = tagOptions.value.find(tag => tag.id === selectedTagId.value);
-  
-  if (!selectedCategory || !selectedTag) return;
+  const { category: selectedCategory, tag: selectedTag } = selection;
   
   // Check if tag already exists (exact same tag)
   const tagExists = structuredTags.value.some(tag => 
-    tag.categoryId === selectedCategoryId.value && tag.tagName === selectedTag.name
+    tag.categoryId === selectedCategory.id && tag.tagName === selectedTag.name
   );
   
   if (tagExists) {
@@ -219,32 +122,34 @@ const addSelectedTag = async () => {
   }
   
   try {
-    // Create new structured tag
-    const newTag = {
+    // Remove existing tags from same category (mutual exclusivity) first
+    const existingTagsInCategory = structuredTags.value.filter(tag => 
+      tag.categoryId === selectedCategory.id
+    );
+    
+    for (const existingTag of existingTagsInCategory) {
+      await tagService.removeTag(props.evidence.id, existingTag.id);
+    }
+    
+    // Create new structured tag data
+    const newTagData = {
       categoryId: selectedCategory.id,
       categoryName: selectedCategory.name,
-      tagId: selectedTag.id,
       tagName: selectedTag.name,
-      color: selectedTag.color
+      color: selectedTag.color,
+      source: 'human',
+      createdBy: 'user-id' // TODO: Get actual user ID from auth store
     };
     
-    // Remove existing tags from same category (mutual exclusivity)
-    const updatedTagsByHuman = (props.evidence.tagsByHuman || [])
-      .filter(tag => tag.categoryId !== selectedCategoryId.value)
-      .concat(newTag);
-    
-    // Update via store
-    await organizerStore.updateEvidenceStructuredTags(
-      props.evidence.id, 
-      updatedTagsByHuman, 
-      props.evidence.tagsByAI || []
-    );
+    // Add tag using subcollection service
+    await tagService.addTag(props.evidence.id, newTagData);
     
     emit('tags-updated');
     
-    // Reset selections
-    selectedCategoryId.value = '';
-    selectedTagId.value = '';
+    // Reset selections in child component
+    if (categoryTagSelector.value) {
+      categoryTagSelector.value.clearSelections();
+    }
     
   } catch (error) {
     console.error('Failed to add structured tag:', error);
@@ -253,20 +158,26 @@ const addSelectedTag = async () => {
 
 const removeStructuredTag = async (tagToRemove) => {
   try {
-    // Get fresh evidence data from core store to avoid stale props
-    const freshEvidence = organizerStore.stores.core.getEvidenceById(props.evidence.id);
-    if (!freshEvidence) {
-      throw new Error('Evidence not found in store');
+    // Use subcollection service to remove tag
+    if (tagToRemove.id) {
+      // Tag has subcollection ID - use subcollection service
+      await tagService.removeTag(props.evidence.id, tagToRemove.id);
+    } else {
+      // Fallback to embedded array method for backward compatibility
+      const freshEvidence = organizerStore.stores.core.getEvidenceById(props.evidence.id);
+      if (!freshEvidence) {
+        throw new Error('Evidence not found in store');
+      }
+      
+      const updatedTagsByHuman = (freshEvidence.tagsByHuman || [])
+        .filter(tag => !(tag.categoryId === tagToRemove.categoryId && tag.tagId === tagToRemove.tagId));
+      
+      await organizerStore.updateEvidenceStructuredTags(
+        props.evidence.id,
+        updatedTagsByHuman,
+        freshEvidence.tagsByAI || []
+      );
     }
-    
-    const updatedTagsByHuman = (freshEvidence.tagsByHuman || [])
-      .filter(tag => !(tag.categoryId === tagToRemove.categoryId && tag.tagId === tagToRemove.tagId));
-    
-    await organizerStore.updateEvidenceStructuredTags(
-      props.evidence.id,
-      updatedTagsByHuman,
-      freshEvidence.tagsByAI || []
-    );
     
     emit('tags-updated');
     
@@ -288,23 +199,57 @@ const removeLegacyTag = async (tagToRemove) => {
     console.error('Failed to remove legacy tag:', error);
   }
 };
+// Lifecycle hooks
+onMounted(async () => {
+  await loadSubcollectionTags();
+});
+
+onUnmounted(() => {
+  if (unsubscribeTags.value) {
+    unsubscribeTags.value();
+    unsubscribeTags.value = null;
+  }
+});
+
+// Watch for evidence changes to reload tags
+watch(() => props.evidence.id, async () => {
+  if (unsubscribeTags.value) {
+    unsubscribeTags.value();
+    unsubscribeTags.value = null;
+  }
+  await loadSubcollectionTags();
+});
+
+/**
+ * Load tags from subcollection with real-time updates
+ */
+const loadSubcollectionTags = async () => {
+  if (!props.evidence.id) return;
+  
+  try {
+    loadingTags.value = true;
+    
+    // Subscribe to real-time tag updates
+    unsubscribeTags.value = tagService.subscribeToTags(
+      props.evidence.id,
+      (tags) => {
+        subcollectionTags.value = tags;
+        loadingTags.value = false;
+      }
+    );
+    
+  } catch (error) {
+    console.error('Failed to load subcollection tags:', error);
+    loadingTags.value = false;
+    // Fallback to embedded arrays in case of error
+    subcollectionTags.value = [];
+  }
+};
+
 </script>
 
 <style scoped>
 .tag-selector {
   max-width: 100%;
-}
-
-.tags-display, .legacy-tags-display {
-  min-height: 40px;
-}
-
-.category-selection {
-  margin-top: 8px;
-}
-
-.migration-prompt {
-  border-left: 4px solid #2196f3;
-  padding-left: 12px;
 }
 </style>

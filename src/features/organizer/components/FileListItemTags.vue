@@ -51,9 +51,10 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import TagSelector from './TagSelector.vue';
 import AITagChip from './AITagChip.vue';
+import { TagSubcollectionService } from '../services/tagSubcollectionService.js';
 
 // Props
 const props = defineProps({
@@ -89,12 +90,35 @@ const emit = defineEmits([
   'tag-error',
 ]);
 
+// Services and local state
+const tagService = new TagSubcollectionService();
+const subcollectionTags = ref([]);
+const loadingTags = ref(false);
+const unsubscribeTags = ref(null);
+
 // Computed properties
 const structuredHumanTags = computed(() => {
+  if (subcollectionTags.value.length > 0) {
+    return subcollectionTags.value.filter(tag => tag.source === 'human');
+  }
+  // Fallback to embedded arrays for backward compatibility
   return props.evidence?.tagsByHuman || [];
 });
 
 const structuredAITags = computed(() => {
+  if (subcollectionTags.value.length > 0) {
+    return subcollectionTags.value
+      .filter(tag => tag.source === 'ai')
+      .map(tag => ({
+        ...tag,
+        // Map subcollection format to expected AI tag format
+        status: tag.metadata?.status || 'suggested',
+        confidence: tag.confidence || 0.8,
+        reasoning: tag.metadata?.reasoning || 'AI suggested',
+        suggestedAt: tag.createdAt
+      }));
+  }
+  // Fallback to embedded arrays for backward compatibility
   return props.evidence?.tagsByAI || [];
 });
 
@@ -113,6 +137,8 @@ const hasAnyTags = computed(() => {
 const handleTagsUpdate = () => {
   // TagSelector handles the update internally, just emit for refresh
   emit('tags-update', props.evidence.id, []);
+  // Reload subcollection tags after update
+  loadSubcollectionTags();
 };
 
 const handleMigrateLegacy = () => {
@@ -123,6 +149,53 @@ const handleMigrateLegacy = () => {
 
 const handleTagError = (error) => {
   emit('tag-error', error);
+};
+
+// Lifecycle hooks
+onMounted(async () => {
+  await loadSubcollectionTags();
+});
+
+onUnmounted(() => {
+  if (unsubscribeTags.value) {
+    unsubscribeTags.value();
+    unsubscribeTags.value = null;
+  }
+});
+
+// Watch for evidence changes to reload tags
+watch(() => props.evidence.id, async () => {
+  if (unsubscribeTags.value) {
+    unsubscribeTags.value();
+    unsubscribeTags.value = null;
+  }
+  await loadSubcollectionTags();
+});
+
+/**
+ * Load tags from subcollection with real-time updates
+ */
+const loadSubcollectionTags = async () => {
+  if (!props.evidence.id) return;
+  
+  try {
+    loadingTags.value = true;
+    
+    // Subscribe to real-time tag updates
+    unsubscribeTags.value = tagService.subscribeToTags(
+      props.evidence.id,
+      (tags) => {
+        subcollectionTags.value = tags;
+        loadingTags.value = false;
+      }
+    );
+    
+  } catch (error) {
+    console.error('Failed to load subcollection tags:', error);
+    loadingTags.value = false;
+    // Fallback to embedded arrays in case of error
+    subcollectionTags.value = [];
+  }
 };
 </script>
 

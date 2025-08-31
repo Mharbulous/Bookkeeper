@@ -5,9 +5,9 @@
     size="small"
     class="ai-tag-chip"
     :class="{
-      'ai-tag-chip--suggested': tag.status === 'suggested',
-      'ai-tag-chip--approved': tag.status === 'approved',
-      'ai-tag-chip--rejected': tag.status === 'rejected'
+      'ai-tag-chip--suggested': getTagStatus() === 'suggested',
+      'ai-tag-chip--approved': getTagStatus() === 'approved',
+      'ai-tag-chip--rejected': getTagStatus() === 'rejected'
     }"
   >
     <!-- AI indicator icon -->
@@ -25,7 +25,7 @@
     
     <!-- Status indicator for suggested tags -->
     <v-icon
-      v-if="tag.status === 'suggested' && showStatusActions"
+      v-if="getTagStatus() === 'suggested' && showStatusActions"
       size="16"
       class="ml-1 status-icon"
     >
@@ -34,7 +34,7 @@
     
     <!-- Approval indicator for approved tags -->
     <v-icon
-      v-if="tag.status === 'approved'"
+      v-if="getTagStatus() === 'approved'"
       size="14"
       class="ml-1 status-icon"
       color="success"
@@ -57,8 +57,8 @@
           <div v-if="tag.reasoning">
             <strong>Reasoning:</strong> {{ tag.reasoning }}
           </div>
-          <div v-if="tag.suggestedAt">
-            <strong>Suggested:</strong> {{ formatDate(tag.suggestedAt) }}
+          <div v-if="getCreatedAt()">
+            <strong>Suggested:</strong> {{ formatDate(getCreatedAt()) }}
           </div>
           <div class="tooltip-status">
             <strong>Status:</strong> {{ statusText }}
@@ -79,9 +79,7 @@ const props = defineProps({
     required: true,
     validator: (tag) => {
       return tag.tagName && 
-             tag.categoryName && 
-             tag.status && 
-             ['suggested', 'approved', 'rejected'].includes(tag.status);
+             tag.categoryName;
     }
   },
   showAIIcon: {
@@ -101,7 +99,8 @@ const props = defineProps({
 
 // Computed properties
 const displayColor = computed(() => {
-  switch (props.tag.status) {
+  const status = getTagStatus();
+  switch (status) {
     case 'suggested':
       return 'orange-lighten-1';
     case 'approved':
@@ -114,17 +113,19 @@ const displayColor = computed(() => {
 });
 
 const chipVariant = computed(() => {
+  const status = getTagStatus();
   // Override variant based on status
-  if (props.tag.status === 'suggested') {
+  if (status === 'suggested') {
     return 'tonal';
-  } else if (props.tag.status === 'rejected') {
+  } else if (status === 'rejected') {
     return 'outlined';
   }
   return props.variant;
 });
 
 const aiIcon = computed(() => {
-  switch (props.tag.status) {
+  const status = getTagStatus();
+  switch (status) {
     case 'suggested':
       return 'mdi-robot-outline';
     case 'approved':
@@ -137,7 +138,8 @@ const aiIcon = computed(() => {
 });
 
 const statusText = computed(() => {
-  switch (props.tag.status) {
+  const status = getTagStatus();
+  switch (status) {
     case 'suggested':
       return 'Awaiting Review';
     case 'approved':
@@ -148,6 +150,33 @@ const statusText = computed(() => {
       return 'Unknown';
   }
 });
+
+/**
+ * Get tag status from either embedded format or subcollection format
+ */
+const getTagStatus = () => {
+  // Check subcollection format first (metadata.status)
+  if (props.tag.metadata?.status) {
+    return props.tag.metadata.status;
+  }
+  
+  // Check if it's a human tag (source: 'human') that was approved from AI
+  if (props.tag.source === 'human' && props.tag.metadata?.originallyFromAI) {
+    return 'approved';
+  }
+  
+  // Check embedded format (direct status property)
+  if (props.tag.status) {
+    return props.tag.status;
+  }
+  
+  // Default for AI tags without explicit status
+  if (props.tag.source === 'ai') {
+    return 'suggested';
+  }
+  
+  return 'unknown';
+};
 
 // Helper functions
 const formatDate = (date) => {
@@ -163,6 +192,23 @@ const formatDate = (date) => {
     hour: 'numeric',
     minute: '2-digit'
   }).format(dateObj);
+};
+
+/**
+ * Get creation date from either embedded format or subcollection format
+ */
+const getCreatedAt = () => {
+  // Check subcollection format (createdAt)
+  if (props.tag.createdAt) {
+    return props.tag.createdAt;
+  }
+  
+  // Check embedded format (suggestedAt)
+  if (props.tag.suggestedAt) {
+    return props.tag.suggestedAt;
+  }
+  
+  return null;
 };
 </script>
 
