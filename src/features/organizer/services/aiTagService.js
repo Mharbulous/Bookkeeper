@@ -77,7 +77,7 @@ export class AITagService {
       const storedTags = await this.storeAISuggestionsWithConfidence(evidenceId, aiSuggestions);
 
       // Get approval statistics
-      const stats = await tagSubcollectionService.getTagStats(evidenceId);
+      const stats = await tagSubcollectionService.getTagStats(evidenceId, teamId);
 
       console.log(`[AITagService] Processed document ${evidenceId}: ${aiSuggestions.length} suggestions, ${stats.autoApproved} auto-approved`);
 
@@ -156,20 +156,32 @@ export class AITagService {
    */
   async storeAISuggestionsWithConfidence(evidenceId, suggestions) {
     try {
+      const teamId = this.getTeamId();
+      
       // Transform suggestions to include confidence and metadata
-      const tagData = suggestions.map(suggestion => ({
-        tagName: suggestion.tagName || suggestion.name,
-        confidence: Math.round(suggestion.confidence || 0),
-        source: 'ai',
-        metadata: {
-          model: 'vertex-ai',
-          processingTime: suggestion.processingTime || 0,
-          context: suggestion.reasoning || ''
+      const tagData = suggestions.map(suggestion => {
+        // Convert decimal confidence (0.9) to percentage (90)
+        let confidence = suggestion.confidence || 0;
+        if (confidence <= 1) {
+          confidence = Math.round(confidence * 100);
+        } else {
+          confidence = Math.round(confidence);
         }
-      }));
+        
+        return {
+          tagName: suggestion.tagName || suggestion.name,
+          confidence: confidence,
+          source: 'ai',
+          metadata: {
+            model: 'vertex-ai',
+            processingTime: suggestion.processingTime || 0,
+            context: suggestion.reasoning || ''
+          }
+        };
+      });
 
       // Store tags in subcollection (auto-approval handled by service)
-      const storedTags = await tagSubcollectionService.addTagsBatch(evidenceId, tagData);
+      const storedTags = await tagSubcollectionService.addTagsBatch(evidenceId, tagData, teamId);
       
       return storedTags;
     } catch (error) {
@@ -204,7 +216,8 @@ export class AITagService {
    * @returns {Promise<Object>} - Tags grouped by status (pending, approved, rejected)
    */
   async getTagsByStatus(evidenceId) {
-    return tagSubcollectionService.getTagsByStatus(evidenceId);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.getTagsByStatus(evidenceId, teamId);
   }
 
   /**
@@ -213,7 +226,8 @@ export class AITagService {
    * @returns {Promise<Array>} - Array of approved tags
    */
   async getApprovedTags(evidenceId) {
-    return tagSubcollectionService.getApprovedTags(evidenceId);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.getApprovedTags(evidenceId, teamId);
   }
 
   /**
@@ -222,7 +236,8 @@ export class AITagService {
    * @returns {Promise<Array>} - Array of pending tags
    */
   async getPendingTags(evidenceId) {
-    return tagSubcollectionService.getPendingTags(evidenceId);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.getPendingTags(evidenceId, teamId);
   }
 
   /**
@@ -232,7 +247,8 @@ export class AITagService {
    * @returns {Promise<Object>} - Operation result
    */
   async approveAITag(evidenceId, tagId) {
-    return tagSubcollectionService.approveTag(evidenceId, tagId);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.approveTag(evidenceId, tagId, teamId);
   }
 
   /**
@@ -242,7 +258,8 @@ export class AITagService {
    * @returns {Promise<Object>} - Operation result
    */
   async rejectAITag(evidenceId, tagId) {
-    return tagSubcollectionService.rejectTag(evidenceId, tagId);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.rejectTag(evidenceId, tagId, teamId);
   }
 
   /**
@@ -252,7 +269,8 @@ export class AITagService {
    * @returns {Promise<Object>} - Operation result
    */
   async approveTagsBatch(evidenceId, tagIds) {
-    return tagSubcollectionService.approveTagsBatch(evidenceId, tagIds);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.approveTagsBatch(evidenceId, tagIds, teamId);
   }
 
   /**
@@ -262,7 +280,8 @@ export class AITagService {
    * @returns {Promise<Object>} - Operation result
    */
   async rejectTagsBatch(evidenceId, tagIds) {
-    return tagSubcollectionService.rejectTagsBatch(evidenceId, tagIds);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.rejectTagsBatch(evidenceId, tagIds, teamId);
   }
 
   /**
@@ -271,7 +290,8 @@ export class AITagService {
    * @returns {Promise<Object>} - Tag statistics
    */
   async getTagStats(evidenceId) {
-    return tagSubcollectionService.getTagStats(evidenceId);
+    const teamId = this.getTeamId();
+    return tagSubcollectionService.getTagStats(evidenceId, teamId);
   }
 
   /**

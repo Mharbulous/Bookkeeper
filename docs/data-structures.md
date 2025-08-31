@@ -1,6 +1,6 @@
 # Firestore Data Structure Design (KISS Edition)
 
-Last Updated: 2025-08-28
+Last Updated: 2025-08-31
 
 ## Overview
 
@@ -18,6 +18,7 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 
 ### 1. Users Collection: `/users/{userId}`
 
+2
 **Purpose**: Store user preferences and app-specific settings
 
 ```javascript
@@ -236,6 +237,7 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
 **Purpose**: Store organizational and processing metadata for uploaded files, providing user-facing document management capabilities
 
 **Key Design Principles:**
+
 - **Single Source of Truth**: No redundant data - all display information references original metadata records
 - **Deduplication Aware**: Handles multiple original names and folder paths for identical files
 - **AI/Human Separation**: Distinguishes between AI-generated and human-applied tags
@@ -248,23 +250,23 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
     fileHash: 'abc123def456789abcdef012345', // SHA-256 content hash (links to Firebase Storage file)
     fileTypes: '.pdf'                       // File extension/type
   },
-  
+
   // Display configuration (references chosen metadata record)
   displayCopy: 'xyz789abc123def456...',     // Metadata hash - points to chosen originalMetadata record
-  
+
   // File properties (for quick access without metadata lookup)
   fileSize: 2048576,                        // File size in bytes
-  
+
   // Document processing status (for future Document Processing Workflow)
   isProcessed: false,                       // Whether document has been processed
   hasAllPages: null,                        // null=unknown, true/false after processing
   processingStage: 'uploaded',              // 'uploaded' | 'splitting' | 'merging' | 'complete'
-  
+
   // Tag subcollection counters (for efficient querying without subcollection queries)
   tagCount: 8,                              // Total tags across all categories
   autoApprovedCount: 5,                     // AI tags that were auto-approved (confidence >= 85%)
   reviewRequiredCount: 2,                   // AI tags needing human review (confidence < 85%)
-  
+
   // Timestamps
   updatedAt: Timestamp                      // When evidence document was last modified
 }
@@ -273,16 +275,19 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
 **Field Details:**
 
 **`displayCopy` Field:**
+
 - **Purpose**: References the specific metadata record to use for display
 - **User Choice**: Users select from available metadata records
 - **Flexibility**: Allows switching display representation without data loss
 - **Simplified**: Direct metadata hash reference for streamlined access
 
 **Tag System Architecture:**
+
 - **Tag Subcollections** (`/tags/{categoryId}`): Category-based approach with confidence workflow
 - **Counters** (`tagCount`, `autoApprovedCount`, `reviewRequiredCount`): Quick access without subcollection query
 
 **Benefits of Subcollection Approach:**
+
 - **Mutually Exclusive Categories**: One tag per category prevents confusion (categoryId as document ID)
 - **Confidence-Based Auto-Approval**: 70-80% of AI tags auto-approved (confidence >= 85%), reducing manual review
 - **Atomic Updates**: Replace category tag without affecting other categories
@@ -291,11 +296,12 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
 - **Clean Implementation**: Optimal structure from the start (no migration complexity)
 
 **Derived Information:**
+
 ```javascript
 // All information derived from referenced data
 const metadata = await getOriginalMetadata(evidence.displayCopy);
-const displayName = metadata.originalName;        // From chosen metadata record
-const createdDate = metadata.lastModified;        // From chosen metadata record
+const displayName = metadata.originalName; // From chosen metadata record
+const createdDate = metadata.lastModified; // From chosen metadata record
 const fileExtension = evidence.storageRef.fileTypes; // From storageRef or derived from filename
 // Tags accessed through subcollection queries, not embedded arrays
 ```
@@ -319,36 +325,36 @@ const fileExtension = evidence.storageRef.fileTypes; // From storageRef or deriv
   // Category identification
   categoryId: 'cat-legal-123',              // Redundant but useful for queries
   categoryName: 'Legal Documents',          // Display name for category
-  
+
   // Selected tag within this category
   tagName: 'Contract',                      // The chosen tag (from AI suggestions or human input)
   color: '#4CAF50',                         // Category color for UI display
-  
+
   // Tag source and confidence
   source: 'ai' | 'ai-auto' | 'human',      // How this tag was applied
-  confidence: 0.95,                         // AI confidence (0-1), 1.0 for human tags
-  
+  confidence: 95,                           // AI confidence (0-100), 100 for human tags
+
   // Auto-approval workflow (for AI tags)
   autoApproved: true,                       // Whether AI auto-approved (confidence >= 85%)
   reviewRequired: false,                    // Whether human review is needed
-  
+
   // Human review tracking
   reviewedAt: Timestamp | null,             // When human reviewed (if applicable)
   reviewedBy: 'user-jane-456' | null,       // Who reviewed it (if applicable)
   humanApproved: true | null,               // Whether human approved AI suggestion
-  
+
   // Timestamps and attribution
   createdAt: Timestamp,                     // When tag was created
   createdBy: 'ai-system' | 'user-john-456', // Who/what created it
-  
+
   // AI analysis and extended metadata
   AIanalysis: {
     aiSelection: 'Contract',                     // AI's selected tag
-    originalConfidence: 0.95,                   // Original AI confidence score
+    originalConfidence: 95,                     // Original AI confidence score (percentage)
     aiSuggestions: ['Contract', 'Agreement', 'Legal Document'], // Top 3 AI suggestions
-    processingModel: 'claude-3-sonnet',         // AI model used
+    processingModel: 'gemini-pro',              // AI model used (via Firebase AI Logic)
     contentMatch: 'signature block detected',   // Why AI suggested this
-    
+
     // Human interaction
     reviewReason: 'confidence_below_threshold', // Why review was needed
     reviewNote: 'Confirmed - this is a contract', // Human reviewer note
@@ -367,16 +373,18 @@ const fileExtension = evidence.storageRef.fileTypes; // From storageRef or deriv
 6. **Natural Data Modeling**: Matches user mental model of "one classification per category"
 
 **Tag Source Types:**
+
 - **`ai`**: AI suggestion requiring human review (confidence < 85%)
 - **`ai-auto`**: AI suggestion auto-approved (confidence >= 85%)
 - **`human`**: Manually applied by user
 
 **Confidence-Based Workflow:**
+
 ```javascript
 // High confidence AI tag (auto-approved)
 {
   source: 'ai-auto',
-  confidence: 0.95,
+  confidence: 95,                           // Percentage format (95%)
   autoApproved: true,
   reviewRequired: false
 }
@@ -384,7 +392,7 @@ const fileExtension = evidence.storageRef.fileTypes; // From storageRef or deriv
 // Low confidence AI tag (needs review)
 {
   source: 'ai',
-  confidence: 0.72,
+  confidence: 72,                           // Percentage format (72%)
   autoApproved: false,
   reviewRequired: true
 }
@@ -392,7 +400,7 @@ const fileExtension = evidence.storageRef.fileTypes; // From storageRef or deriv
 // Human-reviewed AI tag (originally needed review)
 {
   source: 'ai',
-  confidence: 0.78,
+  confidence: 78,                           // Percentage format (78%)
   autoApproved: false,
   reviewRequired: false,  // No longer needs review
   reviewedAt: Timestamp,
@@ -433,29 +441,37 @@ const fileExtension = evidence.storageRef.fileTypes; // From storageRef or deriv
 - Perfect deduplication while preserving all metadata variations
 
 ### Processing Folders
+
 **Purpose**: Organize files based on processing status and operations performed
 
 The following folders are reserved for future file processing workflows:
 
 #### OCRed Files: `/teams/{teamId}/matters/{matterId}/OCRed/`
+
 **Purpose**: Store files that have been processed through Optical Character Recognition
+
 - Contains text-searchable versions of scanned documents
 - Maintains original file hash for deduplication
 - Enables full-text search capabilities
 
 #### Split Files: `/teams/{teamId}/matters/{matterId}/split/`
+
 **Purpose**: Store files that have been split from larger documents
+
 - Contains individual pages or sections from multi-page documents
 - Each split file gets its own hash and metadata record
 - Maintains reference to original source file
 
 #### Merged Files: `/teams/{teamId}/matters/{matterId}/merged/`
+
 **Purpose**: Store files that have been merged from multiple source files
+
 - Contains consolidated documents created from multiple inputs
 - New hash generated for merged content
 - Metadata tracks all source files used in merge operation
 
 **Processing Workflow**:
+
 ```
 Original Upload → /uploads/
      ↓

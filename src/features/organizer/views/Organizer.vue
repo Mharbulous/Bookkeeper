@@ -23,6 +23,7 @@
     <!-- File list display -->
     <FileListDisplay
       v-if="showFileList"
+      :key="refreshKey"
       v-model:view-mode="viewMode"
       :filtered-evidence="filteredEvidence"
       :getEvidenceTags="getEvidenceTags"
@@ -82,6 +83,7 @@ const viewMode = ref('list');
 const showUpdateOverlay = ref(false);
 const tagUpdateLoading = ref(new Set());
 const aiProcessing = ref(new Set()); // Track AI processing by evidence ID
+const refreshKey = ref(0); // Force component refresh after AI processing
 const unsubscribe = ref(null);
 
 
@@ -184,6 +186,10 @@ const processWithAI = async (evidence) => {
       } else {
         showNotification('AI processing complete, but no tags were suggested.', 'info');
       }
+      
+      // Force a reactivity update by updating a key or triggering a refresh
+      // We'll increment a refresh counter that child components can watch
+      refreshKey.value++;
     } else {
       throw new Error(result.error || 'AI processing failed');
     }
