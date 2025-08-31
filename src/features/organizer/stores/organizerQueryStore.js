@@ -39,34 +39,13 @@ export const useOrganizerQueryStore = defineStore('organizerQuery', () => {
         return true;
       }
 
-      // Search in structured tags (tagsByHuman and tagsByAI)
-      const humanTags = evidence.tagsByHuman || [];
-      const aiTags = (evidence.tagsByAI || []).filter(tag => tag.status !== 'rejected'); // Exclude rejected AI tags
-      const structuredTags = [...humanTags, ...aiTags];
-      
-      if (structuredTags.some(tag => 
+      // Search in subcollection tags (new tag system)
+      const allTags = getAllTags(evidence);
+      if (allTags.some(tag => 
         tag.tagName?.toLowerCase().includes(searchTerm) ||
         tag.categoryName?.toLowerCase().includes(searchTerm)
       )) {
         return true;
-      }
-
-      // Search in legacy tags for backward compatibility
-      if (evidence.tags && Array.isArray(evidence.tags)) {
-        if (evidence.tags.some(tag => 
-          tag.toLowerCase().includes(searchTerm)
-        )) {
-          return true;
-        }
-      }
-
-      // Search in legacy tags array
-      if (evidence.legacyTags && Array.isArray(evidence.legacyTags)) {
-        if (evidence.legacyTags.some(tag => 
-          tag.toLowerCase().includes(searchTerm)
-        )) {
-          return true;
-        }
       }
 
       return false;
@@ -91,7 +70,10 @@ export const useOrganizerQueryStore = defineStore('organizerQuery', () => {
       const searchTerm = filterText.value.toLowerCase().trim();
       filtered = filtered.filter((evidence) => {
         return evidence.displayName?.toLowerCase().includes(searchTerm) ||
-          getAllTags(evidence).some(tag => tag.toLowerCase().includes(searchTerm));
+          getAllTags(evidence).some(tag => 
+            tag.tagName?.toLowerCase().includes(searchTerm) ||
+            tag.categoryName?.toLowerCase().includes(searchTerm)
+          );
       });
     }
 
@@ -99,11 +81,8 @@ export const useOrganizerQueryStore = defineStore('organizerQuery', () => {
     Object.entries(categoryFilters).forEach(([categoryId, selectedTags]) => {
       if (selectedTags.length > 0) {
         filtered = filtered.filter(evidence => {
-          const humanTags = evidence.tagsByHuman || [];
-          const aiTags = (evidence.tagsByAI || []).filter(tag => tag.status !== 'rejected');
-          const structuredTags = [...humanTags, ...aiTags];
-          
-          return structuredTags.some(tag => 
+          const allTags = getAllTags(evidence);
+          return allTags.some(tag => 
             tag.categoryId === categoryId && selectedTags.includes(tag.tagName)
           );
         });
@@ -131,28 +110,24 @@ export const useOrganizerQueryStore = defineStore('organizerQuery', () => {
   };
 
   /**
-   * Get all tags (structured + legacy) for display purposes
+   * Get all subcollection tags for display purposes
+   * Note: This now returns tag objects, not just strings
    */
   const getAllTags = (evidence) => {
-    const humanTags = evidence.tagsByHuman || [];
-    const aiTags = (evidence.tagsByAI || []).filter(tag => tag.status !== 'rejected');
-    const structuredTags = [...humanTags, ...aiTags];
-    const structuredTagNames = structuredTags.map(tag => tag.tagName);
-    const legacyTags = evidence.legacyTags || evidence.tags || [];
-    
-    return [...structuredTagNames, ...legacyTags];
+    // This method should ideally load from the subcollection
+    // For now, return empty array since subcollection loading
+    // should be handled at the component level
+    return evidence.subcollectionTags || [];
   };
 
   /**
-   * Get structured tags grouped by category for an evidence document
+   * Get subcollection tags grouped by category for an evidence document
    */
   const getStructuredTagsByCategory = (evidence) => {
-    const humanTags = evidence.tagsByHuman || [];
-    const aiTags = (evidence.tagsByAI || []).filter(tag => tag.status !== 'rejected');
-    const allStructuredTags = [...humanTags, ...aiTags];
+    const allTags = getAllTags(evidence);
     const grouped = {};
     
-    allStructuredTags.forEach(tag => {
+    allTags.forEach(tag => {
       if (!grouped[tag.categoryId]) {
         grouped[tag.categoryId] = {
           categoryName: tag.categoryName,
@@ -166,14 +141,11 @@ export const useOrganizerQueryStore = defineStore('organizerQuery', () => {
   };
 
   /**
-   * Check if evidence has any tags (structured or legacy)
+   * Check if evidence has any subcollection tags
    */
   const hasAnyTags = (evidence) => {
-    const humanTagsCount = evidence.tagsByHuman?.length || 0;
-    const aiTagsCount = (evidence.tagsByAI || []).filter(tag => tag.status !== 'rejected').length;
-    const legacyTagsCount = (evidence.legacyTags?.length || 0) + (evidence.tags?.length || 0);
-    
-    return humanTagsCount + aiTagsCount + legacyTagsCount > 0;
+    const subcollectionTagsCount = getAllTags(evidence).length;
+    return subcollectionTagsCount > 0;
   };
 
   /**

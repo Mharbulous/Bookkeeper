@@ -20,15 +20,6 @@
       @tag-change="onTagChange"
     />
 
-    <!-- Migration prompt for legacy tags -->
-    <TagMigrationPrompt
-      :legacy-tag-count="legacyTags.length"
-      :disabled="disabled"
-      :loading="loading"
-      :hide-prompt="hideMigrationPrompt"
-      @migrate-legacy="$emit('migrate-legacy')"
-      @hide-prompt="hideMigrationPrompt = true"
-    />
   </div>
 </template>
 
@@ -40,7 +31,6 @@ import { useAuthStore } from '../../../core/stores/auth.js';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
 import TagDisplaySection from './TagDisplaySection.vue';
 import CategoryTagSelector from './CategoryTagSelector.vue';
-import TagMigrationPrompt from './TagMigrationPrompt.vue';
 
 const props = defineProps({
   evidence: {
@@ -107,7 +97,7 @@ const allAITags = computed(() => {
   return [...pendingTags.value, ...approvedTags.value.filter(tag => tag.source === 'ai'), ...rejectedTags.value];
 });
 
-const legacyTags = computed(() => props.evidence.legacyTags || props.evidence.tags || []);
+// Legacy tags no longer supported - using subcollection tags only
 
 // Methods
 const onCategoryChange = (categoryId) => {
@@ -297,19 +287,7 @@ const bulkRejectAITags = async (tagIds) => {
   }
 };
 
-const removeLegacyTag = async (tagToRemove) => {
-  try {
-    const updatedLegacyTags = legacyTags.value.filter(tag => tag !== tagToRemove);
-    
-    // Update legacy tags via organizer store
-    await organizerStore.updateEvidenceTags(props.evidence.id, updatedLegacyTags);
-    
-    emit('tags-updated');
-    
-  } catch (error) {
-    console.error('Failed to remove legacy tag:', error);
-  }
-};
+// Legacy tag removal no longer supported
 // Lifecycle hooks
 onMounted(async () => {
   await loadSubcollectionTags();

@@ -36,17 +36,6 @@
         {{ tag.tagName }}
       </v-chip>
       
-      <!-- Legacy tags (for backward compatibility) -->
-      <v-chip
-        v-for="tag in legacyTags"
-        :key="`legacy-${tag}`"
-        size="small"
-        variant="outlined"
-        color="primary"
-        class="ma-1 legacy-tag"
-      >
-        {{ tag }}
-      </v-chip>
       
       <!-- AI tags with confidence-based styling -->
       <AITagChip
@@ -123,10 +112,7 @@ const structuredHumanTags = computed(() => {
   // Get manually added tags (source: 'manual') and approved AI tags that should show as approved
   const manualTags = approvedTags.value.filter(tag => tag.source === 'manual');
   
-  // If no subcollection tags, fallback to embedded arrays for backward compatibility
-  if (manualTags.length === 0 && approvedTags.value.length === 0) {
-    return props.evidence?.tagsByHuman || [];
-  }
+  // Legacy embedded arrays no longer supported
   
   return manualTags;
 });
@@ -139,10 +125,7 @@ const structuredAITags = computed(() => {
     ...rejectedTags.value.map(tag => ({ ...tag, displayStatus: 'rejected' }))
   ];
   
-  // If no subcollection tags, fallback to embedded arrays for backward compatibility
-  if (allAITags.length === 0) {
-    return props.evidence?.tagsByAI || [];
-  }
+  // Legacy embedded arrays no longer supported
   
   // Map to format expected by AITagChip component
   return allAITags.map(tag => ({
@@ -155,10 +138,7 @@ const structuredAITags = computed(() => {
   }));
 });
 
-const legacyTags = computed(() => {
-  // Support legacy tags for backward compatibility
-  return props.evidence?.tags || props.evidence?.legacyTags || [];
-});
+// Legacy tags no longer supported
 
 // Additional computed properties for confidence-based visual indicators
 const pendingAITagsCount = computed(() => pendingTags.value.length);
@@ -174,7 +154,7 @@ const lowConfidenceAITags = computed(() => {
 const hasAnyTags = computed(() => {
   return structuredHumanTags.value.length > 0 || 
          structuredAITags.value.length > 0 || 
-         legacyTags.value.length > 0;
+         false; // Legacy tags no longer supported
 });
 
 const hasHighConfidencePendingTags = computed(() => {
