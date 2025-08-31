@@ -151,25 +151,41 @@ const addSelectedTag = async (selection) => {
     
     for (const existingTag of existingTagsInCategory) {
       if (existingTag.id) {
-        await tagService.deleteTag(props.evidence.id, existingTag.id);
+        const teamId = authStore.currentTeam;
+      if (teamId) {
+        await tagService.deleteTag(props.evidence.id, existingTag.id, teamId);
+      }
       }
     }
     
-    // Create new structured tag data
+    // Create new structured tag data (using NEW data structure from migration plan)
     const newTagData = {
+      categoryId: selectedCategory.id,
+      categoryName: selectedCategory.name,
       tagName: selectedTag.name,
-      confidence: 100, // Manual tags have 100% confidence
-      source: 'manual',
+      color: selectedTag.color,
+      source: 'human',
+      confidence: 1.0, // Human tags have 100% confidence (1.0 scale)
+      autoApproved: null, // Not applicable for human tags
+      reviewRequired: false, // Human tags don't need review
+      createdBy: authStore.user?.uid || 'unknown-user',
       metadata: {
-        categoryId: selectedCategory.id,
-        categoryName: selectedCategory.name,
-        color: selectedTag.color,
-        createdBy: 'user-id' // TODO: Get actual user ID from auth store
+        userNote: 'Manual tag selection',
+        manuallyApplied: true,
+        selectedFromOptions: [selectedTag.name] // Could be expanded to show other options
       }
     };
     
     // Add tag using subcollection service (auto-approved since it's manual)
-    await tagService.addTag(props.evidence.id, newTagData);
+    const teamId = authStore.currentTeam;
+    if (!teamId) {
+      console.error('No team ID available for tag operations');
+      return;
+    }
+    await tagService.addTag(props.evidence.id, newTagData, teamId);
+    
+    // Reload tags to update UI immediately
+    await loadSubcollectionTags();
     
     emit('tags-updated');
     
@@ -188,7 +204,12 @@ const removeStructuredTag = async (tagToRemove) => {
     // Use subcollection service to remove tag
     if (tagToRemove.id) {
       // Tag has subcollection ID - use subcollection service
-      await tagService.deleteTag(props.evidence.id, tagToRemove.id);
+      const teamId = authStore.currentTeam;
+      if (!teamId) {
+        console.error('No team ID available for tag operations');
+        return;
+      }
+      await tagService.deleteTag(props.evidence.id, tagToRemove.id, teamId);
     } else {
       // Fallback to embedded array method for backward compatibility
       const freshEvidence = organizerStore.stores.core.getEvidenceById(props.evidence.id);
@@ -206,6 +227,12 @@ const removeStructuredTag = async (tagToRemove) => {
       );
     }
     
+    // Small delay to ensure Firestore operation is committed before reloading
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Reload tags to update UI immediately
+    await loadSubcollectionTags();
+    
     emit('tags-updated');
     
   } catch (error) {
@@ -216,7 +243,12 @@ const removeStructuredTag = async (tagToRemove) => {
 // New methods for handling AI tag approvals
 const approveAITag = async (tagId) => {
   try {
-    await tagService.approveTag(props.evidence.id, tagId);
+    const teamId = authStore.currentTeam;
+    if (!teamId) {
+      console.error('No team ID available for tag operations');
+      return;
+    }
+    await tagService.approveTag(props.evidence.id, tagId, teamId);
     await loadSubcollectionTags(); // Reload to update state
     emit('tags-updated');
     emit('approve-ai-tag', tagId);
@@ -227,7 +259,12 @@ const approveAITag = async (tagId) => {
 
 const rejectAITag = async (tagId) => {
   try {
-    await tagService.rejectTag(props.evidence.id, tagId);
+    const teamId = authStore.currentTeam;
+    if (!teamId) {
+      console.error('No team ID available for tag operations');
+      return;
+    }
+    await tagService.rejectTag(props.evidence.id, tagId, teamId);
     await loadSubcollectionTags(); // Reload to update state
     emit('tags-updated');
     emit('reject-ai-tag', tagId);
@@ -238,7 +275,12 @@ const rejectAITag = async (tagId) => {
 
 const bulkApproveAITags = async (tagIds) => {
   try {
-    await tagService.approveTagsBatch(props.evidence.id, tagIds);
+    const teamId = authStore.currentTeam;
+    if (!teamId) {
+      console.error('No team ID available for tag operations');
+      return;
+    }
+    await tagService.approveTagsBatch(props.evidence.id, tagIds, teamId);
     await loadSubcollectionTags(); // Reload to update state
     emit('tags-updated');
     emit('bulk-approve-ai-tags', tagIds);
@@ -249,7 +291,12 @@ const bulkApproveAITags = async (tagIds) => {
 
 const bulkRejectAITags = async (tagIds) => {
   try {
-    await tagService.rejectTagsBatch(props.evidence.id, tagIds);
+    const teamId = authStore.currentTeam;
+    if (!teamId) {
+      console.error('No team ID available for tag operations');
+      return;
+    }
+    await tagService.rejectTagsBatch(props.evidence.id, tagIds, teamId);
     await loadSubcollectionTags(); // Reload to update state
     emit('tags-updated');
     emit('bulk-reject-ai-tags', tagIds);
@@ -319,10 +366,8 @@ const loadSubcollectionTags = async () => {
   } catch (error) {
     console.error('Failed to load subcollection tags:', error);
     loadingTags.value = false;
-    // Fallback to empty arrays in case of error
-    pendingTags.value = [];
-    approvedTags.value = [];
-    rejectedTags.value = [];
+    // Don't clear existing tags on error - keep the current state
+    // This prevents the UI from temporarily showing no tags
   }
 };
 

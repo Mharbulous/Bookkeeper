@@ -43,8 +43,8 @@ service cloud.firestore {
                            (request.auth.uid == teamId || 
                             request.auth.token.teamId == teamId);
       
-      // AI tags subcollection
-      match /aiTags/{tagId} {
+      // Tags subcollection (NEW structure)
+      match /tags/{categoryId} {
         allow read, write: if request.auth != null && 
                              (request.auth.uid == teamId || 
                               request.auth.token.teamId == teamId);

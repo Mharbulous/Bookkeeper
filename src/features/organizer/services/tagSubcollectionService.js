@@ -5,6 +5,7 @@ import {
   addDoc, 
   updateDoc, 
   deleteDoc, 
+  setDoc,
   query, 
   where, 
   orderBy, 
@@ -15,10 +16,10 @@ import {
 import { db } from '../../../services/firebase.js'
 
 /**
- * Service for managing AI-generated tags in Firestore subcollections
+ * Service for managing tags in Firestore subcollections (NEW structure)
  * 
  * Data Structure:
- * /teams/{teamId}/evidence/{docId}/aiTags/{tagId}
+ * /teams/{teamId}/evidence/{docId}/tags/{categoryId}
  * 
  * Tag Document Structure:
  * {
@@ -49,7 +50,7 @@ class TagSubcollectionService {
     if (!teamId) {
       throw new Error('Team ID is required for tag operations')
     }
-    return collection(db, 'teams', teamId, 'evidence', docId, 'aiTags')
+    return collection(db, 'teams', teamId, 'evidence', docId, 'tags')
   }
 
   /**
@@ -59,37 +60,46 @@ class TagSubcollectionService {
     if (!teamId) {
       throw new Error('Team ID is required for tag operations')
     }
-    return doc(db, 'teams', teamId, 'evidence', docId, 'aiTags', tagId)
+    return doc(db, 'teams', teamId, 'evidence', docId, 'tags', tagId)
   }
 
   /**
-   * Add a new AI-generated tag to a document
+   * Add a new tag to a document (using NEW data structure with categoryId as document ID)
    */
   async addTag(docId, tagData, teamId) {
     try {
       const tagsCollection = this.getTagsCollection(docId, teamId)
       
-      // Determine if tag should be auto-approved based on confidence
-      const autoApproved = tagData.confidence >= this.confidenceThreshold
-      const status = autoApproved ? 'approved' : 'pending'
+      // Use categoryId as the document ID (per migration plan)
+      if (!tagData.categoryId) {
+        throw new Error('categoryId is required for new tag structure')
+      }
       
+      // Create the tag document with NEW structure from migration plan
       const tagDoc = {
+        categoryId: tagData.categoryId,
+        categoryName: tagData.categoryName,
         tagName: tagData.tagName,
+        color: tagData.color,
+        source: tagData.source,
         confidence: tagData.confidence,
-        status: status,
-        autoApproved: autoApproved,
+        autoApproved: tagData.autoApproved,
+        reviewRequired: tagData.reviewRequired,
         createdAt: serverTimestamp(),
-        source: tagData.source || 'ai',
+        createdBy: tagData.createdBy,
         metadata: tagData.metadata || {}
       }
 
-      // Add reviewed timestamp if auto-approved
-      if (autoApproved) {
+      // Add reviewedAt timestamp if this is an auto-approved AI tag
+      if (tagData.autoApproved && tagData.source !== 'human') {
         tagDoc.reviewedAt = serverTimestamp()
       }
 
-      const docRef = await addDoc(tagsCollection, tagDoc)
-      return { id: docRef.id, ...tagDoc }
+      // Use categoryId as document ID instead of generating random ID
+      const tagDocRef = doc(tagsCollection, tagData.categoryId)
+      await setDoc(tagDocRef, tagDoc)
+      
+      return { id: tagData.categoryId, ...tagDoc }
     } catch (error) {
       console.error('Error adding tag:', error)
       throw error
@@ -139,24 +149,22 @@ class TagSubcollectionService {
   }
 
   /**
-   * Get all tags for a document
+   * Get all tags for a document (NEW structure)
    */
   async getTags(docId, options = {}, teamId) {
     try {
       const tagsCollection = this.getTagsCollection(docId, teamId)
       let q = query(tagsCollection, orderBy('createdAt', 'desc'))
 
-      // Filter by status if specified
-      if (options.status) {
-        q = query(tagsCollection, where('status', '==', options.status), orderBy('createdAt', 'desc'))
-      }
+      // Note: No longer filtering by 'status' field - using new structure with autoApproved/reviewRequired
+      // Filtering now handled by getTagsByStatus method
 
       const querySnapshot = await getDocs(q)
       const tags = []
       
       querySnapshot.forEach((doc) => {
         tags.push({
-          id: doc.id,
+          id: doc.id, // This is now the categoryId
           ...doc.data()
         })
       })
@@ -169,16 +177,23 @@ class TagSubcollectionService {
   }
 
   /**
-   * Get tags grouped by status
+   * Get tags grouped by status (NEW structure using autoApproved/reviewRequired)
    */
   async getTagsByStatus(docId, teamId) {
     try {
       const allTags = await this.getTags(docId, {}, teamId)
       
       return {
-        pending: allTags.filter(tag => tag.status === 'pending'),
-        approved: allTags.filter(tag => tag.status === 'approved'),
-        rejected: allTags.filter(tag => tag.status === 'rejected')
+        // Pending: AI tags that need review (reviewRequired = true)
+        pending: allTags.filter(tag => tag.reviewRequired === true),
+        // Approved: Either human tags or auto-approved AI tags or manually approved AI tags
+        approved: allTags.filter(tag => 
+          tag.source === 'human' || 
+          tag.autoApproved === true || 
+          (tag.source === 'ai' && tag.reviewRequired === false && tag.reviewedAt)
+        ),
+        // Rejected: AI tags that were manually rejected (for future use)
+        rejected: allTags.filter(tag => tag.rejected === true) // New field for rejected tags
       }
     } catch (error) {
       console.error('Error getting tags by status:', error)
@@ -187,70 +202,96 @@ class TagSubcollectionService {
   }
 
   /**
-   * Get only approved tags for a document
+   * Get only approved tags for a document (NEW structure)
    */
   async getApprovedTags(docId, teamId) {
-    return await this.getTags(docId, { status: 'approved' })
+    const tagsByStatus = await this.getTagsByStatus(docId, teamId)
+    return tagsByStatus.approved
   }
 
   /**
-   * Get only pending tags for a document
+   * Get only pending tags for a document (NEW structure)
    */
   async getPendingTags(docId, teamId) {
-    return await this.getTags(docId, { status: 'pending' })
+    const tagsByStatus = await this.getTagsByStatus(docId, teamId)
+    return tagsByStatus.pending
   }
 
   /**
-   * Update a tag's status (approve/reject)
+   * Approve an AI tag (NEW structure)
    */
-  async updateTagStatus(docId, tagId, newStatus, teamId) {
+  async approveAITag(docId, categoryId, teamId) {
     try {
-      const tagRef = this.getTagDoc(docId, tagId, teamId)
+      const tagRef = this.getTagDoc(docId, categoryId, teamId)
       
       const updateData = {
-        status: newStatus,
-        reviewedAt: serverTimestamp()
+        reviewRequired: false,
+        reviewedAt: serverTimestamp(),
+        humanApproved: true
       }
 
       await updateDoc(tagRef, updateData)
-      return { id: tagId, ...updateData }
+      return { id: categoryId, ...updateData }
     } catch (error) {
-      console.error('Error updating tag status:', error)
+      console.error('Error approving AI tag:', error)
       throw error
     }
   }
 
   /**
-   * Approve a tag
+   * Reject an AI tag (NEW structure)
    */
-  async approveTag(docId, tagId, teamId) {
-    return await this.updateTagStatus(docId, tagId, 'approved')
+  async rejectAITag(docId, categoryId, teamId) {
+    try {
+      const tagRef = this.getTagDoc(docId, categoryId, teamId)
+      
+      const updateData = {
+        reviewRequired: false,
+        rejected: true,
+        reviewedAt: serverTimestamp(),
+        humanRejected: true
+      }
+
+      await updateDoc(tagRef, updateData)
+      return { id: categoryId, ...updateData }
+    } catch (error) {
+      console.error('Error rejecting AI tag:', error)
+      throw error
+    }
   }
 
   /**
-   * Reject a tag
+   * Approve a tag (compatibility wrapper for NEW structure)
    */
-  async rejectTag(docId, tagId, teamId) {
-    return await this.updateTagStatus(docId, tagId, 'rejected')
+  async approveTag(docId, categoryId, teamId) {
+    return await this.approveAITag(docId, categoryId, teamId)
   }
 
   /**
-   * Bulk approve multiple tags
+   * Reject a tag (compatibility wrapper for NEW structure)
    */
-  async approveTagsBatch(docId, tagIds, teamId) {
+  async rejectTag(docId, categoryId, teamId) {
+    return await this.rejectAITag(docId, categoryId, teamId)
+  }
+
+  /**
+   * Bulk approve multiple tags (NEW structure)
+   */
+  async approveTagsBatch(docId, categoryIds, teamId) {
     try {
       const batch = writeBatch(db)
       
-      for (const tagId of tagIds) {
-        const tagRef = this.getTagDoc(docId, tagId, teamId)
+      for (const categoryId of categoryIds) {
+        const tagRef = this.getTagDoc(docId, categoryId, teamId)
         batch.update(tagRef, {
-          status: 'approved',
-          reviewedAt: serverTimestamp()
+          reviewRequired: false,
+          reviewedAt: serverTimestamp(),
+          humanApproved: true
         })
       }
 
       await batch.commit()
-      return { approved: tagIds.length }
+      return { approved: categoryIds.length }
     } catch (error) {
       console.error('Error approving tags batch:', error)
       throw error
@@ -258,22 +299,24 @@ class TagSubcollectionService {
   }
 
   /**
-   * Bulk reject multiple tags
+   * Bulk reject multiple tags (NEW structure)
    */
-  async rejectTagsBatch(docId, tagIds, teamId) {
+  async rejectTagsBatch(docId, categoryIds, teamId) {
     try {
       const batch = writeBatch(db)
       
-      for (const tagId of tagIds) {
-        const tagRef = this.getTagDoc(docId, tagId, teamId)
+      for (const categoryId of categoryIds) {
+        const tagRef = this.getTagDoc(docId, categoryId, teamId)
         batch.update(tagRef, {
-          status: 'rejected',
-          reviewedAt: serverTimestamp()
+          reviewRequired: false,
+          rejected: true,
+          reviewedAt: serverTimestamp(),
+          humanRejected: true
         })
       }
 
       await batch.commit()
-      return { rejected: tagIds.length }
+      return { rejected: categoryIds.length }
     } catch (error) {
       console.error('Error rejecting tags batch:', error)
       throw error
@@ -303,7 +346,7 @@ class TagSubcollectionService {
       const batch = writeBatch(db)
       
       for (const tag of tags) {
-        const tagRef = this.getTagDoc(docId, tag.id)
+        const tagRef = this.getTagDoc(docId, tag.id, teamId)
         batch.delete(tagRef)
       }
 
