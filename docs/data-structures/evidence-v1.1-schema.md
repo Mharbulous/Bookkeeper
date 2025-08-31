@@ -1,98 +1,26 @@
-# Evidence Document Structure v1.1 - Category-Based Tags
+# Evidence Document Structure v1.1 - Subcollection-Based Tags with Confidence Workflow
 
 ## Overview
 
-This document defines the updated Evidence document structure for Organizer v1.1, which introduces structured category-based tagging while maintaining full backward compatibility with v1.0.
+This document defines the Evidence document structure for Organizer v1.1, featuring subcollection-based tagging with confidence-based auto-approval. Since we are starting with a clean slate (all data and documents have been deleted), this version implements the optimal subcollection architecture from the start.
 
 ## Database Location
 ```
 /teams/{teamId}/evidence/{evidenceId}
 ```
 
-## Updated Evidence Document Structure
-
-### Current v1.0 Structure (Preserved)
-```javascript
-{
-  // === FILE REFERENCES (Unchanged) ===
-  storageRef: {
-    storage: 'uploads',
-    fileHash: string  // SHA-256 hash of file content
-  },
-  
-  displayCopy: {
-    metadataHash: string,  // Reference to originalMetadata document
-    folderPath: string     // Original folder path from upload
-  },
-  
-  // === FILE PROPERTIES (Unchanged) ===
-  fileSize: number,
-  
-  // === PROCESSING STATUS (Unchanged) ===
-  isProcessed: boolean,
-  hasAllPages: boolean | null,
-  processingStage: 'uploaded' | 'splitting' | 'merging' | 'complete',
-  
-  // === LEGACY TAGS (Preserved for Compatibility) ===
-  tags: string[],           // v1.0 free-form tags - PRESERVED
-  tagCount: number,         // Total count of all tags
-  lastTaggedAt: timestamp,
-  taggedBy: 'manual' | 'ai' | 'migration',
-  
-  // === TIMESTAMPS (Unchanged) ===
-  updatedAt: timestamp
-}
-```
-
-### New v1.1 Structured Tags
-```javascript
-{
-  // === NEW STRUCTURED TAGS ===
-  tagsByHuman: [            // Human-assigned structured tags
-    {
-      categoryId: string,      // Reference to category document ID
-      categoryName: string,    // Denormalized category name for performance
-      tagId: string,          // Unique identifier for this tag instance
-      tagName: string,        // Display name of the tag
-      color: string          // Hex color code (e.g., '#1976d2')
-    }
-  ],
-  
-  tagsByAI: [               // AI-assigned structured tags (v1.2 preparation)
-    {
-      categoryId: string,
-      categoryName: string,
-      tagId: string,
-      tagName: string,
-      color: string,
-      confidence: number     // AI confidence score (0.0 - 1.0)
-    }
-  ],
-  
-  // === MIGRATION SUPPORT ===
-  legacyTags: string[],     // Explicit storage of original v1.0 tags
-  migrationStatus: 'pending' | 'completed' | 'skipped',
-  migratedAt: timestamp,    // When migration was performed
-  
-  // === UPDATED COMPUTED FIELDS ===
-  tagCount: number         // Total: tagsByHuman.length + tagsByAI.length + legacyTags.length
-}
-```
-
-## Complete v1.1 Evidence Document Schema
+## Evidence Document Structure
 
 ```javascript
 {
   // === FILE REFERENCES ===
   storageRef: {
     storage: 'uploads',
-    fileHash: string
+    fileHash: string,  // SHA-256 hash of file content
+    fileTypes: string  // File extension/type (e.g., '.pdf')
   },
   
-  displayCopy: {
-    metadataHash: string,
-    folderPath: string
-  },
+  displayCopy: string,  // Metadata hash - reference to originalMetadata document
   
   // === FILE PROPERTIES ===
   fileSize: number,
@@ -102,67 +30,79 @@ This document defines the updated Evidence document structure for Organizer v1.1
   hasAllPages: boolean | null,
   processingStage: 'uploaded' | 'splitting' | 'merging' | 'complete',
   
-  // === STRUCTURED TAGGING SYSTEM (v1.1) ===
-  tagsByHuman: [
-    {
-      categoryId: string,
-      categoryName: string,
-      tagId: string,
-      tagName: string,
-      color: string
-    }
-  ],
-  
-  tagsByAI: [
-    {
-      categoryId: string,
-      categoryName: string,
-      tagId: string,
-      tagName: string,
-      color: string,
-      confidence: number
-    }
-  ],
-  
-  // === BACKWARD COMPATIBILITY ===
-  tags: string[],              // v1.0 tags - preserved for compatibility
-  legacyTags: string[],        // Explicit legacy tag storage
-  
-  // === METADATA ===
-  tagCount: number,            // Total count of all tags
-  lastTaggedAt: timestamp,
-  taggedBy: 'manual' | 'ai' | 'migration',
-  migrationStatus: 'pending' | 'completed' | 'skipped',
-  migratedAt: timestamp,
+  // === TAG SUBCOLLECTION COUNTERS ===
+  tagCount: number,                // Total tags across all categories
+  autoApprovedCount: number,       // AI tags auto-approved (confidence >= 85%)
+  reviewRequiredCount: number,     // AI tags needing human review (confidence < 85%)
   
   // === TIMESTAMPS ===
   updatedAt: timestamp
 }
 ```
 
-## Migration Strategy
+## Tag Subcollection Structure
 
-### Phase 1: Non-Breaking Schema Extension
-1. **Add new fields** without removing existing fields
-2. **Preserve `tags` array** for v1.0 compatibility  
-3. **Add `legacyTags` array** for explicit legacy storage
-4. **Initialize structured arrays** as empty (`tagsByHuman: [], tagsByAI: []`)
+```
+/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}
+```
 
-### Phase 2: Data Population  
-1. **Copy `tags` to `legacyTags`** for all existing documents
-2. **User-initiated migration** converts legacy tags to structured format
-3. **Preserve original `tags` array** until user confirms migration
+```javascript
+{
+  // === CATEGORY IDENTIFICATION ===
+  categoryId: string,              // Same as document ID (enforces one tag per category)
+  categoryName: string,            // Display name for category
+  
+  // === SELECTED TAG ===
+  tagName: string,                 // The chosen tag within this category
+  color: string,                   // Category color for UI display (#4CAF50)
+  
+  // === TAG SOURCE AND CONFIDENCE ===
+  source: 'ai' | 'ai-auto' | 'human',    // How this tag was applied
+  confidence: number,              // AI confidence (0-1), 1.0 for human tags
+  
+  // === AUTO-APPROVAL WORKFLOW ===
+  autoApproved: boolean,           // Whether AI auto-approved (confidence >= 85%)
+  reviewRequired: boolean,         // Whether human review is needed
+  
+  // === HUMAN REVIEW TRACKING ===
+  reviewedAt: timestamp | null,    // When human reviewed (if applicable)
+  reviewedBy: string | null,       // Who reviewed it (if applicable)
+  humanApproved: boolean | null,   // Whether human approved AI suggestion
+  
+  // === TIMESTAMPS AND ATTRIBUTION ===
+  createdAt: timestamp,            // When tag was created
+  createdBy: string,               // Who/what created it ('ai-system' | userId)
+  
+  // === AI ANALYSIS AND EXTENDED METADATA ===
+  AIanalysis: {
+    // AI processing details
+    aiSelection: string,                   // AI's selected tag
+    originalConfidence: number,            // Original AI confidence score
+    aiSuggestions: string[],               // Top 3 AI suggestions
+    processingModel: string,               // AI model used ('claude-3-sonnet')
+    contentMatch: string,                  // Why AI suggested this
+    
+    // Human interaction
+    reviewReason: string,                  // Why review was needed
+    reviewNote: string,                    // Human reviewer note
+    userNote: string                       // User-added note
+  }
+}
+```
 
-### Phase 3: Gradual Transition
-1. **New tags** created using structured format
-2. **Search** includes both structured and legacy tags
-3. **Display** prioritizes structured tags, falls back to legacy
+## Implementation Notes
+
+Since we are starting with a clean database:
+1. **All new evidence documents** will use the subcollection architecture from the start
+2. **No migration required** - this is the optimal implementation
+3. **Tag counters** will be maintained in evidence documents for quick access
+4. **Clean, scalable data structure** across all documents
 
 ## Validation Rules
 
-### Structured Tag Validation
+### Tag Subcollection Validation
 ```javascript
-// tagsByHuman and tagsByAI validation
+// Tag document validation
 {
   categoryId: {
     required: true,
@@ -174,11 +114,6 @@ This document defines the updated Evidence document structure for Organizer v1.1
     type: 'string',
     maxLength: 50
   },
-  tagId: {
-    required: true,
-    type: 'string',
-    format: 'uuid' // Generated using crypto.randomUUID()
-  },
   tagName: {
     required: true,
     type: 'string',
@@ -189,152 +124,204 @@ This document defines the updated Evidence document structure for Organizer v1.1
     type: 'string',
     pattern: /^#[0-9A-Fa-f]{6}$/ // Valid hex color
   },
-  confidence: { // AI tags only
+  source: {
+    required: true,
+    type: 'string',
+    enum: ['ai', 'ai-auto', 'human']
+  },
+  confidence: {
+    required: true,
     type: 'number',
     minimum: 0.0,
     maximum: 1.0
+  },
+  autoApproved: {
+    required: true,
+    type: 'boolean'
+  },
+  reviewRequired: {
+    required: true,
+    type: 'boolean'
+  },
+  AIanalysis: {
+    required: true,
+    type: 'object',
+    properties: {
+      aiSelection: { type: 'string' },
+      originalConfidence: { type: 'number', minimum: 0.0, maximum: 1.0 },
+      aiSuggestions: { type: 'array', items: { type: 'string' } },
+      processingModel: { type: 'string' }
+    }
   }
 }
 ```
 
 ### Document-Level Constraints
-- **Maximum 100 structured tags per document** (tagsByHuman + tagsByAI)
-- **Maximum 50 tags per category** per document
-- **Category must exist** and be active when adding structured tags
-- **Tag names within category must be unique** per document
+- **Maximum 100 tags per evidence document** (across all categories)
+- **One tag per category** (enforced by categoryId as document ID)
+- **Category must exist** and be active when adding tags
+- **Confidence threshold**: AI tags >= 85% auto-approved, < 85% require review
 
 ## Firestore Security Rules
 
-### Updated Rules for v1.1
+### Security Rules for v1.1
 ```javascript
 // Evidence document access
 match /teams/{teamId}/evidence/{evidenceId} {
   allow read, write: if 
     request.auth != null &&
-    resource.data.get('teamId', teamId) == teamId &&
-    isTeamMember(teamId);
+    request.auth.token.teamId == teamId;
+}
+
+// Tag subcollection access
+match /teams/{teamId}/evidence/{evidenceId}/tags/{categoryId} {
+  allow read, write: if 
+    request.auth != null &&
+    request.auth.token.teamId == teamId;
   
-  // Validate structured tags on write
-  allow update: if
-    validateStructuredTags(request.resource.data.get('tagsByHuman', [])) &&
-    validateStructuredTags(request.resource.data.get('tagsByAI', [])) &&
-    preserveLegacyTags(resource.data, request.resource.data);
+  // Validate tag document on write
+  allow create, update: if
+    validateTagDocument(request.resource.data);
 }
 
-function validateStructuredTags(tags) {
-  return tags.size() <= 100 &&
-    tags.hasAll(['categoryId', 'categoryName', 'tagId', 'tagName', 'color']);
-}
-
-function preserveLegacyTags(oldData, newData) {
-  // Ensure legacyTags are not deleted during updates
-  return newData.get('legacyTags', []).hasAll(oldData.get('legacyTags', []));
+function validateTagDocument(data) {
+  return data.keys().hasAll(['categoryId', 'categoryName', 'tagName', 'color', 'source', 'confidence', 'autoApproved', 'reviewRequired', 'AIanalysis']) &&
+    data.categoryId is string &&
+    data.tagName is string &&
+    data.source in ['ai', 'ai-auto', 'human'] &&
+    data.confidence >= 0.0 && data.confidence <= 1.0 &&
+    data.AIanalysis.keys().hasAny(['aiSelection', 'originalConfidence', 'aiSuggestions', 'processingModel']);
 }
 ```
 
 ## Query Patterns
 
-### Search Across All Tag Types
+### Get All Tags for Evidence Document
 ```javascript
-// Client-side filtering for mixed tag search
-const searchTerm = 'invoice';
+// Query tag subcollection
+const tagsSnapshot = await db
+  .collection('teams').doc(teamId)
+  .collection('evidence').doc(evidenceId)
+  .collection('tags')
+  .get();
 
-evidence.filter(doc => {
-  // Search structured tags
-  const structuredTags = [...(doc.tagsByHuman || []), ...(doc.tagsByAI || [])];
-  const hasStructuredMatch = structuredTags.some(tag => 
-    tag.tagName.toLowerCase().includes(searchTerm) ||
-    tag.categoryName.toLowerCase().includes(searchTerm)
-  );
-  
-  // Search legacy tags
-  const hasLegacyMatch = (doc.legacyTags || doc.tags || [])
-    .some(tag => tag.toLowerCase().includes(searchTerm));
-    
-  return hasStructuredMatch || hasLegacyMatch;
-});
+const tags = tagsSnapshot.docs.map(doc => ({
+  id: doc.id,
+  ...doc.data()
+}));
 ```
 
-### Category-Based Filtering
+### Filter Tags by Review Status
 ```javascript
-// Filter by specific category and tags
-const categoryFilters = {
-  'cat-doc-type': ['Invoice', 'Statement'],
-  'cat-institution': ['Bank of America']
-};
+// Get only tags requiring review
+const reviewRequiredTags = await db
+  .collection('teams').doc(teamId)
+  .collection('evidence').doc(evidenceId)
+  .collection('tags')
+  .where('reviewRequired', '==', true)
+  .get();
 
-evidence.filter(doc => {
-  const structuredTags = [...(doc.tagsByHuman || []), ...(doc.tagsByAI || [])];
+// Get only auto-approved tags
+const autoApprovedTags = await db
+  .collection('teams').doc(teamId)
+  .collection('evidence').doc(evidenceId)
+  .collection('tags')
+  .where('autoApproved', '==', true)
+  .get();
+```
+
+### Search Across Documents by Tag
+```javascript
+// Search requires client-side filtering due to subcollection structure
+const searchTerm = 'invoice';
+
+// First get all evidence documents
+const evidenceSnapshot = await db
+  .collection('teams').doc(teamId)
+  .collection('evidence')
+  .get();
+
+// Then filter by tags (requires subcollection queries)
+const matchingDocuments = [];
+for (const evidenceDoc of evidenceSnapshot.docs) {
+  const tagsSnapshot = await evidenceDoc.ref.collection('tags').get();
+  const hasMatchingTag = tagsSnapshot.docs.some(tagDoc => 
+    tagDoc.data().tagName.toLowerCase().includes(searchTerm) ||
+    tagDoc.data().categoryName.toLowerCase().includes(searchTerm)
+  );
   
-  return Object.entries(categoryFilters).every(([categoryId, selectedTags]) => {
-    return structuredTags.some(tag => 
-      tag.categoryId === categoryId && 
-      selectedTags.includes(tag.tagName)
-    );
-  });
-});
+  if (hasMatchingTag) {
+    matchingDocuments.push(evidenceDoc);
+  }
+}
 ```
 
 ## Performance Considerations
 
 ### Indexing Strategy
 ```javascript
-// Composite indexes for efficient queries
+// Composite indexes for tag subcollections
 [
-  ['tagsByHuman.categoryId', 'updatedAt'],
-  ['tagsByHuman.tagName', 'updatedAt'],
-  ['tagsByAI.categoryId', 'confidence', 'updatedAt']
+  ['reviewRequired', 'createdAt'],
+  ['autoApproved', 'confidence'],
+  ['source', 'createdAt'],
+  ['categoryId', 'tagName']  // Though categoryId is document ID
 ]
 ```
 
-### Denormalization Benefits
-- **Category names** stored in each tag for fast display
-- **Colors** stored in tags to avoid category lookups
-- **Tag counts** computed and stored for quick statistics
+### Subcollection Benefits
+- **Direct category access**: Access specific categories without full subcollection query
+- **Mutually exclusive**: Only one tag per category (categoryId as document ID)
+- **Scalable**: No document size limits as tags grow
+- **Atomic updates**: Replace category tag without affecting others
 
-### Memory Management
-- **Lazy loading** of tag details when needed
-- **Pagination** for documents with many tags
-- **Caching** of frequently accessed category data
+### Performance Optimization
+- **Counter fields** in evidence document avoid subcollection queries for counts
+- **Lazy loading** of tag subcollections when needed
+- **Category caching** for frequently accessed categories
+- **Batch operations** for multiple tag updates
 
-## Rollback Plan
+## Feature Flags
 
-### Emergency Rollback to v1.0
-1. **Revert components** to use `tags` array only
-2. **Disable structured tag features** via feature flags
-3. **Preserve all data** - no data loss during rollback
-4. **Migration can resume** when issues are resolved
-
-### Rollback Implementation
+### Confidence-Based Auto-Approval Control
 ```javascript
-// Feature flag for emergency rollback
-const USE_STRUCTURED_TAGS = process.env.VITE_ENABLE_STRUCTURED_TAGS !== 'false';
+// Feature flag for auto-approval (default enabled for clean slate)
+const ENABLE_AUTO_APPROVAL = process.env.VITE_ENABLE_AUTO_APPROVAL !== 'false';
+const CONFIDENCE_THRESHOLD = parseFloat(process.env.VITE_CONFIDENCE_THRESHOLD) || 0.85;
 
-// Fallback tag display
-const getDisplayTags = (evidence) => {
-  if (USE_STRUCTURED_TAGS && evidence.tagsByHuman?.length > 0) {
-    return evidence.tagsByHuman.map(tag => tag.tagName);
-  }
-  return evidence.legacyTags || evidence.tags || [];
+// Auto-approval logic helper
+const shouldAutoApprove = (confidence) => {
+  return ENABLE_AUTO_APPROVAL && confidence >= CONFIDENCE_THRESHOLD;
+};
+
+// Tag counter helper (uses evidence document counters)
+const getTagCounts = (evidence) => {
+  return {
+    total: evidence.tagCount || 0,
+    autoApproved: evidence.autoApprovedCount || 0,
+    reviewRequired: evidence.reviewRequiredCount || 0
+  };
 };
 ```
 
 ## Testing Requirements
 
 ### Unit Tests
-- [ ] Structured tag validation
-- [ ] Migration utilities  
-- [ ] Search across mixed tag types
-- [ ] Category-based filtering
+- [ ] Subcollection tag validation
+- [ ] Confidence-based auto-approval logic
+- [ ] Tag counter increment/decrement
+- [ ] Review workflow state transitions
 
 ### Integration Tests
-- [ ] Evidence creation with structured tags
-- [ ] Legacy tag preservation during updates
-- [ ] Migration from v1.0 to v1.1 format
-- [ ] Rollback to v1.0 compatibility
+- [ ] Evidence document creation with counters
+- [ ] Tag subcollection CRUD operations
+- [ ] Auto-approval workflow end-to-end
+- [ ] Human review process
+- [ ] Tag deletion and counter updates
 
 ### Performance Tests
-- [ ] Query performance with 1000+ documents
-- [ ] Tag assignment operations <500ms
-- [ ] Search response time <300ms with mixed tags
-- [ ] Memory usage with large tag datasets
+- [ ] Subcollection query performance with 100+ tags per document
+- [ ] Tag counter updates <100ms
+- [ ] Auto-approval processing <200ms
+- [ ] Review interface loading <300ms
+- [ ] Memory usage with large tag subcollections

@@ -245,14 +245,12 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
   // File reference (points to actual file content)
   storageRef: {
     storage: 'uploads',                     // Storage collection type
-    fileHash: 'abc123def456789abcdef012345'  // SHA-256 content hash (links to Firebase Storage file)
+    fileHash: 'abc123def456789abcdef012345', // SHA-256 content hash (links to Firebase Storage file)
+    fileTypes: '.pdf'                       // File extension/type
   },
   
-  // Display configuration (user-selectable from available metadata)
-  displayCopy: {
-    metadataHash: 'xyz789abc123def456...',  // Points to chosen originalMetadata record
-    folderPath: '/2025/Statements'          // User's chosen folder path from that metadata record
-  },
+  // Display configuration (references chosen metadata record)
+  displayCopy: 'xyz789abc123def456...',     // Metadata hash - points to chosen originalMetadata record
   
   // File properties (for quick access without metadata lookup)
   fileSize: 2048576,                        // File size in bytes
@@ -262,9 +260,10 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
   hasAllPages: null,                        // null=unknown, true/false after processing
   processingStage: 'uploaded',              // 'uploaded' | 'splitting' | 'merging' | 'complete'
   
-  // Organizational tags (separated by source)
-  tagsByAI: ['financial-document', 'bank-statement', 'pdf'],      // AI-generated tags
-  tagsByHuman: ['important', 'client-abc', 'needs-review'],       // Human-applied tags
+  // Tag subcollection counters (for efficient querying without subcollection queries)
+  tagCount: 8,                              // Total tags across all categories
+  autoApprovedCount: 5,                     // AI tags that were auto-approved (confidence >= 85%)
+  reviewRequiredCount: 2,                   // AI tags needing human review (confidence < 85%)
   
   // Timestamps
   updatedAt: Timestamp                      // When evidence document was last modified
@@ -273,24 +272,32 @@ Folder paths are automatically extracted from the HTML5 `webkitRelativePath` pro
 
 **Field Details:**
 
-**`displayCopy` Object:**
-- **Purpose**: References the specific metadata record and folder path to use for display
-- **User Choice**: Users select from available metadata records (dropdown 1) and folder paths within that record (dropdown 2)
+**`displayCopy` Field:**
+- **Purpose**: References the specific metadata record to use for display
+- **User Choice**: Users select from available metadata records
 - **Flexibility**: Allows switching display representation without data loss
+- **Simplified**: Direct metadata hash reference for streamlined access
 
-**Tag Arrays:**
-- **`tagsByAI`**: System-generated tags from AI analysis (file type detection, content recognition, etc.)
-- **`tagsByHuman`**: User-applied tags for organization and search
-- **Benefits**: Separate treatment in UI, different styling, audit trails, AI training data
+**Tag System Architecture:**
+- **Tag Subcollections** (`/tags/{categoryId}`): Category-based approach with confidence workflow
+- **Counters** (`tagCount`, `autoApprovedCount`, `reviewRequiredCount`): Quick access without subcollection query
+
+**Benefits of Subcollection Approach:**
+- **Mutually Exclusive Categories**: One tag per category prevents confusion (categoryId as document ID)
+- **Confidence-Based Auto-Approval**: 70-80% of AI tags auto-approved (confidence >= 85%), reducing manual review
+- **Atomic Updates**: Replace category tag without affecting other categories
+- **Scalable**: No document size limits as tags grow
+- **Queryable**: Direct access to specific category tags
+- **Clean Implementation**: Optimal structure from the start (no migration complexity)
 
 **Derived Information:**
 ```javascript
 // All information derived from referenced data
-const metadata = await getOriginalMetadata(evidence.displayCopy.metadataHash);
+const metadata = await getOriginalMetadata(evidence.displayCopy);
 const displayName = metadata.originalName;        // From chosen metadata record
 const createdDate = metadata.lastModified;        // From chosen metadata record
-const fileExtension = getExtension(displayName);  // Derived from filename
-const allTags = [...evidence.tagsByAI, ...evidence.tagsByHuman];  // Combined for search
+const fileExtension = evidence.storageRef.fileTypes; // From storageRef or derived from filename
+// Tags accessed through subcollection queries, not embedded arrays
 ```
 
 **Why This Structure:**
@@ -300,6 +307,99 @@ const allTags = [...evidence.tagsByAI, ...evidence.tagsByHuman];  // Combined fo
 3. **User Control**: Users choose which metadata record and folder path to display
 4. **Extensible**: Easy to add new organizational features without breaking existing data
 5. **Performance**: Quick access to common fields (fileSize) while maintaining data integrity
+
+#### Tag Subcollections: `/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}`
+
+**Purpose**: Store category-based tags with mutually exclusive categories and confidence-based auto-approval
+
+**Key Design Decision**: Using `categoryId` as the document ID ensures only one tag per category can exist, preventing tag explosion and making category-based logic simple.
+
+```javascript
+{
+  // Category identification
+  categoryId: 'cat-legal-123',              // Redundant but useful for queries
+  categoryName: 'Legal Documents',          // Display name for category
+  
+  // Selected tag within this category
+  tagName: 'Contract',                      // The chosen tag (from AI suggestions or human input)
+  color: '#4CAF50',                         // Category color for UI display
+  
+  // Tag source and confidence
+  source: 'ai' | 'ai-auto' | 'human',      // How this tag was applied
+  confidence: 0.95,                         // AI confidence (0-1), 1.0 for human tags
+  
+  // Auto-approval workflow (for AI tags)
+  autoApproved: true,                       // Whether AI auto-approved (confidence >= 85%)
+  reviewRequired: false,                    // Whether human review is needed
+  
+  // Human review tracking
+  reviewedAt: Timestamp | null,             // When human reviewed (if applicable)
+  reviewedBy: 'user-jane-456' | null,       // Who reviewed it (if applicable)
+  humanApproved: true | null,               // Whether human approved AI suggestion
+  
+  // Timestamps and attribution
+  createdAt: Timestamp,                     // When tag was created
+  createdBy: 'ai-system' | 'user-john-456', // Who/what created it
+  
+  // AI analysis and extended metadata
+  AIanalysis: {
+    aiSelection: 'Contract',                     // AI's selected tag
+    originalConfidence: 0.95,                   // Original AI confidence score
+    aiSuggestions: ['Contract', 'Agreement', 'Legal Document'], // Top 3 AI suggestions
+    processingModel: 'claude-3-sonnet',         // AI model used
+    contentMatch: 'signature block detected',   // Why AI suggested this
+    
+    // Human interaction
+    reviewReason: 'confidence_below_threshold', // Why review was needed
+    reviewNote: 'Confirmed - this is a contract', // Human reviewer note
+    userNote: 'Primary contract for Q1 project'   // User-added note
+  }
+}
+```
+
+**Advantages of categoryId as Document ID:**
+
+1. **Mutually Exclusive Categories**: Physically impossible to have multiple tags in same category
+2. **Direct Document Access**: `doc('cat-legal')` instead of querying by categoryId
+3. **Atomic Updates**: Replace category tag with single document write
+4. **Predictable Paths**: Always know where category data lives
+5. **Simplified UI Logic**: Direct subscription to specific categories
+6. **Natural Data Modeling**: Matches user mental model of "one classification per category"
+
+**Tag Source Types:**
+- **`ai`**: AI suggestion requiring human review (confidence < 85%)
+- **`ai-auto`**: AI suggestion auto-approved (confidence >= 85%)
+- **`human`**: Manually applied by user
+
+**Confidence-Based Workflow:**
+```javascript
+// High confidence AI tag (auto-approved)
+{
+  source: 'ai-auto',
+  confidence: 0.95,
+  autoApproved: true,
+  reviewRequired: false
+}
+
+// Low confidence AI tag (needs review)
+{
+  source: 'ai',
+  confidence: 0.72,
+  autoApproved: false,
+  reviewRequired: true
+}
+
+// Human-reviewed AI tag (originally needed review)
+{
+  source: 'ai',
+  confidence: 0.78,
+  autoApproved: false,
+  reviewRequired: false,  // No longer needs review
+  reviewedAt: Timestamp,
+  reviewedBy: 'user-jane-456',
+  humanApproved: true
+}
+```
 
 ## Firebase Storage Structure
 
