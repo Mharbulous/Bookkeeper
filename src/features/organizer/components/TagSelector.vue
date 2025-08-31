@@ -8,13 +8,6 @@
       @remove-tag="removeStructuredTag"
     />
 
-    <!-- Display legacy tags if they exist -->
-    <LegacyTagDisplay
-      :legacy-tags="legacyTags"
-      :disabled="disabled"
-      :loading="loading"
-      @remove-legacy-tag="removeLegacyTag"
-    />
 
     <!-- Category-based tag assignment -->
     <CategoryTagSelector
@@ -46,7 +39,6 @@ import { useOrganizerStore } from '../stores/organizer.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
 import TagDisplaySection from './TagDisplaySection.vue';
-import LegacyTagDisplay from './LegacyTagDisplay.vue';
 import CategoryTagSelector from './CategoryTagSelector.vue';
 import TagMigrationPrompt from './TagMigrationPrompt.vue';
 
