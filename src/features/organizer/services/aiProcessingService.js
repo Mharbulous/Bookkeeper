@@ -58,6 +58,11 @@ export class AIProcessingService {
         return `Category "${cat.name}": ${tagList || 'No existing tags'}`;
       }).join('\n');
 
+      console.log(`[AIProcessingService] DEBUG: Sending ${categories.length} categories to AI:`);
+      categories.forEach(cat => {
+        console.log(`  - ${cat.name}: [${cat.tags.map(tag => tag.name).join(', ')}]`);
+      });
+
       // Create AI prompt
       const prompt = this.createTagSuggestionPrompt(categoryContext, evidence);
 
@@ -78,8 +83,16 @@ export class AIProcessingService {
       const response = await result.response;
       const text = response.text();
 
+      console.log(`[AIProcessingService] DEBUG: Raw AI response:`, text);
+
       // Parse AI response
-      return this.parseAIResponse(text, categories);
+      const parsedSuggestions = this.parseAIResponse(text, categories);
+      console.log(`[AIProcessingService] DEBUG: Parsed ${parsedSuggestions.length} suggestions:`);
+      parsedSuggestions.forEach(suggestion => {
+        console.log(`  - ${suggestion.categoryName}: ${suggestion.tagName} (confidence: ${suggestion.confidence})`);
+      });
+
+      return parsedSuggestions;
 
     } catch (error) {
       console.error('[AIProcessingService] Failed to generate AI suggestions:', error);
@@ -106,9 +119,10 @@ Document Information:
 
 Instructions:
 1. Analyze the document content carefully
-2. ONLY suggest tags that exist within the provided categories
-3. If a category has no existing tags, you may suggest new tag names that fit that category
-4. Return suggestions as JSON array in this format:
+2. Try to suggest at least one tag from EACH category when applicable
+3. ONLY suggest tags that exist within the provided categories
+4. If a category has no existing tags, you may suggest new tag names that fit that category
+5. Return suggestions as JSON array in this format:
 [
   {
     "categoryId": "category-id",
@@ -118,8 +132,8 @@ Instructions:
     "reasoning": "Brief explanation"
   }
 ]
-5. Limit to maximum 5 suggestions
-6. Only suggest tags with confidence > 0.7
+6. Limit to maximum 5 suggestions
+7. Only suggest tags with confidence > 0.7
 
 Please analyze the document and provide tag suggestions:
 `;
@@ -142,9 +156,15 @@ Please analyze the document and provide tag suggestions:
       const suggestions = JSON.parse(jsonMatch[0]);
       const validatedSuggestions = [];
 
+      console.log(`[AIProcessingService] DEBUG: Raw suggestions from AI: ${suggestions.length}`);
+      suggestions.forEach(suggestion => {
+        console.log(`  - Raw: ${suggestion.categoryName} → ${suggestion.tagName}`);
+      });
+
       for (const suggestion of suggestions) {
         // Validate suggestion structure
         if (!suggestion.categoryName || !suggestion.tagName) {
+          console.log(`[AIProcessingService] DEBUG: Skipped invalid suggestion:`, suggestion);
           continue;
         }
 
@@ -154,6 +174,7 @@ Please analyze the document and provide tag suggestions:
         );
 
         if (!category) {
+          console.log(`[AIProcessingService] DEBUG: Skipped - category not found: "${suggestion.categoryName}"`);
           continue;
         }
 
