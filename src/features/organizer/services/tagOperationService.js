@@ -28,30 +28,15 @@ export class TagOperationService {
       }
 
       // Get current AI tag from subcollection
-      const aiTags = await this.tagService.getAITags(evidenceId);
+      const aiTags = await this.tagService.getPendingTags(evidenceId, this.teamId);
       const currentAITag = aiTags.find(tag => tag.id === aiTag.id);
       
       if (!currentAITag) {
         throw new Error('AI tag not found in subcollection');
       }
 
-      // Update the AI tag to mark it as approved and change source to human
-      const approvedTagData = {
-        source: 'human',
-        createdBy: 'user-approved', // TODO: Get actual user ID
-        approvedAt: serverTimestamp(),
-        metadata: {
-          ...currentAITag.metadata,
-          originallyFromAI: true,
-          approvedFromAI: true,
-          originalConfidence: currentAITag.confidence
-        }
-      };
-
-      // Remove confidence since it's now a human tag
-      delete approvedTagData.confidence;
-
-      const updatedTag = await this.tagService.updateTag(evidenceId, aiTag.id, approvedTagData);
+      // Use the subcollection service's approve method instead of updating directly
+      const updatedTag = await this.tagService.approveAITag(evidenceId, aiTag.id, teamId);
 
       console.log(`[TagOperationService] Approved AI tag: ${aiTag.tagName} for ${evidenceId}`);
 
@@ -80,16 +65,8 @@ export class TagOperationService {
         throw new Error('AI tag must have subcollection ID for rejection');
       }
 
-      // Update the AI tag status to rejected
-      const rejectedTagData = {
-        metadata: {
-          status: 'rejected',
-          rejectedAt: serverTimestamp(),
-          rejectedBy: 'user-rejected' // TODO: Get actual user ID
-        }
-      };
-
-      const updatedTag = await this.tagService.updateTag(evidenceId, aiTag.id, rejectedTagData);
+      // Use the subcollection service's reject method instead of updating directly
+      const updatedTag = await this.tagService.rejectAITag(evidenceId, aiTag.id, teamId);
 
       console.log(`[TagOperationService] Rejected AI tag: ${aiTag.tagName} for ${evidenceId}`);
 
@@ -165,13 +142,17 @@ export class TagOperationService {
    */
   async getAITagsByStatus(evidenceId, teamId, status = null) {
     try {
-      const aiTags = await this.tagService.getAITags(evidenceId);
+      // Get all tags and filter for AI source
+      const allTags = await this.tagService.getTags(evidenceId, {}, teamId);
+      const aiTags = allTags.filter(tag => tag.source === 'ai');
       
-      if (status) {
-        return aiTags.filter(tag => 
-          tag.metadata?.status === status || 
-          (status === 'suggested' && !tag.metadata?.status)
-        );
+      if (status === 'pending') {
+        return aiTags.filter(tag => tag.reviewRequired === true);
+      } else if (status === 'approved') {
+        return aiTags.filter(tag => tag.autoApproved === true || 
+                                  (tag.reviewRequired === false && tag.reviewedAt));
+      } else if (status === 'rejected') {
+        return aiTags.filter(tag => tag.rejected === true);
       }
       
       return aiTags;

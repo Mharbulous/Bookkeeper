@@ -3,20 +3,11 @@
  * General utilities for file viewer functionality
  */
 
-/**
- * Format file size for display
- * @param {number} bytes - File size in bytes
- * @returns {string} Formatted file size
- */
-export function formatFileSize(bytes) {
-  if (bytes === 0) return '0 B'
-  
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
+import { formatFileSize, formatDate } from './fileUtils.js'
+
+// Re-export utility functions for compatibility
+export { formatFileSize, formatDate }
+
 
 /**
  * Get file type from filename or MIME type
@@ -113,14 +104,3 @@ export function sortFiles(files, sortBy = 'name', sortOrder = 'asc') {
   return sortedFiles
 }
 
-/**
- * Format date for display
- * @param {string|Date} date - Date to format
- * @returns {string} Formatted date string
- */
-export function formatDate(date) {
-  if (!date) return 'Unknown'
-  
-  const dateObj = new Date(date)
-  return dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString()
-}

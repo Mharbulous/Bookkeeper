@@ -51,7 +51,7 @@ export class EvidenceQueryService {
   }
 
   /**
-   * Find evidence documents by tags
+   * Find evidence documents by tags (using new subcollection structure)
    * @param {Array} tags - Array of tag strings to search for
    * @param {boolean} matchAll - Whether to match all tags (AND) or any tag (OR)
    * @returns {Promise<Array>} - Array of evidence documents
@@ -60,23 +60,41 @@ export class EvidenceQueryService {
     try {
       if (!Array.isArray(tags) || tags.length === 0) return [];
 
+      // Note: With subcollection tags, we need to query each evidence document's tags subcollection
+      // This is a more complex query that may need optimization for large datasets
       const evidenceRef = collection(db, 'teams', this.teamId, 'evidence');
-      const q = query(evidenceRef, where('tagsByHuman', 'array-contains-any', tags), orderBy('updatedAt', 'desc'));
-      const querySnapshot = await getDocs(q);
-      const evidenceList = [];
+      const evidenceSnapshot = await getDocs(evidenceRef);
+      const matchingEvidence = [];
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      for (const evidenceDoc of evidenceSnapshot.docs) {
+        const evidenceData = { id: evidenceDoc.id, ...evidenceDoc.data() };
         
-        if (matchAll) {
-          const docTags = [...(data.tagsByHuman || []), ...(data.tagsByAI || [])];
-          if (!tags.every(tag => docTags.includes(tag))) return;
+        // Get approved tags from subcollection for this evidence document
+        const tagsRef = collection(db, 'teams', this.teamId, 'evidence', evidenceDoc.id, 'tags');
+        const tagsSnapshot = await getDocs(tagsRef);
+        
+        const docTags = [];
+        tagsSnapshot.forEach((tagDoc) => {
+          const tagData = tagDoc.data();
+          // Only include approved tags (either human tags or auto-approved AI tags)
+          if (tagData.source === 'human' || tagData.autoApproved === true || 
+              (tagData.source === 'ai' && tagData.reviewRequired === false && tagData.reviewedAt)) {
+            docTags.push(tagData.tagName);
+          }
+        });
+        
+        // Check if document matches the tag criteria
+        const hasMatchingTags = matchAll 
+          ? tags.every(tag => docTags.includes(tag))
+          : tags.some(tag => docTags.includes(tag));
+          
+        if (hasMatchingTags) {
+          matchingEvidence.push(evidenceData);
         }
+      }
 
-        evidenceList.push({ id: doc.id, ...data });
-      });
-
-      return evidenceList;
+      // Sort by updatedAt descending
+      return matchingEvidence.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
     } catch (error) {
       console.error('[EvidenceQueryService] Failed to find evidence by tags:', error);
       throw error;
@@ -163,7 +181,7 @@ export class EvidenceQueryService {
   }
 
   /**
-   * Get evidence statistics
+   * Get evidence statistics (using new subcollection structure)
    * @returns {Promise<Object>} - Statistics about evidence documents
    */
   async getEvidenceStatistics() {
@@ -177,7 +195,7 @@ export class EvidenceQueryService {
         totalFileSize: 0, taggedDocuments: 0
       };
 
-      querySnapshot.forEach((doc) => {
+      for (const doc of querySnapshot.docs) {
         const data = doc.data();
         stats.total++;
         data.isProcessed ? stats.processed++ : stats.unprocessed++;
@@ -187,8 +205,23 @@ export class EvidenceQueryService {
         }
         
         if (data.fileSize) stats.totalFileSize += data.fileSize;
-        if ((data.tagsByHuman?.length > 0) || (data.tagsByAI?.length > 0)) stats.taggedDocuments++;
-      });
+        
+        // Check if document has approved tags in subcollection
+        const tagsRef = collection(db, 'teams', this.teamId, 'evidence', doc.id, 'tags');
+        const tagsSnapshot = await getDocs(tagsRef);
+        
+        let hasApprovedTags = false;
+        for (const tagDoc of tagsSnapshot.docs) {
+          const tagData = tagDoc.data();
+          if (tagData.source === 'human' || tagData.autoApproved === true || 
+              (tagData.source === 'ai' && tagData.reviewRequired === false && tagData.reviewedAt)) {
+            hasApprovedTags = true;
+            break;
+          }
+        }
+        
+        if (hasApprovedTags) stats.taggedDocuments++;
+      }
 
       return stats;
     } catch (error) {
@@ -198,7 +231,7 @@ export class EvidenceQueryService {
   }
 
   /**
-   * Search evidence documents by text content
+   * Search evidence documents by text content (using new subcollection structure)
    * @param {string} searchTerm - Text to search for
    * @returns {Promise<Array>} - Array of evidence documents
    */
@@ -211,15 +244,35 @@ export class EvidenceQueryService {
       const results = [];
       const searchTermLower = searchTerm.toLowerCase().trim();
 
-      querySnapshot.forEach((doc) => {
+      for (const doc of querySnapshot.docs) {
         const data = doc.data();
-        const isMatch = data.displayName?.toLowerCase().includes(searchTermLower) ||
-                       [...(data.tagsByHuman || []), ...(data.tagsByAI || [])]
-                         .some(tag => tag.toLowerCase().includes(searchTermLower)) ||
-                       data.displayCopy?.folderPath?.toLowerCase().includes(searchTermLower);
+        let isMatch = false;
+        
+        // Check displayName and folderPath
+        if (data.displayName?.toLowerCase().includes(searchTermLower) ||
+            data.displayCopy?.folderPath?.toLowerCase().includes(searchTermLower)) {
+          isMatch = true;
+        }
+        
+        // Check approved tags from subcollection
+        if (!isMatch) {
+          const tagsRef = collection(db, 'teams', this.teamId, 'evidence', doc.id, 'tags');
+          const tagsSnapshot = await getDocs(tagsRef);
+          
+          for (const tagDoc of tagsSnapshot.docs) {
+            const tagData = tagDoc.data();
+            // Only search in approved tags
+            if ((tagData.source === 'human' || tagData.autoApproved === true || 
+                 (tagData.source === 'ai' && tagData.reviewRequired === false && tagData.reviewedAt)) &&
+                tagData.tagName?.toLowerCase().includes(searchTermLower)) {
+              isMatch = true;
+              break;
+            }
+          }
+        }
 
         if (isMatch) results.push({ id: doc.id, ...data });
-      });
+      }
 
       return results.sort((a, b) => (b.updatedAt?.seconds || 0) - (a.updatedAt?.seconds || 0));
     } catch (error) {

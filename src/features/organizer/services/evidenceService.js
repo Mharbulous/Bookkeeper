@@ -56,9 +56,7 @@ export class EvidenceService {
         hasAllPages: null, // null = unknown, true/false after processing
         processingStage: 'uploaded', // uploaded|splitting|merging|complete
         
-        // Organization tags (separated by source)
-        tagsByAI: [], // Empty initially - populated by AI processing
-        tagsByHuman: options.tags || [], // User-provided tags if any
+        // Note: Tags are now stored in subcollection /teams/{teamId}/evidence/{docId}/tags/
         
         // Timestamps
         updatedAt: serverTimestamp()
@@ -71,7 +69,7 @@ export class EvidenceService {
       console.log(`[EvidenceService] Created evidence document: ${docRef.id}`, {
         metadataHash: metadataHash.substring(0, 8) + '...',
         fileHash: uploadMetadata.hash.substring(0, 8) + '...',
-        tagsByHuman: evidenceData.tagsByHuman,
+        processingStage: evidenceData.processingStage,
       });
 
       return docRef.id;
@@ -116,8 +114,7 @@ export class EvidenceService {
           hasAllPages: null,
           processingStage: 'uploaded',
           
-          tagsByAI: [],
-          tagsByHuman: [],
+          // Tags stored in subcollection
           
           updatedAt: serverTimestamp()
         };
@@ -135,40 +132,6 @@ export class EvidenceService {
     }
   }
 
-  /**
-   * Update tags for an evidence document
-   * @param {string} evidenceId - Evidence document ID
-   * @param {Array} tags - Array of tag strings
-   * @returns {Promise<void>}
-   */
-  async updateTags(evidenceId, tags) {
-    try {
-      if (!Array.isArray(tags)) {
-        throw new Error('Tags must be an array');
-      }
-
-      // Clean and deduplicate tags
-      const cleanedTags = [...new Set(
-        tags
-          .map(tag => tag.toString().trim())
-          .filter(tag => tag.length > 0)
-      )];
-
-      const evidenceRef = doc(db, 'teams', this.teamId, 'evidence', evidenceId);
-      await updateDoc(evidenceRef, {
-        tags: cleanedTags,
-        tagCount: cleanedTags.length,
-        lastTaggedAt: serverTimestamp(),
-        taggedBy: 'manual',
-        updatedAt: serverTimestamp(),
-      });
-
-      console.log(`[EvidenceService] Updated tags for ${evidenceId}:`, cleanedTags);
-    } catch (error) {
-      console.error('[EvidenceService] Failed to update tags:', error);
-      throw error;
-    }
-  }
 
   /**
    * Update display name for an evidence document

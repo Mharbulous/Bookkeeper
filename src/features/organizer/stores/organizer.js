@@ -53,30 +53,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
     }
   };
 
-  /**
-   * Update evidence tags using new subcollection system
-   * Note: This method is deprecated - use TagSubcollectionService directly
-   */
-  const updateEvidenceTags = async (evidenceId, newTags) => {
-    console.warn('[OrganizerStore] updateEvidenceTags is deprecated. Use TagSubcollectionService for tag operations.');
-    throw new Error('Legacy tag updates not supported. Use subcollection-based tagging.');
-  };
-
-  /**
-   * Add a single tag (deprecated)
-   */
-  const addTag = async (evidenceId, tagText) => {
-    console.warn('[OrganizerStore] addTag is deprecated. Use TagSubcollectionService for tag operations.');
-    throw new Error('Legacy tag operations not supported. Use subcollection-based tagging.');
-  };
-
-  /**
-   * Remove a single tag (deprecated)
-   */
-  const removeTag = async (evidenceId, tagText) => {
-    console.warn('[OrganizerStore] removeTag is deprecated. Use TagSubcollectionService for tag operations.');
-    throw new Error('Legacy tag operations not supported. Use subcollection-based tagging.');
-  };
 
   /**
    * Get all tags for display
@@ -111,9 +87,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
 
     // Legacy Actions (backward compatibility)
     loadEvidence: coreStore.loadEvidence,
-    updateEvidenceTags,
-    addTag,
-    removeTag,
     setFilter: queryStore.setFilter,
     clearFilters: queryStore.clearFilters,
     reset,
@@ -136,13 +109,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
     deleteCategory: categoryStore.deleteCategory,
     getCategoryById: categoryStore.getCategoryById,
     
-    // Tag management (deprecated - use TagSubcollectionService directly)
-    // updateEvidenceStructuredTags: deprecated,
-    // addStructuredTag: deprecated,
-    // removeStructuredTag: deprecated,
-    // replaceTagsInCategory: deprecated,
-    // createStructuredTag: deprecated,
-    // groupTagsByCategory: deprecated,
     
     // Advanced filtering
     applyFiltersWithCategories: queryStore.applyFiltersWithCategories,
