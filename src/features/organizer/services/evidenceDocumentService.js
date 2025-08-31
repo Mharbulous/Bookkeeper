@@ -23,14 +23,14 @@ export class EvidenceDocumentService {
     try {
       const evidenceRef = doc(db, 'teams', teamId, 'evidence', evidenceId);
       const evidenceSnap = await getDoc(evidenceRef);
-      
+
       if (evidenceSnap.exists()) {
         return {
           id: evidenceSnap.id,
-          ...evidenceSnap.data()
+          ...evidenceSnap.data(),
         };
       }
-      
+
       return null;
     } catch (error) {
       console.error('[EvidenceDocumentService] Failed to get evidence document:', error);
@@ -46,17 +46,17 @@ export class EvidenceDocumentService {
   async getUserCategories(teamId) {
     try {
       const categoryStore = useCategoryStore();
-      
+
       // Initialize categories if not loaded
       if (!categoryStore.isInitialized) {
         await categoryStore.loadCategories();
       }
 
-      return categoryStore.categories.map(category => ({
+      return categoryStore.categories.map((category) => ({
         id: category.id,
         name: category.name,
         color: category.color,
-        tags: category.tags || []
+        tags: category.tags || [],
       }));
     } catch (error) {
       console.error('[EvidenceDocumentService] Failed to get user categories:', error);
@@ -71,10 +71,10 @@ export class EvidenceDocumentService {
    * @param {Array} suggestions - AI tag suggestions
    * @returns {Promise<void>}
    */
-  async storeAISuggestions(evidenceId, teamId, suggestions) {
+  async storeaiAlternatives(evidenceId, teamId, suggestions) {
     try {
       // Convert AI suggestions to new subcollection tag format
-      const aiTagsData = suggestions.map(suggestion => ({
+      const aiTagsData = suggestions.map((suggestion) => ({
         tagName: suggestion.tagName || suggestion.name,
         confidence: Math.round((suggestion.confidence || 0.8) * 100), // Convert to 0-100 scale
         source: 'ai',
@@ -85,26 +85,27 @@ export class EvidenceDocumentService {
           reasoning: suggestion.reasoning,
           model: 'vertex-ai',
           processingTime: suggestion.processingTime || 0,
-          context: suggestion.reasoning || 'AI suggested based on document content'
-        }
+          context: suggestion.reasoning || 'AI suggested based on document content',
+        },
       }));
 
       // Add tags to subcollection with auto-approval logic
       if (aiTagsData.length > 0) {
         const storedTags = await this.tagService.addTagsBatch(evidenceId, aiTagsData);
-        
+
         // Get stats to log approval information
         const stats = await this.tagService.getTagStats(evidenceId);
-        console.log(`[EvidenceDocumentService] Stored ${suggestions.length} AI suggestions: ${stats.autoApproved} auto-approved, ${stats.pending} pending review`);
+        console.log(
+          `[EvidenceDocumentService] Stored ${suggestions.length} AI suggestions: ${stats.autoApproved} auto-approved, ${stats.pending} pending review`
+        );
       }
 
       // Update evidence document with AI processing metadata
       const evidenceRef = doc(db, 'teams', teamId, 'evidence', evidenceId);
       await updateDoc(evidenceRef, {
         lastAIProcessed: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
-
     } catch (error) {
       console.error('[EvidenceDocumentService] Failed to store AI suggestions:', error);
       throw error;
@@ -121,12 +122,12 @@ export class EvidenceDocumentService {
   async updateEvidenceDocument(evidenceId, teamId, updates) {
     try {
       const evidenceRef = doc(db, 'teams', teamId, 'evidence', evidenceId);
-      
+
       const updateData = {
         ...updates,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       };
-      
+
       await updateDoc(evidenceRef, updateData);
 
       console.log(`[EvidenceDocumentService] Updated evidence document ${evidenceId}`);
@@ -227,7 +228,7 @@ export class EvidenceDocumentService {
    * @param {string} teamId - Team ID (unused but kept for compatibility)
    * @returns {Promise<Array>} - Array of pending AI tag suggestions
    */
-  async getAISuggestions(evidenceId, teamId) {
+  async getaiAlternatives(evidenceId, teamId) {
     try {
       return await this.tagService.getPendingTags(evidenceId);
     } catch (error) {
@@ -245,7 +246,7 @@ export class EvidenceDocumentService {
   async getHumanTags(evidenceId, teamId) {
     try {
       const approvedTags = await this.tagService.getApprovedTags(evidenceId);
-      return approvedTags.filter(tag => tag.source === 'manual');
+      return approvedTags.filter((tag) => tag.source === 'manual');
     } catch (error) {
       console.error('[EvidenceDocumentService] Failed to get human tags:', error);
       throw error;

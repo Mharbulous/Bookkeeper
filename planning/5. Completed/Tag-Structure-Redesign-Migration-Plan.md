@@ -55,7 +55,7 @@ teams/{teamId}/evidence/{docId}/tags/{categoryId}
 └── AIanalysis: {
     aiSelection: 'Contract'
     originalConfidence: 0.95,
-    aiSuggestions: ['Contract', 'Agreement', 'Legal Document']  // Top 3 AI suggestions
+    aiAlternatives: ['Contract', 'Agreement', 'Legal Document']  // Top 3 AI suggestions
     processingModel: 'claude-3-sonnet'
   }
 ```
@@ -109,7 +109,7 @@ teams/{teamId}/evidence/{docId}/tags/{categoryId}
   - `src/features/organizer/services/aiTagService.js` - **ENHANCED**
 - **Changes Implemented**:
   - ✅ Enhanced `processSingleDocument()` method for subcollection storage
-  - ✅ Added `storeAISuggestionsWithConfidence()` method
+  - ✅ Added `storeaiAlternativesWithConfidence()` method
   - ✅ Integrated confidence-based auto-approval workflow
   - ✅ Maintained backward compatibility with legacy tag methods
 - **Integration Status**:
@@ -173,7 +173,7 @@ teams/{teamId}/evidence/{docId}/tags/{categoryId}
 - **Files Updated**:
   - `src/features/organizer/services/evidenceDocumentService.js` - **ENHANCED**
 - **Changes Implemented**:
-  - ✅ Updated `storeAISuggestions()` method for subcollection format
+  - ✅ Updated `storeaiAlternatives()` method for subcollection format
   - ✅ Added new methods: `getTagsByStatus()`, `getApprovedTags()`, `getPendingAITags()`
   - ✅ Maintained legacy compatibility methods for backward compatibility
   - ✅ Enhanced integration with tagSubcollectionService
@@ -316,7 +316,7 @@ With all data deleted, we can implement the optimal structure directly:
     processingModel: 'claude-3-sonnet',
     contentMatch: 'invoice number and total amount detected',
     autoApprovalReason: 'confidence_threshold_met',
-    aiSuggestions: ['Invoice', 'Bill', 'Financial Document']  // Top 3 suggestions
+    aiAlternatives: ['Invoice', 'Bill', 'Financial Document']  // Top 3 suggestions
   }
 }
 
@@ -338,7 +338,7 @@ With all data deleted, we can implement the optimal structure directly:
     processingModel: 'claude-3-sonnet',
     contentMatch: 'legal terminology detected but no clear contract structure',
     reviewReason: 'confidence_below_threshold',
-    aiSuggestions: ['Contract', 'Agreement', 'Legal Document']  // User can choose
+    aiAlternatives: ['Contract', 'Agreement', 'Legal Document']  // User can choose
   }
 }
 
@@ -384,7 +384,7 @@ With all data deleted, we can implement the optimal structure directly:
     contentMatch: 'service terms and conditions detected',
     reviewReason: 'confidence_below_threshold',
     reviewNote: 'Confirmed - this is indeed a service agreement',
-    aiSuggestions: ['Service Agreement', 'Contract', 'Terms Document'],
+    aiAlternatives: ['Service Agreement', 'Contract', 'Terms Document'],
     humanSelectedIndex: 0  // Human chose first AI suggestion
   }
 }

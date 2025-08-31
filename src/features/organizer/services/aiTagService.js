@@ -35,12 +35,12 @@ export class AITagService {
     if (this.teamId) {
       return this.teamId;
     }
-    
+
     const authStore = useAuthStore();
     if (!authStore.isAuthenticated) {
       throw new Error('User not authenticated');
     }
-    
+
     return authStore.currentTeam;
   }
 
@@ -56,30 +56,40 @@ export class AITagService {
       }
 
       const teamId = this.getTeamId();
-      
+
       // Get evidence document
-      const evidence = await this.evidenceService.getEvidenceDocumentWithValidation(evidenceId, teamId);
+      const evidence = await this.evidenceService.getEvidenceDocumentWithValidation(
+        evidenceId,
+        teamId
+      );
 
       // Validate file size
       this.aiProcessingService.validateFileSize(evidence);
 
       // Get file content from Firebase Storage
       const fileContent = await this.fileProcessingService.getFileForProcessing(evidence, teamId);
-      
+
       // Get user's categories for AI context
       const categories = await this.evidenceService.validateAndGetCategories(teamId);
 
       // Generate AI suggestions (pass file extension as fallback)
       const extension = this.fileProcessingService.getFileExtension(evidence);
-      const aiSuggestions = await this.aiProcessingService.generateTagSuggestions(fileContent, categories, evidence, extension);
+      const aiAlternatives = await this.aiProcessingService.generateTagSuggestions(
+        fileContent,
+        categories,
+        evidence,
+        extension
+      );
 
       // Store AI suggestions in subcollection with confidence-based auto-approval
-      const storedTags = await this.storeAISuggestionsWithConfidence(evidenceId, aiSuggestions);
+      const storedTags = await this.storeaiAlternativesWithConfidence(evidenceId, aiAlternatives);
 
       // Get approval statistics
       const stats = await tagSubcollectionService.getTagStats(evidenceId, teamId);
 
-      console.log(`[AITagService] Processed document ${evidenceId}: ${aiSuggestions.length} suggestions, ${stats.autoApproved} auto-approved`);
+      console.log(
+        `[AITagService] Processed document ${evidenceId}: ${aiAlternatives.length} suggestions, ${stats.autoApproved} auto-approved`
+      );
 
       return {
         success: true,
@@ -88,9 +98,8 @@ export class AITagService {
         stats,
         processedAt: new Date(),
         categories: categories.length,
-        autoApprovalThreshold: tagSubcollectionService.getConfidenceThreshold()
+        autoApprovalThreshold: tagSubcollectionService.getConfidenceThreshold(),
       };
-
     } catch (error) {
       console.error('[AITagService] Failed to process document:', error);
       throw error;
@@ -135,7 +144,12 @@ export class AITagService {
    * @returns {Promise<Array>} - Array of suggested tags
    */
   async generateTagSuggestions(base64Data, categories, evidence, extension = 'pdf') {
-    return this.aiProcessingService.generateTagSuggestions(base64Data, categories, evidence, extension);
+    return this.aiProcessingService.generateTagSuggestions(
+      base64Data,
+      categories,
+      evidence,
+      extension
+    );
   }
 
   /**
@@ -154,12 +168,12 @@ export class AITagService {
    * @param {Array} suggestions - AI tag suggestions with confidence scores
    * @returns {Promise<Array>} - Array of stored tag documents
    */
-  async storeAISuggestionsWithConfidence(evidenceId, suggestions) {
+  async storeaiAlternativesWithConfidence(evidenceId, suggestions) {
     try {
       const teamId = this.getTeamId();
-      
+
       // Transform suggestions to include confidence and metadata with proper constraint fields
-      const tagData = suggestions.map(suggestion => {
+      const tagData = suggestions.map((suggestion) => {
         // Convert decimal confidence (0.9) to percentage (90)
         let confidence = suggestion.confidence || 0;
         if (confidence <= 1) {
@@ -167,31 +181,31 @@ export class AITagService {
         } else {
           confidence = Math.round(confidence);
         }
-        
+
         // Determine auto-approval based on confidence threshold
         const autoApproved = confidence >= tagSubcollectionService.getConfidenceThreshold();
-        
+
         return {
-          categoryId: suggestion.categoryId,           // Required for constraint-based deduplication
-          categoryName: suggestion.categoryName,       // Category display name
+          categoryId: suggestion.categoryId, // Required for constraint-based deduplication
+          categoryName: suggestion.categoryName, // Category display name
           tagName: suggestion.tagName || suggestion.name,
           // Removed color field - use category color as single source of truth
           confidence: confidence,
           source: 'ai',
           autoApproved: autoApproved,
-          reviewRequired: !autoApproved,               // High confidence tags don't need review
-          createdBy: this.getTeamId(),                 // Use team ID as creator for AI tags
+          reviewRequired: !autoApproved, // High confidence tags don't need review
+          createdBy: this.getTeamId(), // Use team ID as creator for AI tags
           metadata: {
-            model: 'gemini-pro',                       // Updated to match actual model
+            model: 'gemini-pro', // Updated to match actual model
             processingTime: suggestion.processingTime || 0,
-            context: suggestion.reasoning || ''
-          }
+            context: suggestion.reasoning || '',
+          },
         };
       });
 
       // Store tags in subcollection (auto-approval handled by service)
       const storedTags = await tagSubcollectionService.addTagsBatch(evidenceId, tagData, teamId);
-      
+
       return storedTags;
     } catch (error) {
       console.error('[AITagService] Error storing AI suggestions:', error);
@@ -206,8 +220,8 @@ export class AITagService {
    * @param {Array} suggestions - AI tag suggestions
    * @returns {Promise<void>}
    */
-  async storeAISuggestions(evidenceId, teamId, suggestions) {
-    return this.evidenceService.storeAISuggestions(evidenceId, teamId, suggestions);
+  async storeaiAlternatives(evidenceId, teamId, suggestions) {
+    return this.evidenceService.storeaiAlternatives(evidenceId, teamId, suggestions);
   }
 
   /**
@@ -262,7 +276,7 @@ export class AITagService {
 
   /**
    * Reject an AI suggested tag using subcollection service
-   * @param {string} evidenceId - Evidence document ID  
+   * @param {string} evidenceId - Evidence document ID
    * @param {string} tagId - Tag ID to reject
    * @returns {Promise<Object>} - Operation result
    */

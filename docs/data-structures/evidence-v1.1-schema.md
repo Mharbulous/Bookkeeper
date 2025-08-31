@@ -5,6 +5,7 @@
 This document defines the Evidence document structure for Organizer v1.1, featuring subcollection-based tagging with confidence-based auto-approval. Since we are starting with a clean slate (all data and documents have been deleted), this version implements the optimal subcollection architecture from the start.
 
 ## Database Location
+
 ```
 /teams/{teamId}/evidence/{evidenceId}
 ```
@@ -19,22 +20,22 @@ This document defines the Evidence document structure for Organizer v1.1, featur
     fileHash: string,  // SHA-256 hash of file content
     fileTypes: string  // File extension/type (e.g., '.pdf')
   },
-  
+
   displayCopy: string,  // Metadata hash - reference to originalMetadata document
-  
+
   // === FILE PROPERTIES ===
   fileSize: number,
-  
+
   // === PROCESSING STATUS ===
   isProcessed: boolean,
   hasAllPages: boolean | null,
   processingStage: 'uploaded' | 'splitting' | 'merging' | 'complete',
-  
+
   // === TAG SUBCOLLECTION COUNTERS ===
   tagCount: number,                // Total tags across all categories
   autoApprovedCount: number,       // AI tags auto-approved (confidence >= 85%)
   reviewRequiredCount: number,     // AI tags needing human review (confidence < 85%)
-  
+
   // === TIMESTAMPS ===
   updatedAt: timestamp
 }
@@ -51,37 +52,37 @@ This document defines the Evidence document structure for Organizer v1.1, featur
   // === CATEGORY IDENTIFICATION ===
   categoryId: string,              // Same as document ID (enforces one tag per category)
   categoryName: string,            // Display name for category
-  
+
   // === SELECTED TAG ===
   tagName: string,                 // The chosen tag within this category
   color: string,                   // Category color for UI display (#4CAF50)
-  
+
   // === TAG SOURCE AND CONFIDENCE ===
   source: 'ai' | 'ai-auto' | 'human',    // How this tag was applied
   confidence: number,              // AI confidence (0-1), 1.0 for human tags
-  
+
   // === AUTO-APPROVAL WORKFLOW ===
   autoApproved: boolean,           // Whether AI auto-approved (confidence >= 85%)
   reviewRequired: boolean,         // Whether human review is needed
-  
+
   // === HUMAN REVIEW TRACKING ===
   reviewedAt: timestamp | null,    // When human reviewed (if applicable)
   reviewedBy: string | null,       // Who reviewed it (if applicable)
   humanApproved: boolean | null,   // Whether human approved AI suggestion
-  
+
   // === TIMESTAMPS AND ATTRIBUTION ===
   createdAt: timestamp,            // When tag was created
   createdBy: string,               // Who/what created it ('ai-system' | userId)
-  
+
   // === AI ANALYSIS AND EXTENDED METADATA ===
   AIanalysis: {
     // AI processing details
     aiSelection: string,                   // AI's selected tag
     originalConfidence: number,            // Original AI confidence score
-    aiSuggestions: string[],               // Top 3 AI suggestions
+    aiAlternatives: string[],               // Top 3 AI suggestions
     processingModel: string,               // AI model used ('claude-3-sonnet')
     contentMatch: string,                  // Why AI suggested this
-    
+
     // Human interaction
     reviewReason: string,                  // Why review was needed
     reviewNote: string,                    // Human reviewer note
@@ -93,6 +94,7 @@ This document defines the Evidence document structure for Organizer v1.1, featur
 ## Implementation Notes
 
 Since we are starting with a clean database:
+
 1. **All new evidence documents** will use the subcollection architecture from the start
 2. **No migration required** - this is the optimal implementation
 3. **Tag counters** will be maintained in evidence documents for quick access
@@ -101,6 +103,7 @@ Since we are starting with a clean database:
 ## Validation Rules
 
 ### Tag Subcollection Validation
+
 ```javascript
 // Tag document validation
 {
@@ -149,7 +152,7 @@ Since we are starting with a clean database:
     properties: {
       aiSelection: { type: 'string' },
       originalConfidence: { type: 'number', minimum: 0.0, maximum: 1.0 },
-      aiSuggestions: { type: 'array', items: { type: 'string' } },
+      aiAlternatives: { type: 'array', items: { type: 'string' } },
       processingModel: { type: 'string' }
     }
   }
@@ -157,6 +160,7 @@ Since we are starting with a clean database:
 ```
 
 ### Document-Level Constraints
+
 - **Maximum 100 tags per evidence document** (across all categories)
 - **One tag per category** (enforced by categoryId as document ID)
 - **Category must exist** and be active when adding tags
@@ -165,20 +169,21 @@ Since we are starting with a clean database:
 ## Firestore Security Rules
 
 ### Security Rules for v1.1
+
 ```javascript
 // Evidence document access
 match /teams/{teamId}/evidence/{evidenceId} {
-  allow read, write: if 
+  allow read, write: if
     request.auth != null &&
     request.auth.token.teamId == teamId;
 }
 
 // Tag subcollection access
 match /teams/{teamId}/evidence/{evidenceId}/tags/{categoryId} {
-  allow read, write: if 
+  allow read, write: if
     request.auth != null &&
     request.auth.token.teamId == teamId;
-  
+
   // Validate tag document on write
   allow create, update: if
     validateTagDocument(request.resource.data);
@@ -190,66 +195,73 @@ function validateTagDocument(data) {
     data.tagName is string &&
     data.source in ['ai', 'ai-auto', 'human'] &&
     data.confidence >= 0.0 && data.confidence <= 1.0 &&
-    data.AIanalysis.keys().hasAny(['aiSelection', 'originalConfidence', 'aiSuggestions', 'processingModel']);
+    data.AIanalysis.keys().hasAny(['aiSelection', 'originalConfidence', 'aiAlternatives', 'processingModel']);
 }
 ```
 
 ## Query Patterns
 
 ### Get All Tags for Evidence Document
+
 ```javascript
 // Query tag subcollection
 const tagsSnapshot = await db
-  .collection('teams').doc(teamId)
-  .collection('evidence').doc(evidenceId)
+  .collection('teams')
+  .doc(teamId)
+  .collection('evidence')
+  .doc(evidenceId)
   .collection('tags')
   .get();
 
-const tags = tagsSnapshot.docs.map(doc => ({
+const tags = tagsSnapshot.docs.map((doc) => ({
   id: doc.id,
-  ...doc.data()
+  ...doc.data(),
 }));
 ```
 
 ### Filter Tags by Review Status
+
 ```javascript
 // Get only tags requiring review
 const reviewRequiredTags = await db
-  .collection('teams').doc(teamId)
-  .collection('evidence').doc(evidenceId)
+  .collection('teams')
+  .doc(teamId)
+  .collection('evidence')
+  .doc(evidenceId)
   .collection('tags')
   .where('reviewRequired', '==', true)
   .get();
 
 // Get only auto-approved tags
 const autoApprovedTags = await db
-  .collection('teams').doc(teamId)
-  .collection('evidence').doc(evidenceId)
+  .collection('teams')
+  .doc(teamId)
+  .collection('evidence')
+  .doc(evidenceId)
   .collection('tags')
   .where('autoApproved', '==', true)
   .get();
 ```
 
 ### Search Across Documents by Tag
+
 ```javascript
 // Search requires client-side filtering due to subcollection structure
 const searchTerm = 'invoice';
 
 // First get all evidence documents
-const evidenceSnapshot = await db
-  .collection('teams').doc(teamId)
-  .collection('evidence')
-  .get();
+const evidenceSnapshot = await db.collection('teams').doc(teamId).collection('evidence').get();
 
 // Then filter by tags (requires subcollection queries)
 const matchingDocuments = [];
 for (const evidenceDoc of evidenceSnapshot.docs) {
   const tagsSnapshot = await evidenceDoc.ref.collection('tags').get();
-  const hasMatchingTag = tagsSnapshot.docs.some(tagDoc => 
-    tagDoc.data().tagName.toLowerCase().includes(searchTerm) ||
-    tagDoc.data().categoryName.toLowerCase().includes(searchTerm)
+  const hasMatchingTag = tagsSnapshot.docs.some(
+    (tagDoc) =>
+      tagDoc.data().tagName.toLowerCase().includes(searchTerm) ||
+      tagDoc.data().categoryName.toLowerCase().includes(searchTerm)
   );
-  
+
   if (hasMatchingTag) {
     matchingDocuments.push(evidenceDoc);
   }
@@ -259,23 +271,26 @@ for (const evidenceDoc of evidenceSnapshot.docs) {
 ## Performance Considerations
 
 ### Indexing Strategy
+
 ```javascript
 // Composite indexes for tag subcollections
 [
   ['reviewRequired', 'createdAt'],
   ['autoApproved', 'confidence'],
   ['source', 'createdAt'],
-  ['categoryId', 'tagName']  // Though categoryId is document ID
-]
+  ['categoryId', 'tagName'], // Though categoryId is document ID
+];
 ```
 
 ### Subcollection Benefits
+
 - **Direct category access**: Access specific categories without full subcollection query
 - **Mutually exclusive**: Only one tag per category (categoryId as document ID)
 - **Scalable**: No document size limits as tags grow
 - **Atomic updates**: Replace category tag without affecting others
 
 ### Performance Optimization
+
 - **Counter fields** in evidence document avoid subcollection queries for counts
 - **Lazy loading** of tag subcollections when needed
 - **Category caching** for frequently accessed categories
@@ -284,6 +299,7 @@ for (const evidenceDoc of evidenceSnapshot.docs) {
 ## Feature Flags
 
 ### Confidence-Based Auto-Approval Control
+
 ```javascript
 // Feature flag for auto-approval (default enabled for clean slate)
 const ENABLE_AUTO_APPROVAL = process.env.VITE_ENABLE_AUTO_APPROVAL !== 'false';
@@ -299,7 +315,7 @@ const getTagCounts = (evidence) => {
   return {
     total: evidence.tagCount || 0,
     autoApproved: evidence.autoApprovedCount || 0,
-    reviewRequired: evidence.reviewRequiredCount || 0
+    reviewRequired: evidence.reviewRequiredCount || 0,
   };
 };
 ```
@@ -307,12 +323,14 @@ const getTagCounts = (evidence) => {
 ## Testing Requirements
 
 ### Unit Tests
+
 - [ ] Subcollection tag validation
 - [ ] Confidence-based auto-approval logic
 - [ ] Tag counter increment/decrement
 - [ ] Review workflow state transitions
 
 ### Integration Tests
+
 - [ ] Evidence document creation with counters
 - [ ] Tag subcollection CRUD operations
 - [ ] Auto-approval workflow end-to-end
@@ -320,6 +338,7 @@ const getTagCounts = (evidence) => {
 - [ ] Tag deletion and counter updates
 
 ### Performance Tests
+
 - [ ] Subcollection query performance with 100+ tags per document
 - [ ] Tag counter updates <100ms
 - [ ] Auto-approval processing <200ms
