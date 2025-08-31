@@ -161,7 +161,7 @@ export { default as FolderOptionsDialog } from './components/FolderOptionsDialog
 // Export core composables
 export { useFileQueue } from './composables/useFileQueue.js'
 export { useFileMetadata } from './composables/useFileMetadata.js'
-export { useFileDragDrop } from './composables/useFileDragDrop.js'
+export { useFileDragDrop } from './features/upload/composables/useFileDragDrop.js'
 export { useQueueDeduplication } from './composables/useQueueDeduplication.js'
 
 // Export utilities
