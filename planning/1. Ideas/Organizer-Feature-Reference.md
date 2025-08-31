@@ -50,8 +50,8 @@ The **Organizer** is an AI-powered document discovery and organization system de
 - **Unified Processing**: All file types processed through Gemini's multimodal capabilities
 - **No File-Type Optimization**: Avoid premature optimization that becomes obsolete as AI improves
 - **No Size Limits**: Large files processed normally; testing will determine practical constraints
-- **Enhanced AI Suggestions**: AI provides up to 3 tag suggestions per category with individual confidence levels
-- **Rich Data Structure**: AI suggestions stored with confidence levels, human overrides, and reviewer attribution
+- **Enhanced AI Alternatives**: AI stores comprehensive alternative options (no cap), UI displays up to 3 choices with individual confidence levels
+- **Rich Data Structure**: AI alternatives stored with confidence levels, human overrides, and reviewer attribution
 - **Priority-Based Processing**: All processed documents enter review queue ordered by confidence (lowest first)
 - **Context-Enhanced Processing**: Uses previously reviewed examples to improve accuracy over time
 
@@ -215,7 +215,7 @@ The **Organizer** is an AI-powered document discovery and organization system de
 **As a user, I want to review uncertain AI classifications**
 - Given the AI is less than 90% confident about some document categorizations
 - When I access the "Human Review Required" folder
-- Then I see the top 3 AI suggestions with confidence percentages
+- Then I see up to 3 AI options (choice + alternatives) plus "Other" for all category options with confidence percentages
 - So that I can quickly correct misclassifications and improve system accuracy
 
 **As a user, I want the system to learn from my corrections**
@@ -280,7 +280,7 @@ The **Organizer** is an AI-powered document discovery and organization system de
 
 **As a user, I want simple review options for uncertain documents**
 - Given the AI presents a document with uncertain classification
-- When I see the 3 AI suggestions plus "Other" and "Create New Category" buttons
+- When I see up to 3 AI options plus "Other" (showing all category options) and "Create New Category" buttons
 - Then I can quickly select the correct option or create a new one
 - So that document review is fast and doesn't interrupt my workflow
 

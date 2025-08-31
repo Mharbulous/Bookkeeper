@@ -111,8 +111,10 @@ The `aiAlternatives` field implements a no-cap approach that balances UX simplic
 
 **UI Implementation:**
 - Displays only top 2 alternatives as quick-click options
-- "Other" button reveals complete ranked list when needed
-- Optimal decision tree: AI choice → Alt 1 → Alt 2 → Other
+- "Other" button shows all category options with smart ordering:
+  - Remaining aiAlternatives (3rd, 4th, 5th, etc.) in rank order
+  - Followed by all other category options not in aiAlternatives
+- Optimal decision tree: AI choice → Alt 1 → Alt 2 → Other (full category)
 
 **Benefits:**
 - Maximum AI transparency for debugging and analysis

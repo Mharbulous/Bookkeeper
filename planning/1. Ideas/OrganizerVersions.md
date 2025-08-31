@@ -237,21 +237,21 @@ This document outlines the incremental implementation phases for the Organizer f
 **Core Goal**: Intelligent review queue without arbitrary confidence thresholds
 
 **New Features**:
-- **Enhanced AI Suggestions**: Up to 3 tag suggestions per category with individual confidence levels
+- **Enhanced AI Alternatives**: Stores comprehensive alternative options (no cap), displays up to 3 choices with individual confidence levels
 - **Smart Review Queue**: All processed documents ordered by confidence (lowest confidence first)
 - **Rich Data Tracking**: Human override recording with reviewer attribution and timestamps
 - **Natural Threshold Discovery**: Users review until comfortable, finding their own stopping point
 - **Multi-option review interface**: Accept AI suggestions, choose alternatives, or create new categories
 
 **Implementation Scope**:
-- Enhanced `tagsByAI` data structure supporting multiple suggestions per category
+- Enhanced `aiAlternatives` data structure supporting comprehensive alternative options per category
 - Priority-based review queue component ordered by confidence levels
 - Human override tracking with reviewer identification
 - Review interface supporting multiple AI suggestions per category
 - Analytics dashboard showing AI accuracy vs human decisions over time
 
 **User Flow**:
-1. AI processes files and provides up to 3 tag suggestions per category with confidence levels
+1. AI processes files and stores comprehensive alternatives (no cap), displays up to 3 options per category with confidence levels
 2. All processed documents appear in review queue, sorted by lowest confidence first
 3. User reviews documents starting with most uncertain, seeing AI's confidence levels
 4. User naturally discovers their comfort threshold by reviewing until errors become rare
@@ -259,21 +259,32 @@ This document outlines the incremental implementation phases for the Organizer f
 
 **Data Structure Enhancement**:
 ```javascript
-tagsByAI: [
-  {
-    categoryId: "cat-1",
-    categoryName: "Document Type",
-    suggestions: [
-      { tagName: "Invoice", confidence: 0.95 },
-      { tagName: "Receipt", confidence: 0.78 },
-      { tagName: "Statement", confidence: 0.65 }
-    ],
-    humanOverride: "Invoice", // What human chose
-    reviewedBy: "user@example.com",
-    reviewedAt: timestamp
-  }
-]
+// AI Processing Result
+aiSelection: "Invoice",                    // AI's chosen tag
+originalConfidence: 95,                   // AI's confidence in chosen tag
+aiAlternatives: [                         // All alternatives AI considered (no cap)
+  "Receipt", 
+  "Statement", 
+  "Contract", 
+  "Report", 
+  "Bill"
+],
+processingModel: "gemini-pro",
+contentMatch: "signature block detected",
+
+// Human Review (if applicable)
+humanOverride: "Invoice",                 // What human chose
+reviewedBy: "user@example.com",
+reviewedAt: timestamp
 ```
+
+**UI Implementation**:
+- Data Storage: Complete aiAlternatives array (no cap) for full transparency
+- UI Display: AI choice + top 2 alternatives = up to 3 quick options
+- "Other" dropdown shows all category options with smart ordering:
+  - Remaining aiAlternatives (3rd, 4th, 5th, etc.) in rank order
+  - Followed by all other category options not in aiAlternatives  
+- Optimal UX: AI Choice → Alt1 → Alt2 → Other (full category) → Create New
 
 ---
 
