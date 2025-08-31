@@ -1,500 +1,541 @@
 # Organizer v1.3 Implementation Plan: Virtual Folder View
 
-**Version**: 1.3  
-**Status**: 📋 **PLANNING**  
-**Dependencies**: Organizer v1.1 (✅ Completed August 30, 2025)  
-**Target Timeline**: 2-3 weeks  
+**Created**: 2025-08-31  
+**Status**: Ready for Implementation  
+**Previous Version**: v1.2 (AI Categorization - Completed)  
+**Estimated Timeline**: 2-3 weeks
 
----
+## Overview
 
-## Executive Summary
+Version 1.3 implements virtual folder views that present tag-based data as familiar folder structures. Users can right-click any tag in the current flat view and select "Show in Folders" to create dynamic hierarchy views based on tag categories.
 
-### Problem Statement
-The current Organizer v1.1 provides excellent category-based tagging with color-coded organization, but users still need to scroll through flat file lists to find documents. For large document collections, users want the familiar experience of browsing through folder hierarchies while maintaining the flexibility of the tag-based system.
+## Core Goal
 
-### Proposed Solution
-Transform the flat tag-based view into dynamic virtual folder structures where users can:
-1. Right-click any tag to create instant folder hierarchies
-2. Navigate through breadcrumb-based folder structures
-3. Switch seamlessly between flat and folder views
-4. Reorganize folder hierarchies instantly without data processing
+**Present tags as familiar folder structures** while maintaining the underlying tag-based flat storage system. Enable users to switch between flat view (current default) and virtual folder organizations without changing the underlying data structure.
 
-### Key Benefits
-- **Familiar Navigation**: Users get traditional folder browsing experience
-- **Instant Reorganization**: Change folder hierarchy without data processing delays
-- **Contextual Filtering**: Folder views show only relevant files and tags
-- **Dual View Support**: Maintain both flat and folder views for different workflows
-- **Progressive Disclosure**: Start broad, narrow down through folder navigation
+## Architecture Analysis
 
-### Internet Research Summary
+### Current v1.2 Architecture (Built Upon)
 
-**Vue.js Tree Navigation and Virtual Scrolling Best Practices (2024-2025):**
+**Data Structure** (No Changes Required):
+- **Evidence Collection**: `/teams/{teamId}/evidence/{evidenceId}` - Document metadata and references
+- **Tag Subcollections**: `/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}` - Category-based tags with confidence/approval workflow
+- **Categories**: `/teams/{teamId}/categories/{categoryId}` - User-defined category structures with colors
+- **Display References**: Evidence documents point to originalMetadata via `displayCopy.metadataHash`
 
-- **Modern Tree Components**: Vue ecosystem offers mature solutions like PrimeVue VirtualScroller and Radix Vue TreeVirtualizer for handling large datasets with tree virtualization
-- **Performance Improvements**: Vue 3.4/3.5 brought significant performance gains with rewritten template parser and improved reactivity system, reducing memory usage for hierarchical data
-- **Virtual Scrolling Solutions**: Vuetify Virtual Scroller component and PrimeVue's lazy loading patterns provide proven approaches for rendering large amounts of data efficiently
-- **Navigation Patterns**: Modern implementations support full keyboard navigation, multiple selection, and adhere to Tree WAI-ARIA design patterns
-- **Optimization Techniques**: Tree shaking, lazy loading, and virtual scrolling are essential for performance with large hierarchical datasets in 2025
-- **Memory Management**: Virtual scrolling solutions handle dynamic heights and memory usage efficiently when dealing with large tree structures
+**Current Stores** (Will Be Extended):
+- `organizerCore.js` - Evidence document management with display info caching
+- `categoryStore.js` - Category CRUD operations and color management  
+- `tagStore.js` - Tag operations and filtering logic
+- `organizer.js` - Main orchestration store combining all functionality
 
-### Key Files and Current State
-- **Organizer.vue** (195 lines) - Main organizer view requiring dual view mode integration
-- **FileItem.vue** (191 lines) - File display component requiring folder view enhancements  
-- **TagSelector.vue** (303 lines) - **CRITICAL: Exceeds 300-line limit, must be decomposed before implementation**
-- **FileListDisplay.vue** (115 lines) - List display component requiring folder view integration
-- **organizerCore.js** (241 lines) - Core store to be enhanced with folder view state management
+**Current Components** (Will Be Enhanced):
+- `Organizer.vue` - Main view with flat list display
+- `FileListDisplay.vue` - List/grid toggle and file rendering
+- `FileListItem.vue` - Individual file cards with tag display
+- `TagSelector.vue` - Category-based tag assignment interface
 
-## Core Goals
+### New v1.3 Architecture Components
 
-1. **Implement virtual folder view** that presents tag-based data as folder hierarchies
-2. **Add seamless view switching** between flat and folder modes
-3. **Create dynamic folder hierarchies** based on tag category selections
-4. **Build intuitive navigation** with breadcrumbs and context-aware filtering
-5. **Maintain performance** with instant reorganization capabilities
-
-## User Stories
-
-### Virtual Folder Navigation Stories
-- **As a user, I want to create folder views by right-clicking tags** so I can browse documents in a familiar folder structure
-- **As a user, I want to drill down through multiple folder levels** so I can narrow down to specific document sets
-- **As a user, I want breadcrumb navigation** so I can easily navigate back through folder hierarchies
-- **As a user, I want to instantly reorganize folder hierarchies** so I can experiment with different organizational schemes
-- **As a user, I want to switch between flat and folder views** so I can use the best view for my current task
-
-### Contextual Filtering Stories
-- **As a user, I want to see only relevant tags in folder view** so I'm not overwhelmed with unrelated tags
-- **As a user, I want folder counts** so I can see how many documents are in each folder before drilling down
-- **As a user, I want to maintain my place in folder navigation** when performing actions like tag assignment
-- **As a user, I want to bookmark frequently used folder configurations** for quick access to common organizational schemes
-
-## Technical Architecture
-
-### Prerequisites: TagSelector Component Decomposition
-
-**CRITICAL**: TagSelector.vue currently has 303 lines, exceeding the 300-line limit. This component MUST be decomposed before v1.3 implementation begins.
-
-#### Proposed Decomposition Structure:
-- **TagSelectorContainer.vue** (<150 lines) - Main container and state management
-- **CategoryDropdown.vue** (<100 lines) - Individual category selection interface  
-- **TagChipDisplay.vue** (<80 lines) - Display and removal of selected tags
-- **TagValidation.js** (<50 lines) - Composable for tag validation logic
-
-### View State Management
-
-#### Enhanced organizerCore.js Store (Single Source of Truth)
-Rather than creating a separate folderViewStore.js, extend the existing organizerCore.js store to maintain single source of truth:
+**Virtual Folder System Design**:
 
 ```javascript
-// Enhanced organizerCore.js with folder view capabilities
-export const useOrganizerCore = defineStore('organizerCore', () => {
-  // Existing v1.1 state...
-  
-  // New folder view state
-  const viewMode = ref('flat') // 'flat' | 'folder'
-  const folderHierarchy = ref([])
-  const currentFolderPath = ref([])
-  const breadcrumbs = computed(() => generateBreadcrumbs(currentFolderPath.value))
-  
-  // Virtual folder generation
-  const folderStructure = computed(() => {
-    if (viewMode.value === 'flat') return null
-    return generateVirtualFolders(filteredEvidence.value, folderHierarchy.value)
-  })
-  
-  const currentFolderFiles = computed(() => {
-    if (viewMode.value === 'flat') return filteredEvidence.value
-    return filterFilesByFolderPath(filteredEvidence.value, currentFolderPath.value)
-  })
-})
-```
-
-### Component Architecture
-
-#### New Components
-
-1. **FolderView.vue** - Main folder view container
-   - Renders folder hierarchy with navigation
-   - Manages breadcrumb display and navigation
-   - Handles view state transitions
-
-2. **FolderBreadcrumbs.vue** - Navigation breadcrumb component
-   - Shows current folder path
-   - Enables click-to-navigate to any level
-   - Displays folder context and file counts
-
-3. **FolderGrid.vue** - Grid display for folders and files
-   - Shows subfolders as folder icons with counts
-   - Displays files in current folder level
-   - Handles folder/file selection and actions
-
-4. **ViewSwitcher.vue** - Toggle between flat and folder views
-   - Seamless transition between view modes
-   - Preserves search and filter state across views
-   - Visual mode indicators
-
-5. **TagContextMenu.vue** - Right-click menu for tags
-   - "Show in Folders" option for any tag
-   - Additional tag management options
-   - Context-aware menu options
-
-#### Enhanced Components
-
-1. **Organizer.vue** - Updated to support dual view modes
-2. **FileItem.vue** - Enhanced with folder view specific actions
-3. **TagSelector.vue** - Context-aware tag display in folder views
-
-### Folder Logic Implementation
-
-#### Virtual Folder Generation
-```javascript
-// Convert tag-based data into folder structures
-function generateFolderHierarchy(documents, hierarchyCategories) {
-  const folders = new Map();
-  
-  documents.forEach(doc => {
-    const folderPath = buildFolderPath(doc.tagsByHuman, hierarchyCategories);
-    const folderKey = folderPath.join('/');
-    
-    if (!folders.has(folderKey)) {
-      folders.set(folderKey, {
-        path: folderPath,
-        files: [],
-        subfolders: new Set()
-      });
-    }
-    
-    folders.get(folderKey).files.push(doc);
-  });
-  
-  return organizeFolderStructure(folders);
+// Virtual folder structure representation
+{
+  viewMode: 'flat' | 'folders',           // Current view mode
+  folderHierarchy: [                      // Ordered category hierarchy 
+    { categoryId: 'cat-type', categoryName: 'Document Type' },
+    { categoryId: 'cat-date', categoryName: 'Date/Period' }
+  ],
+  currentPath: [                          // Current folder navigation path
+    { categoryId: 'cat-type', tagName: 'Invoice' },
+    { categoryId: 'cat-date', tagName: '2024' }
+  ],
+  filteredEvidence: [],                   // Files matching current folder context
 }
 ```
 
-#### Hierarchy Management
-- Support for multi-level hierarchies (e.g., Type → Date → Institution)
-- Dynamic reorganization without data processing
-- Contextual filtering at each level
-- Breadcrumb-based navigation state
+**Key Architecture Decisions**:
 
-## Implementation Phases
+1. **No Data Structure Changes**: Virtual folders are purely presentational - the tag subcollection storage remains unchanged
+2. **Real-time Conversion**: Tag data dynamically converted to folder structure at rendering time  
+3. **Stateful Navigation**: Folder hierarchy and current path tracked in Vue reactive state
+4. **Context Filtering**: Evidence documents filtered based on current folder path context
+5. **Instant Reorganization**: Hierarchy changes require no backend processing - just re-filtering and re-rendering
 
-### Phase 0: Prerequisite - TagSelector Decomposition (Week 0)
-**Complexity**: Medium | **Breaking Risk**: Medium
+## Implementation Plan
 
-#### Tasks:
-- [ ] **Decompose TagSelector.vue** (303 lines) into smaller components
-  - **Granular Success Criteria**: Create 4 focused components all <150 lines, maintain all existing functionality, no breaking changes
-  - **Rollback Mechanism**: 
-    - Create backup branch `backup/tagselector-decomposition` before starting
-    - Run comprehensive test suite before and after decomposition
-    - If any test fails or build breaks, immediately revert to backup branch
-    - Validate that all 15 existing TagSelector usages continue to work
-    - Criteria for rollback: Any test failure, build error, or >10% performance degradation
-- [ ] **Test decomposed components** thoroughly
-  - **Granular Success Criteria**: All tag assignment functionality preserved, no performance degradation, proper error handling
-- [ ] **Update imports** in all consuming components
-  - **Granular Success Criteria**: All references updated, no broken imports, build succeeds
+### Phase 1: Virtual Folder Core Infrastructure (Week 1)
 
-### Phase 1: Hierarchy Selection & Tag Context Menu (Week 1)
-**Complexity**: High | **Breaking Risk**: Low
+#### 1.1: Virtual Folder Store Extension
+**File**: `src/features/organizer/stores/virtualFolderStore.js` (NEW)
 
-**Internet Research Summary for Phase 1:**
-- **Keywords Used**: "Vue.js context menu right-click component", "hierarchy selection interface patterns", "tag-to-folder conversion algorithms"
-- **Solutions Found**: Vuetify v-menu component with activator="parent" for right-click menus; Ant Design Vue dropdown patterns for hierarchy selection; Tree data structure conversion algorithms for tag-to-folder mapping
-- **Implementation Approach**: Use Vuetify's context menu patterns with custom positioning logic, implement drag-and-drop hierarchy selection using Vue.Draggable, leverage existing category structure for efficient folder mapping
+**Purpose**: Manage virtual folder state and navigation logic
 
-#### Tasks:
-- [ ] **Create TagContextMenu.vue** with "Show in Folders" option
-  - **Granular Success Criteria**: Right-click detection, menu positioning, keyboard navigation support
-  - **Rollback Mechanism**: Feature flag to disable context menu functionality
-- [ ] **Build hierarchy selection interface** 
-  - **Granular Success Criteria**: Users can choose hierarchy order, preview folder structure, save preferences
-- [ ] **Implement tag-to-folder conversion** logic
-  - **Granular Success Criteria**: Creates appropriate hierarchy based on research, processes 1000+ documents efficiently
-- [ ] **Enhance organizerCore.js store** with folder view state
-  - **Granular Success Criteria**: Single source of truth maintained, no data duplication, proper state management
+```javascript
+// Key State Management
+const viewMode = ref('flat')              // 'flat' | 'folders'
+const folderHierarchy = ref([])           // Active category hierarchy
+const currentPath = ref([])               // Current navigation path
+const breadcrumbs = ref([])               // Navigation breadcrumbs
 
-### Phase 2: Core Folder View Foundation (Week 1-2)  
-**Complexity**: High | **Breaking Risk**: Low
-
-**Internet Research Summary for Phase 2:**
-- **Keywords Used**: "Vue 3 tree view virtual scrolling performance", "folder navigation breadcrumb components", "hierarchical data rendering Vue.js"
-- **Solutions Found**: PrimeVue VirtualScroller for large dataset handling; Radix Vue TreeVirtualizer for tree virtualization; Vue 3.4/3.5 performance improvements with rewritten template parser; WAI-ARIA tree navigation patterns
-- **Implementation Approach**: Use computed properties for efficient folder generation, implement breadcrumb navigation following Material Design patterns, leverage Vue 3.5 reactivity improvements for responsive folder tree rendering
-
-#### Tasks:
-- [ ] **Build FolderView.vue** main container component
-  - **Granular Success Criteria**: Renders folder structure using research-based patterns, handles navigation events, responsive design
-- [ ] **Implement virtual folder generation** algorithm based on Vue.js research
-  - **Granular Success Criteria**: Uses Vue 3.4/3.5 performance optimizations, handles large datasets efficiently, creates accurate hierarchies
-- [ ] **Create FolderBreadcrumbs.vue** navigation component
-  - **Granular Success Criteria**: Shows full path, supports click navigation, follows WAI-ARIA patterns from research
-- [ ] **Add basic folder navigation** with state management
-  - **Granular Success Criteria**: Navigation completes quickly, maintains proper state, handles deep hierarchies
-
-### Phase 3: View Switching & Display (Week 2)
-**Complexity**: Medium | **Breaking Risk**: Low
-
-#### Tasks:
-- [ ] **Create ViewSwitcher.vue** for flat/folder mode toggle
-  - **Granular Success Criteria**: Instant switching, preserves search state, visual mode indicators
-- [ ] **Build FolderGrid.vue** for folder/file display
-  - **Granular Success Criteria**: Folder icons with counts, efficient rendering, responsive grid layout
-- [ ] **Implement folder file counting** with performance optimization
-  - **Granular Success Criteria**: Uses virtual scrolling techniques from research, cache folder counts, handles large collections
-- [ ] **Add view state persistence** across navigation
-  - **Granular Success Criteria**: Maintains view mode, preserves folder position, survives page refresh
-
-### Phase 4: Enhanced File Actions & Integration (Week 2-3)
-**Complexity**: Medium | **Breaking Risk**: Low
-
-#### Tasks:
-- [ ] **Enhanced file actions** in folder context
-  - **Granular Success Criteria**: Tag assignment preserves folder context, file operations maintain position
-- [ ] **Add folder context filtering** to show relevant tags only
-  - **Granular Success Criteria**: Filters complete quickly, shows only relevant options, maintains tag relationships  
-- [ ] **Implement folder-specific search** and filtering
-  - **Granular Success Criteria**: Search within current folder, highlight matching terms, preserve hierarchy context
-- [ ] **Dynamic hierarchy reorganization** capability
-  - **Granular Success Criteria**: Instant reorganization, maintains current selection, preserves user context
-
-### Phase 5: Performance & Testing (Week 3)
-**Complexity**: Low | **Breaking Risk**: Low
-
-#### Tasks:
-- [ ] **Performance optimization** using research-based techniques
-  - **Granular Success Criteria**: Implement virtual scrolling for large folders, lazy loading patterns, memory efficiency
-- [ ] **Integration with existing tag system** verification
-  - **Granular Success Criteria**: All v1.1 functionality preserved, tag changes reflect in folders, consistent behavior
-- [ ] **Comprehensive testing** with realistic data volumes
-  - **Granular Success Criteria**: 10,000+ files benchmarks, folder navigation performance meets research standards
-- [ ] **Accessibility implementation** following WAI-ARIA patterns
-  - **Granular Success Criteria**: Keyboard navigation, screen reader support, focus management per research
-
-## Detailed Implementation Specifications
-
-### FolderView.vue Interface Design
-```
-┌─────────────────────────────────────────────────────────────┐
-│ [≡ Flat View] | [📁 Folder View] ← ViewSwitcher             │
-├─────────────────────────────────────────────────────────────┤
-│ 🏠 All Documents › 📄 Statements › 📅 Q3 2024            │ ← Breadcrumbs
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│ 📁 Bank of America (12)    📁 Chase (8)    📁 Wells (3)   │ ← Subfolders
-│                                                             │
-│ 📄 statement_001.pdf   📄 statement_002.pdf              │ ← Files in current folder
-│ 📄 statement_003.pdf   📄 statement_004.pdf              │
-│                                                             │
-│ Showing 23 files in Q3 2024 › Statements                  │ ← Status bar
-└─────────────────────────────────────────────────────────────┘
+// Key Methods
+const enterFolderView(categoryId)         // Switch to folder view with selected category
+const addHierarchyLevel(categoryId)       // Add category to folder hierarchy  
+const navigateToPath(pathSegments)        // Navigate to specific folder path
+const exitFolderView()                    // Return to flat view
+const getFilteredEvidence()               // Get files matching current folder context
 ```
 
-### Tag Context Menu
-```
-┌─────────────────────────────┐
-│ [Statement]                 │ ← Right-clicked tag
-├─────────────────────────────┤
-│ 📁 Show in Folders         │ ← Creates folder view
-│ 🔍 Filter by this tag      │
-│ ✏️  Edit tag               │
-│ 🗑️  Remove from document   │
-└─────────────────────────────┘
+**Integration**: Extends existing organizer.js store without breaking current functionality
+
+#### 1.2: Folder Navigation Components
+**Files**: 
+- `src/features/organizer/components/FolderBreadcrumbs.vue` (NEW)
+- `src/features/organizer/components/FolderHierarchySelector.vue` (NEW)
+
+**FolderBreadcrumbs.vue** - Navigation breadcrumb component:
+```javascript
+// Props: currentPath, folderHierarchy
+// Events: navigate-to-path, exit-folder-view
+// Features: Home → Category1: Tag1 → Category2: Tag2 navigation
 ```
 
-### Folder Hierarchy Selection Dialog
+**FolderHierarchySelector.vue** - Category hierarchy configuration:
+```javascript  
+// Props: availableCategories, currentHierarchy
+// Events: hierarchy-changed
+// Features: Drag-and-drop category ordering, add/remove from hierarchy
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ Choose Folder Organization                                   │
-├─────────────────────────────────────────────────────────────┤
-│ Organize by: [Document Type ▼] → [Date ▼] → [Institution ▼] │
-│                                                             │
-│ Preview:                                                    │
-│ 📁 Statements (45)                                         │
-│   └─ 📁 Q3 2024 (23)                                      │
-│       └─ 📁 Bank of America (12)                          │
-│                                                             │
-│ 📁 Invoices (32)                                           │
-│   └─ 📁 Q4 2024 (18)                                      │
-│       └─ 📁 Chase (8)                                      │
-│                                                             │
-│ [Apply] [Cancel] [Save as Bookmark]                        │
-└─────────────────────────────────────────────────────────────┘
+
+#### 1.3: Enhanced View Mode Toggle
+**File**: `src/features/organizer/components/ViewModeToggle.vue` (ENHANCED)
+
+**Current**: List/Grid toggle  
+**Enhanced**: Flat/Folders toggle + List/Grid sub-toggle
+
+```javascript
+// Enhanced ViewModeToggle Structure
+{
+  primaryMode: 'flat' | 'folders',        // Primary view mode
+  secondaryMode: 'list' | 'grid',         // Display format within mode
+}
+```
+
+### Phase 2: Tag Context Menu and Folder Entry (Week 2)
+
+#### 2.1: Tag Right-Click Context Menu
+**File**: `src/features/organizer/components/TagContextMenu.vue` (NEW)
+
+**Features**:
+- Right-click on any tag chip triggers context menu
+- "Show in Folders" option creates folder view based on tag's category
+- "Filter by this tag" option (enhance existing flat view filtering)
+- Context-aware menu options based on current view mode
+
+**Integration Points**:
+- Integrate into `FileListItemTags.vue` - add right-click handlers to tag chips
+- Connect to virtual folder store for folder entry logic
+
+#### 2.2: Folder View Display Component  
+**File**: `src/features/organizer/components/FolderViewDisplay.vue` (NEW)
+
+**Purpose**: Render folder-based organization of evidence documents
+
+```javascript
+// Component Structure
+{
+  folders: Map<tagName, evidenceDocuments[]>,  // Current level folders
+  files: evidenceDocuments[],                  // Files in current folder
+  breadcrumbs: navigationPath[],               // Current path
+  canNavigateDeeper: boolean,                  // Whether more levels available
+}
+```
+
+**Features**:
+- Folder icons with file counts
+- Nested navigation (click folder to drill down)  
+- File display within folders (same as flat view FileListItem)
+- "Back" navigation and breadcrumb links
+
+#### 2.3: Enhanced FileListDisplay Integration
+**File**: `src/features/organizer/components/FileListDisplay.vue` (ENHANCED)
+
+**Current Structure**:
+```javascript
+// Current: Flat list/grid toggle
+<FileListItem v-for="evidence in filteredEvidence" />
+```
+
+**Enhanced Structure**:
+```javascript
+// Enhanced: Mode-based rendering  
+<FlatViewDisplay v-if="viewMode.primary === 'flat'" />
+<FolderViewDisplay v-else-if="viewMode.primary === 'folders'" />
+```
+
+### Phase 3: Advanced Navigation and User Experience (Week 3)
+
+#### 3.1: Multi-Level Hierarchy Support
+**Enhancement**: Support complex folder hierarchies like "Document Type → Date → Institution"
+
+**Features**:
+- Dynamic hierarchy reconfiguration (drag-and-drop category ordering)
+- Instant reorganization without backend processing
+- Hierarchy persistence in local storage for user preference
+- "Quick Switch" to common hierarchy configurations
+
+#### 3.2: Search and Filter Integration
+**File**: `src/features/organizer/components/FolderSearch.vue` (NEW)
+
+**Features**:
+- Search within current folder context  
+- Global search that can optionally switch back to flat view
+- Filter by additional categories not in current hierarchy
+- "Show search results in folders" option
+
+#### 3.3: Performance Optimization
+**Files**: 
+- Enhanced caching in virtual folder store
+- Lazy loading for deep folder structures
+- Optimized evidence filtering algorithms
+
+**Key Optimizations**:
+- Cache folder structures to avoid recomputation
+- Virtual scrolling for large folder contents  
+- Debounced hierarchy changes
+- Memoized folder content calculations
+
+## Detailed Component Specifications
+
+### Virtual Folder Store API
+
+```javascript
+// src/features/organizer/stores/virtualFolderStore.js
+export const useVirtualFolderStore = defineStore('virtualFolder', () => {
+  
+  // State Management
+  const viewMode = ref('flat')
+  const folderHierarchy = ref([])
+  const currentPath = ref([])
+  
+  // Computed Properties  
+  const isInFolderView = computed(() => viewMode.value === 'folders')
+  const currentBreadcrumbs = computed(() => generateBreadcrumbs(currentPath.value))
+  const availableNextCategories = computed(() => getUnusedCategories())
+  
+  // Core Methods
+  const enterFolderView = (categoryId, tagName = null) => {
+    viewMode.value = 'folders'
+    folderHierarchy.value = [{ categoryId, categoryName: getCategoryName(categoryId) }]
+    if (tagName) {
+      currentPath.value = [{ categoryId, tagName }]
+    }
+  }
+  
+  const navigateToFolder = (categoryId, tagName) => {
+    const pathIndex = currentPath.value.findIndex(p => p.categoryId === categoryId)
+    if (pathIndex >= 0) {
+      // Navigate back to existing level
+      currentPath.value = currentPath.value.slice(0, pathIndex + 1)
+      currentPath.value[pathIndex].tagName = tagName  
+    } else {
+      // Add new level
+      currentPath.value.push({ categoryId, tagName })
+    }
+  }
+  
+  const exitFolderView = () => {
+    viewMode.value = 'flat'
+    folderHierarchy.value = []
+    currentPath.value = []
+  }
+  
+  // Evidence Filtering
+  const getFilteredEvidence = (allEvidence, organizerStore) => {
+    if (viewMode.value === 'flat') {
+      return organizerStore.filteredEvidence // Use existing flat filtering
+    }
+    
+    return filterByFolderContext(allEvidence, currentPath.value, organizerStore)
+  }
+  
+  return {
+    // State
+    viewMode,
+    folderHierarchy, 
+    currentPath,
+    
+    // Computed
+    isInFolderView,
+    currentBreadcrumbs,
+    availableNextCategories,
+    
+    // Methods  
+    enterFolderView,
+    navigateToFolder,
+    exitFolderView,
+    getFilteredEvidence
+  }
+})
+```
+
+### Folder View Display Component
+
+```javascript
+// src/features/organizer/components/FolderViewDisplay.vue  
+<template>
+  <div class="folder-view-container">
+    
+    <!-- Breadcrumb Navigation -->
+    <FolderBreadcrumbs 
+      :breadcrumbs="breadcrumbs"
+      @navigate="handleBreadcrumbNavigation"
+      @exit-folders="exitFolderView"
+    />
+    
+    <!-- Hierarchy Configuration -->
+    <FolderHierarchySelector
+      v-if="showHierarchyConfig"
+      :available-categories="availableCategories" 
+      :current-hierarchy="folderHierarchy"
+      @hierarchy-changed="updateHierarchy"
+    />
+    
+    <!-- Current Level Display -->
+    <div class="folder-content">
+      
+      <!-- Folders (next level categories) -->
+      <div v-if="availableFolders.length" class="folder-grid">
+        <div 
+          v-for="folder in availableFolders"
+          :key="folder.tagName"
+          class="folder-card"
+          @click="navigateToFolder(folder)"
+        >
+          <v-icon>mdi-folder</v-icon>
+          <span class="folder-name">{{ folder.tagName }}</span>
+          <span class="file-count">{{ folder.fileCount }}</span>
+        </div>
+      </div>
+      
+      <!-- Files (evidence documents in current folder) -->
+      <div v-if="currentFiles.length" class="files-in-folder">
+        <h4>Files in this folder</h4>
+        <FileListItem
+          v-for="evidence in currentFiles"
+          :key="evidence.id"
+          :evidence="evidence"
+          @tags-updated="$emit('tagsUpdated')"
+          @download="$emit('download', $event)"
+          @process-with-ai="$emit('process-with-ai', $event)"
+        />
+      </div>
+      
+      <!-- Empty State -->
+      <div v-if="!availableFolders.length && !currentFiles.length" class="empty-folder">
+        <v-icon size="48">mdi-folder-open-outline</v-icon>
+        <p>This folder is empty</p>
+      </div>
+      
+    </div>
+  </div>
+</template>
+```
+
+### Tag Context Menu Component
+
+```javascript
+// src/features/organizer/components/TagContextMenu.vue
+<template>
+  <v-menu
+    v-model="menu"
+    :position-x="x"
+    :position-y="y"
+    absolute
+    offset-y
+  >
+    <v-list>
+      <v-list-item @click="showInFolders">
+        <v-list-item-title>
+          <v-icon>mdi-folder-outline</v-icon>
+          Show in Folders  
+        </v-list-item-title>
+      </v-list-item>
+      
+      <v-list-item @click="filterByTag">
+        <v-list-item-title>
+          <v-icon>mdi-filter-outline</v-icon>
+          Filter by "{{ tagName }}"
+        </v-list-item-title>
+      </v-list-item>
+      
+      <v-divider />
+      
+      <v-list-item @click="editTag" v-if="canEdit">
+        <v-list-item-title>
+          <v-icon>mdi-pencil</v-icon>
+          Edit Tag
+        </v-list-item-title>
+      </v-list-item>
+      
+    </v-list>
+  </v-menu>
+</template>
+
+<script setup>
+const props = defineProps({
+  categoryId: String,
+  tagName: String, 
+  canEdit: Boolean,
+  x: Number,
+  y: Number,
+  modelValue: Boolean
+})
+
+const emit = defineEmits(['show-in-folders', 'filter-by-tag', 'edit-tag'])
+
+const showInFolders = () => {
+  emit('show-in-folders', { 
+    categoryId: props.categoryId, 
+    tagName: props.tagName 
+  })
+  menu.value = false
+}
+</script>
+```
+
+## Integration Points
+
+### 1. Enhanced Organizer.vue Main View
+**Changes**:
+- Add virtual folder store integration
+- Handle view mode switching (flat ↔ folders)
+- Route tag context menu events to folder navigation
+- Manage folder state persistence
+
+### 2. FileListItem Tag Enhancement  
+**Changes**:
+- Add right-click handlers to tag chips in `FileListItemTags.vue`
+- Integrate `TagContextMenu.vue` component
+- Handle "Show in Folders" event emission
+
+### 3. Search Integration
+**Changes**:
+- Update search logic to work within folder contexts  
+- Add "search in current folder" vs "search all" modes
+- Handle search result display in folder view
+
+## Data Flow Architecture
+
+```mermaid
+graph TD
+    A[User Right-clicks Tag] --> B[TagContextMenu Appears]
+    B --> C[User Selects "Show in Folders"]
+    C --> D[VirtualFolderStore.enterFolderView]
+    D --> E[Set viewMode = 'folders']
+    E --> F[Set folderHierarchy from categoryId]
+    F --> G[Set currentPath from tagName]
+    G --> H[FileListDisplay Switches to FolderViewDisplay]
+    H --> I[FolderViewDisplay Filters Evidence by currentPath]
+    I --> J[Render Folder Structure + Files]
+    
+    K[User Clicks Folder] --> L[VirtualFolderStore.navigateToFolder]
+    L --> M[Update currentPath]
+    M --> N[Re-filter Evidence]  
+    N --> O[Re-render Folder Content]
+    
+    P[User Clicks Breadcrumb] --> Q[Navigate to Path Segment]
+    Q --> M
+    
+    R[User Exits Folder View] --> S[VirtualFolderStore.exitFolderView]
+    S --> T[Reset viewMode = 'flat']
+    T --> U[FileListDisplay Shows Flat View]
 ```
 
 ## User Experience Flow
 
-### Creating First Folder View
-1. User is in flat view seeing all files with tags
-2. Right-clicks on any tag (e.g., "Statement")
-3. Selects "Show in Folders" from context menu
-4. View transforms to folder structure organized by that tag's category
-5. User sees folder containing all "Statement" documents
+### Entering Folder View
+1. **Current State**: User sees flat list with color-coded tags
+2. **Action**: User right-clicks on "Invoice" tag (Document Type category)
+3. **Result**: 
+   - View switches to folder mode
+   - Breadcrumb shows: "Home → Document Type"
+   - Folders appear: "Invoice" (15 files), "Statement" (8 files), "Contract" (3 files)
+   - User clicks "Invoice" folder
+   - Files filtered to show only Invoice documents
 
-### Multi-Level Navigation
-1. User is in "Document Type" folder view
-2. Right-clicks on "Q3 2024" tag within a statement file
-3. Selects "Add Date to Folders" (or similar)
-4. Folder view reorganizes to Type → Date hierarchy
-5. User can navigate: All → Statements → Q3 2024 → [files]
+### Multi-Level Navigation  
+1. **Current State**: User is in "Invoice" folder under Document Type
+2. **Action**: User right-clicks "2024" tag on an invoice document
+3. **Result**:
+   - Hierarchy extends: "Document Type → Date"
+   - Breadcrumb shows: "Home → Document Type: Invoice → Date"  
+   - New folders appear: "2024" (12 files), "2023" (3 files)
+   - User clicks "2024" folder
+   - Files filtered to show only Invoice documents from 2024
 
-### Instant Reorganization
-1. User has Type → Date folder hierarchy
-2. Decides they want Date → Type instead
-3. Uses hierarchy selection dialog or right-click option
-4. View instantly reorganizes without data processing
-5. New path: All → Q3 2024 → Statements → [same files]
+### Quick Reorganization
+1. **Current State**: Viewing "Document Type → Date" hierarchy  
+2. **Action**: User wants to reorganize by "Date → Document Type"
+3. **Implementation**: Drag-and-drop in hierarchy selector OR quick switch button
+4. **Result**:
+   - Instant reorganization (no backend processing)
+   - New breadcrumb: "Home → Date → Document Type"  
+   - Same files, different organization structure
 
-### Switching Between Views
-1. User is deep in folder hierarchy: Type → Date → Institution
-2. Wants to see comprehensive tag view for a file
-3. Clicks "Flat View" toggle
-4. Returns to flat view with full tag display
-5. Can return to folder view and resume where left off
+## Technical Implementation Notes
 
-## Data Integration
+### No Database Changes Required
+- Virtual folder system is purely presentational
+- All data remains in existing Evidence and Tag subcollection structures  
+- Folder views generated dynamically from tag relationships
+- No migration scripts or schema updates needed
 
-### Client-Side Folder Generation
-All folder operations will be performed client-side using existing v1.1 evidence data:
+### Performance Considerations
+- **Caching**: Folder structures cached to avoid recomputation
+- **Filtering**: Evidence filtering optimized with indexed tag lookups
+- **Lazy Loading**: Large folder structures loaded on-demand
+- **Memory Management**: Cleanup unused folder state when switching views
 
-```javascript
-// Use existing evidence from organizerCore.js store
-const folderContents = computed(() => {
-  return generateClientSideFolders(
-    organizerCore.filteredEvidence, 
-    currentHierarchy.value,
-    currentFolderPath.value
-  )
-})
+### Error Handling
+- **Missing Categories**: Graceful degradation if referenced categories deleted
+- **Invalid Paths**: Automatic path correction for invalid folder navigation
+- **Network Issues**: Offline-capable folder navigation using cached data
+- **Loading States**: Smooth transitions during folder content loading
 
-// Leverage existing category and tag data
-const availableHierarchies = computed(() => {
-  return categoryStore.categories.map(cat => ({
-    id: cat.id,
-    name: cat.name,
-    color: cat.color
-  }))
-})
-```
+## Future Enhancement Hooks  
 
-### Integration with Existing Services
-- **evidenceService.js**: Continue using existing evidence loading and updates
-- **categoryService.js**: Leverage existing category management for hierarchy options
-- **organizerCore.js**: Extend with folder view state management
+### v1.4+ Integration Points
+**Priority Review Queue**: Folders can be filtered by tag confidence/review status
+**BATES Numbering**: Print folder contents with sequential BATES stamps  
+**Advanced Search**: Cross-folder search with folder context highlighting
+**Bulk Operations**: Select all files in current folder for bulk actions
 
-## Performance Considerations
-
-### Folder Generation Optimization
-- Cache folder structures for common hierarchies
-- Lazy load subfolder contents until navigation
-- Use indexed queries for folder counting
-- Debounce hierarchy reorganization
-
-### Memory Management
-- Virtual scrolling for large folder contents
-- Unload deep folder cache when not in use
-- Efficient breadcrumb state management
-- Optimize folder count calculations
-
-### User Experience Performance
-- Instant view switching with cached states
-- Progressive loading for complex hierarchies
-- Skeleton loading for folder contents
-- Optimistic UI updates for navigation
-
-## Testing Strategy
-
-### Unit Tests
-- Virtual folder generation algorithms
-- Hierarchy state management
-- Breadcrumb navigation logic
-- View switching functionality
-- Folder counting accuracy
-
-### Integration Tests
-- Folder view with tag assignment
-- Search functionality in folder context
-- File actions within folders
-- View state persistence
-- Bookmark management
-
-### User Acceptance Tests
-- Create folder views from flat view
-- Navigate complex folder hierarchies
-- Switch between flat and folder views
-- Reorganize folder hierarchies
-- Use folder bookmarking features
-
-## Risk Mitigation
-
-### Performance Risks
-- **Large Collections**: Virtual scrolling and lazy loading prevent UI blocking
-- **Complex Hierarchies**: Depth limits and progressive loading maintain responsiveness
-- **Memory Usage**: Cache management and cleanup prevent memory leaks
-
-### User Experience Risks
-- **Navigation Confusion**: Clear breadcrumbs and consistent navigation patterns
-- **View State Loss**: Persistent state management preserves user context
-- **Overwhelming Options**: Progressive disclosure and sensible defaults
-
-### Data Consistency Risks
-- **Tag Changes**: Real-time synchronization between views
-- **Folder Accuracy**: Robust folder generation algorithms with validation
-- **State Management**: Comprehensive testing of all state transitions
+### Extensibility Architecture
+- **Plugin System**: Virtual folder rendering can support custom folder types
+- **Multi-Hierarchy**: Framework supports multiple simultaneous folder hierarchies  
+- **External Integration**: Folder structures can be exported/imported
+- **Analytics**: Folder navigation patterns trackable for UX optimization
 
 ## Success Metrics
 
-### Functionality Metrics
-- [ ] All v1.1 tag functionality preserved in folder view
-- [ ] Folder navigation completes in <100ms
-- [ ] View switching preserves all user context
-- [ ] Folder hierarchies accurately represent tag relationships
-- [ ] Breadcrumb navigation works for 10+ levels deep
+### User Experience
+- **Discovery Time**: Reduced time to locate specific document types
+- **Navigation Intuition**: User comfort with folder vs. flat view switching
+- **Hierarchy Usage**: Frequency of multi-level folder navigation
+- **View Preference**: User preference distribution between flat/folder views
 
-### User Experience Metrics
-- [ ] Users successfully create folder views on first attempt
-- [ ] Folder navigation feels intuitive (>90% task completion)
-- [ ] Users prefer folder view for document discovery tasks
-- [ ] View switching usage indicates both modes serve distinct purposes
-- [ ] Folder bookmarking adoption rate >50% for frequent users
+### Technical Performance  
+- **Rendering Speed**: Folder view load time < 200ms for typical datasets
+- **Memory Usage**: Folder state memory overhead < 5MB for large collections
+- **Search Integration**: Search performance maintained in folder contexts
+- **Responsiveness**: Smooth navigation without UI blocking
 
-### Technical Metrics
-- [ ] Folder generation handles 10,000+ documents efficiently
-- [ ] Memory usage remains stable during extended navigation
-- [ ] No performance degradation from existing flat view functionality
-- [ ] Folder counts remain accurate in real-time
-- [ ] State persistence survives page refresh and browser restart
+### Feature Adoption
+- **Context Menu Usage**: Frequency of "Show in Folders" selections
+- **Hierarchy Customization**: User creation of custom folder hierarchies
+- **Cross-Mode Usage**: Users who use both flat and folder views regularly
+- **Error Recovery**: Successful recovery from navigation/display errors
 
-## Future Enhancements for v1.4+
-
-### Core Navigation Enhancements
-- Keyboard shortcuts for folder navigation following WAI-ARIA patterns
-- Recent folders history for improved user workflow
-- Enhanced folder search within current hierarchy context
-
-### Performance Scaling
-- Advanced virtual scrolling for extremely large collections (>50,000 documents)
-- Background folder count caching for improved responsiveness
-- Memory management optimizations for deep hierarchies
-
-## Preparation for Future Versions
-
-### v1.4 AI Integration Compatibility
-- Folder views support AI-suggested tags seamlessly
-- Confidence indicators work within folder context
-- Review workflows maintain folder navigation state
-- AI processing considers folder organization preferences
-
-### v1.5 Context-Enhanced Processing
-- Folder structures provide context for AI processing
-- Similar document detection works within folder scope
-- Learning algorithms consider folder organization patterns
-- Batch processing respects folder selections
-
-## Conclusion
-
-Version 1.3 transforms the Organizer from a flat tag-based system into a dynamic, navigable folder experience while preserving all the benefits of the underlying tag system. Users gain the familiarity of traditional folder browsing combined with the flexibility and power of tag-based organization.
-
-The virtual folder system provides immediate user benefits through intuitive navigation while maintaining the technical foundation needed for AI processing in future versions. The implementation preserves all existing functionality while adding sophisticated new capabilities that scale efficiently to large document collections.
-
-**Target**: Complete virtual folder view implementation that makes large document collections as navigable as traditional file systems while maintaining the superior flexibility of tag-based organization.
+This implementation plan provides a complete roadmap for implementing virtual folder views while maintaining backward compatibility and preparing for future enhancements. The architecture leverages existing v1.2 infrastructure while adding intuitive folder-based navigation that users expect from file management interfaces.
