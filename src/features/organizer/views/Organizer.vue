@@ -45,20 +45,6 @@
       <p class="ml-4">Updating tags...</p>
     </v-overlay>
 
-    <!-- AI Tag Review Modal -->
-    <AITagReview
-      v-model="showAIReview"
-      :evidence="currentReviewEvidence"
-      :loading="aiReviewLoading"
-      :error="aiReviewError"
-      @approve-tag="handleApproveTag"
-      @reject-tag="handleRejectTag"
-      @approve-all="handleApproveAll"
-      @reject-all="handleRejectAll"
-      @save-changes="handleSaveAIReview"
-      @retry-load="retryAIReview"
-      @close="closeAIReview"
-    />
 
     <!-- Snackbar for notifications -->
     <v-snackbar
@@ -85,7 +71,6 @@ import { AITagService } from '../services/aiTagService.js';
 import OrganizerHeader from '../components/OrganizerHeader.vue';
 import OrganizerStates from '../components/OrganizerStates.vue';
 import FileListDisplay from '../components/FileListDisplay.vue';
-import AITagReview from '../components/AITagReview.vue';
 
 // Store and router
 const organizerStore = useOrganizerStore();
@@ -99,11 +84,6 @@ const tagUpdateLoading = ref(new Set());
 const aiProcessing = ref(new Set()); // Track AI processing by evidence ID
 const unsubscribe = ref(null);
 
-// AI Review Modal State
-const showAIReview = ref(false);
-const currentReviewEvidence = ref(null);
-const aiReviewLoading = ref(false);
-const aiReviewError = ref(null);
 
 // AI Service instance
 const aiTagService = new AITagService();
@@ -243,78 +223,6 @@ const showNotification = (message, color = 'success', timeout = 4000) => {
   };
 };
 
-// AI Review Modal Handlers
-const handleApproveTag = (tag) => {
-  console.log('Tag approved:', tag);
-  // Individual tag approval is handled by the modal component
-  // The save operation will handle the actual database updates
-};
-
-const handleRejectTag = (tag) => {
-  console.log('Tag rejected:', tag);
-  // Individual tag rejection is handled by the modal component
-  // The save operation will handle the actual database updates
-};
-
-const handleApproveAll = (tags) => {
-  console.log('All tags approved:', tags);
-  // Batch approval handled by modal component
-};
-
-const handleRejectAll = (tags) => {
-  console.log('All tags rejected:', tags);
-  // Batch rejection handled by modal component
-};
-
-const handleSaveAIReview = async (changes) => {
-  if (!currentReviewEvidence.value) return;
-
-  try {
-    aiReviewLoading.value = true;
-    
-    // Process the review changes using AITagService
-    const result = await aiTagService.processReviewChanges(
-      currentReviewEvidence.value.id,
-      changes
-    );
-
-    if (result.success) {
-      const { approvedCount, rejectedCount, errors } = result.results;
-      
-      if (errors.length > 0) {
-        showNotification(
-          `Partial success: ${approvedCount} approved, ${rejectedCount} rejected. ${errors.length} failed.`,
-          'warning'
-        );
-      } else {
-        showNotification(
-          `Successfully applied changes: ${approvedCount} approved, ${rejectedCount} rejected.`,
-          'success'
-        );
-      }
-    } else {
-      throw new Error('Review processing failed');
-    }
-    
-    closeAIReview();
-  } catch (error) {
-    console.error('Failed to save AI review changes:', error);
-    showNotification('Failed to save changes. Please try again.', 'error');
-  } finally {
-    aiReviewLoading.value = false;
-  }
-};
-
-const retryAIReview = () => {
-  // Retry loading AI suggestions (if needed)
-  aiReviewError.value = null;
-};
-
-const closeAIReview = () => {
-  showAIReview.value = false;
-  currentReviewEvidence.value = null;
-  aiReviewError.value = null;
-};
 
 // Lifecycle
 onMounted(async () => {

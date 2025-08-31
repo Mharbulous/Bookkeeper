@@ -9,7 +9,6 @@ import { useOrganizerCoreStore } from './organizerCore.js';
 import { useOrganizerQueryStore } from './organizerQueryStore.js';
 import { useCategoryStore } from './categoryStore.js';
 import { useTagStore } from './tagStore.js';
-import { useMigrationStore } from './migrationStore.js';
 
 /**
  * Main Organizer Store - Facade pattern combining decomposed stores
@@ -21,7 +20,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
   const queryStore = useOrganizerQueryStore();
   const categoryStore = useCategoryStore();
   const tagStore = useTagStore();
-  const migrationStore = useMigrationStore();
   const authStore = useAuthStore();
 
   // Watch core store evidence changes to update query store
@@ -173,7 +171,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
     coreStore.reset();
     queryStore.reset();
     categoryStore.reset();
-    migrationStore.reset();
   };
 
   // Return interface maintaining backward compatibility + new features
@@ -231,13 +228,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
     getStructuredTagsByCategory: queryStore.getStructuredTagsByCategory,
     hasAnyTags: queryStore.hasAnyTags,
     
-    // Migration features
-    migrationStatus: computed(() => migrationStore.migrationStatus),
-    migrationProgress: computed(() => migrationStore.migrationProgress),
-    migrationResults: computed(() => migrationStore.migrationResults),
-    analyzeLegacyTags: migrationStore.analyzeLegacyTags,
-    performAutoMigration: migrationStore.performAutoMigration,
-    rollbackMigration: migrationStore.rollbackMigration,
     
     // Initialization
     initialize,
@@ -248,7 +238,6 @@ export const useOrganizerStore = defineStore('organizer', () => {
       query: queryStore,
       category: categoryStore,
       tag: tagStore,
-      migration: migrationStore
     }
   };
 });
