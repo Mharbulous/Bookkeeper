@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useVirtualFolderStore } from './virtualFolderStore.js';
+import { useVirtualFolderStore } from '../../../../../src/features/organizer/stores/virtualFolderStore.js';
 import { 
   generateMockCategories, 
   generateMockEvidence, 
@@ -8,7 +8,7 @@ import {
   mockStoreStates,
   performanceUtils,
   validationUtils
-} from '../../../test-utils/virtualFolderTestUtils.js';
+} from '../../../../../src/test-utils/virtualFolderTestUtils.js';
 
 describe('Virtual Folder Store', () => {
   let store;

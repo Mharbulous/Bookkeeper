@@ -334,3 +334,4 @@ The system uses real-time hardware calibration for accurate predictions:
 - **Cross-App Testing**: Use dedicated dev commands for SSO testing across multiple apps
 - **Firebase Consistency**: All apps in SSO architecture must use identical Firebase configuration
 - IMPORTANT: Always use the plan-reviewer agent on EVERY written implementation plan.
+- Vitest test suites should be saved in the "tests" folder.

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useFolderTimeouts } from '../features/upload/composables/useFolderTimeouts.js';
-import { useFolderAnalysis } from '@/features/upload/composables/useFolderAnalysis.js';
-import { memoryTestUtils, cloudFolderScenarios } from '../test-utils/mockFileAPI.js';
+import { useFolderTimeouts } from '../../../src/features/upload/composables/useFolderTimeouts.js';
+import { useFolderAnalysis } from '../../../src/features/upload/composables/useFolderAnalysis.js';
+import { memoryTestUtils, cloudFolderScenarios } from '../../../src/test-utils/mockFileAPI.js';
 
 describe('Memory Leak Prevention Tests', () => {
   let controllerTracker;

@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useOrganizerStore } from './organizer.js';
+import { useOrganizerStore } from '../../../../../src/features/organizer/stores/organizer.js';
 import { 
   generateMockCategories, 
   generateMockEvidence, 
   testScenarios,
   performanceUtils,
   validationUtils
-} from '../../../test-utils/virtualFolderTestUtils.js';
+} from '../../../../../src/test-utils/virtualFolderTestUtils.js';
 
 // Mock Firebase dependencies
 vi.mock('../../../services/firebase.js', () => ({

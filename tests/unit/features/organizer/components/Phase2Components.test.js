@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useVirtualFolderStore } from '../../stores/virtualFolderStore.js';
+import { useVirtualFolderStore } from '../../../../../src/features/organizer/stores/virtualFolderStore.js';
 
 describe('Phase 2: Core Virtual Folder Components - Logic Testing', () => {
   let store;

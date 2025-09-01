@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useFolderTimeouts } from './useFolderTimeouts.js';
+import { useFolderTimeouts } from '../../../../../src/features/upload/composables/useFolderTimeouts.js';
 
 // Mock browser APIs
 global.AbortController = vi.fn(() => ({

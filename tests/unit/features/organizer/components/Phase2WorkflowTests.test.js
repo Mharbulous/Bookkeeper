@@ -6,15 +6,15 @@ import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 
 // Import Phase 2 components
-import FileListItemTags from '../FileListItemTags.vue';
-import TagContextMenu from '../TagContextMenu.vue';
-import FolderBreadcrumbs from '../FolderBreadcrumbs.vue';
-import ViewModeToggle from '../ViewModeToggle.vue';
-import FolderHierarchySelector from '../FolderHierarchySelector.vue';
+import FileListItemTags from '../../../../../src/features/organizer/components/FileListItemTags.vue';
+import TagContextMenu from '../../../../../src/features/organizer/components/TagContextMenu.vue';
+import FolderBreadcrumbs from '../../../../../src/features/organizer/components/FolderBreadcrumbs.vue';
+import ViewModeToggle from '../../../../../src/features/organizer/components/ViewModeToggle.vue';
+import FolderHierarchySelector from '../../../../../src/features/organizer/components/FolderHierarchySelector.vue';
 
 // Import stores
-import { useVirtualFolderStore } from '../../stores/virtualFolderStore.js';
-import { useOrganizerStore } from '../../stores/organizer.js';
+import { useVirtualFolderStore } from '../../../../../src/features/organizer/stores/virtualFolderStore.js';
+import { useOrganizerStore } from '../../../../../src/features/organizer/stores/organizer.js';
 
 // Create Vuetify instance for testing
 const vuetify = createVuetify({

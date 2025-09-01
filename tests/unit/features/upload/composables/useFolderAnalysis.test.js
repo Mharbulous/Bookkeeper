@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { useFolderAnalysis } from './useFolderAnalysis.js';
+import { useFolderAnalysis } from '../../../../../src/features/upload/composables/useFolderAnalysis.js';
 
 describe('useFolderAnalysis', () => {
   const { preprocessFileData, calculateFileSizeMetrics, calculateFilenameStats } = useFolderAnalysis();
