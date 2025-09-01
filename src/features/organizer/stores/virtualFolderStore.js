@@ -83,7 +83,7 @@ export const useVirtualFolderStore = defineStore('virtualFolder', () => {
    * @param {Array} categories - Array of category objects {categoryId, categoryName}
    */
   const setFolderHierarchy = (categories) => {
-    folderHierarchy.value = [...categories];
+    folderHierarchy.value = Array.isArray(categories) ? [...categories] : [];
     clearFolderCache();
   };
   
