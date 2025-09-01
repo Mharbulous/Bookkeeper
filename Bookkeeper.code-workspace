@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "path": ".",
+    },
+    {
+      "path": "../../.claude",
+    },
+  ],
+  "settings": {
+    "claudeCodeChat.permissions.yoloMode": true,
+  },
+}
