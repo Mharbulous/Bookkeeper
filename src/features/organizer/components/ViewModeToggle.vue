@@ -4,17 +4,17 @@
     <v-btn-toggle v-model="viewMode" mandatory variant="outlined" divided class="enhanced-toggle">
       <v-btn value="list" size="small" class="toggle-btn" :disabled="loading">
         <v-icon size="16">mdi-view-list</v-icon>
-        <v-tooltip activator="parent" location="bottom"> Flat List View </v-tooltip>
+        <v-tooltip activator="parent" location="bottom"> Flat List </v-tooltip>
       </v-btn>
 
       <v-btn value="grid" size="small" class="toggle-btn" :disabled="loading">
         <v-icon size="16">mdi-view-grid</v-icon>
-        <v-tooltip activator="parent" location="bottom"> Folder Grid View </v-tooltip>
+        <v-tooltip activator="parent" location="bottom"> Folder Grid </v-tooltip>
       </v-btn>
 
       <v-btn value="tree" size="small" class="toggle-btn" :disabled="loading">
         <v-icon size="16">mdi-file-tree</v-icon>
-        <v-tooltip activator="parent" location="bottom"> Folder Tree View </v-tooltip>
+        <v-tooltip activator="parent" location="bottom"> Folder Tree </v-tooltip>
       </v-btn>
     </v-btn-toggle>
   </div>
@@ -45,20 +45,17 @@ const emit = defineEmits(['view-mode-changed']);
 const viewMode = ref('list'); // 'list', 'grid', or 'tree'
 
 // Handle view mode changes
-watch(
-  viewMode,
-  (newMode, oldMode) => {
-    if (newMode !== oldMode) {
-      // Save to localStorage for persistence
-      localStorage.setItem('organizer-view-mode', newMode);
+watch(viewMode, (newMode, oldMode) => {
+  if (newMode !== oldMode) {
+    // Save to localStorage for persistence
+    localStorage.setItem('organizer-view-mode', newMode);
 
-      emit('view-mode-changed', {
-        mode: newMode,
-        previous: oldMode,
-      });
-    }
+    emit('view-mode-changed', {
+      mode: newMode,
+      previous: oldMode,
+    });
   }
-);
+});
 
 // Initialize component using onMounted lifecycle hook
 onMounted(() => {
@@ -92,7 +89,6 @@ onMounted(() => {
 .toggle-btn:hover .v-icon {
   transform: scale(1.1);
 }
-
 
 /* Compact mode */
 .view-mode-toggle.compact {

@@ -26,19 +26,7 @@
               placeholder="e.g., Project Code"
             />
           </v-col>
-          <v-col cols="12" md="3" class="d-flex align-center">
-            <div class="d-flex align-center">
-              <v-icon 
-                :color="getAutomaticTagColorForTemplate(categories.length)"
-                size="24"
-                class="mr-2"
-              >
-                mdi-palette
-              </v-icon>
-              <span class="text-caption text-medium-emphasis">Auto-assigned color</span>
-            </div>
-          </v-col>
-          <v-col cols="12" md="3" class="d-flex align-center">
+          <v-col cols="12" md="6" class="d-flex align-center">
             <v-btn
               color="primary"
               :loading="creating"

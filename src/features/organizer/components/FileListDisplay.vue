@@ -32,7 +32,7 @@
       <div v-else-if="currentViewMode === 'grid'" class="file-grid">
         <p class="text-body-2 text-center text-medium-emphasis pa-8">
           <v-icon size="48" class="mb-2 d-block">mdi-view-grid</v-icon>
-          Folder Grid view coming in future updates
+          Folder Grid coming in future updates
         </p>
       </div>
 
@@ -40,7 +40,7 @@
       <div v-else-if="currentViewMode === 'tree'" class="file-tree">
         <p class="text-body-2 text-center text-medium-emphasis pa-8">
           <v-icon size="48" class="mb-2 d-block">mdi-file-tree</v-icon>
-          Folder Tree view coming in future updates
+          Folder Tree coming in future updates
         </p>
       </div>
     </div>
