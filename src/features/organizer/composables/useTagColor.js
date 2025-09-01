@@ -1,41 +1,42 @@
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
+import { getAutomaticTagColor } from '../utils/automaticTagColors.js';
 
 /**
  * Composable for centralized tag color resolution
- * Implements single source of truth by looking up category colors for tags
+ * Uses automatic color assignment pattern instead of user-controlled colors
  */
 export function useTagColor() {
   const organizerStore = useOrganizerStore();
   const { categories } = storeToRefs(organizerStore);
 
   /**
-   * Get color for a tag based on its category
+   * Get color for a tag based on its category using automatic color assignment
    * @param {Object} tag - Tag object with categoryId
    * @returns {string} - Hex color code
    */
   const getTagColor = (tag) => {
     if (!tag?.categoryId) {
-      return '#1976d2'; // Default blue fallback
+      return getAutomaticTagColor(0); // Default first color
     }
 
-    const category = categories.value.find(cat => cat.id === tag.categoryId);
-    return category?.color || '#1976d2'; // Default blue if category not found
+    const categoryIndex = categories.value.findIndex(cat => cat.id === tag.categoryId);
+    return getAutomaticTagColor(categoryIndex >= 0 ? categoryIndex : 0);
   };
 
   /**
-   * Get color for a tag by category ID
+   * Get color for a tag by category ID using automatic color assignment
    * @param {string} categoryId - Category ID
    * @returns {string} - Hex color code
    */
   const getColorByCategoryId = (categoryId) => {
     if (!categoryId) {
-      return '#1976d2'; // Default blue fallback
+      return getAutomaticTagColor(0); // Default first color
     }
 
-    const category = categories.value.find(cat => cat.id === categoryId);
-    return category?.color || '#1976d2'; // Default blue if category not found
+    const categoryIndex = categories.value.findIndex(cat => cat.id === categoryId);
+    return getAutomaticTagColor(categoryIndex >= 0 ? categoryIndex : 0);
   };
 
   /**
@@ -49,23 +50,24 @@ export function useTagColor() {
   };
 
   /**
-   * Get multiple tag colors efficiently
+   * Get multiple tag colors efficiently using automatic color assignment
    * @param {Array} tags - Array of tag objects
    * @returns {Object} - Map of tagId to color
    */
   const getMultipleTagColors = (tags) => {
     const colorMap = {};
-    const categoryMap = new Map();
+    const categoryIndexMap = new Map();
 
-    // Create category lookup map for efficiency
-    categories.value.forEach(cat => {
-      categoryMap.set(cat.id, cat.color);
+    // Create category index lookup map for efficiency
+    categories.value.forEach((cat, index) => {
+      categoryIndexMap.set(cat.id, index);
     });
 
-    // Map tag IDs to colors
+    // Map tag IDs to colors using automatic assignment
     tags.forEach(tag => {
       if (tag.id && tag.categoryId) {
-        colorMap[tag.id] = categoryMap.get(tag.categoryId) || '#1976d2';
+        const categoryIndex = categoryIndexMap.get(tag.categoryId);
+        colorMap[tag.id] = getAutomaticTagColor(categoryIndex !== undefined ? categoryIndex : 0);
       }
     });
 

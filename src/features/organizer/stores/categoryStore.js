@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { useCategoryCore } from './categoryCore.js';
-import { useCategoryColors } from './categoryColors.js';
 import { useCategoryValidation } from './categoryValidation.js';
 import { useCategoryComposables } from './categoryComposables.js';
 
@@ -11,9 +10,6 @@ import { useCategoryComposables } from './categoryComposables.js';
 export const useCategoryStore = defineStore('category', () => {
   // Core functionality (state, CRUD operations)
   const core = useCategoryCore();
-  
-  // Color management and utilities
-  const colors = useCategoryColors(core.categories);
   
   // Validation and business rules
   const validation = useCategoryValidation(core.categories);
@@ -33,13 +29,9 @@ export const useCategoryStore = defineStore('category', () => {
         throw new Error(limitCheck.errors.join(', '));
       }
 
-      // Assign a safe color if not provided
-      const color = categoryData.color || colors.getSafeColor(categoryData.preferredColor);
-
-      // Sanitize the data
+      // Sanitize the data (colors are now automatically assigned by UI)
       const sanitizedData = {
         name: validation.sanitizeCategoryName(categoryData.name),
-        color,
         tags: (categoryData.tags || []).map(tag => ({
           ...tag,
           name: validation.sanitizeTagName(tag.name),
@@ -141,14 +133,7 @@ export const useCategoryStore = defineStore('category', () => {
     getCategoryById: core.getCategoryById,
     reset: core.reset,
 
-    // Color utilities
-    defaultColors: colors.defaultColors,
-    getNextDefaultColor: colors.getNextDefaultColor,
-    generateTagColor: colors.generateTagColor,
-    adjustColor: colors.adjustColor,
-    isValidHexColor: colors.isValidHexColor,
-    getContrastingTextColor: colors.getContrastingTextColor,
-    getSafeColor: colors.getSafeColor,
+    // Color utilities removed - colors are now automatically assigned by UI
 
     // Validation utilities
     validateCategoryData: validation.validateCategoryData,

@@ -44,29 +44,7 @@ export function useCategoryValidation(categories) {
     return errors;
   };
 
-  /**
-   * Validate category color
-   */
-  const validateCategoryColor = (color) => {
-    const errors = [];
-
-    if (!color) {
-      // Color is optional, will use default
-      return errors;
-    }
-
-    if (typeof color !== 'string') {
-      errors.push('Category color must be a string');
-      return errors;
-    }
-
-    // Validate hex color format
-    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
-      errors.push('Category color must be a valid hex color (e.g., #1976d2)');
-    }
-
-    return errors;
-  };
+  // Color validation removed - colors are now automatically assigned by UI
 
   /**
    * Validate category tags array
@@ -129,8 +107,7 @@ export function useCategoryValidation(categories) {
     // Validate name
     allErrors = allErrors.concat(validateCategoryName(categoryData.name, excludeId));
 
-    // Validate color
-    allErrors = allErrors.concat(validateCategoryColor(categoryData.color));
+    // Color validation removed - colors are now automatically assigned by UI
 
     // Validate tags
     allErrors = allErrors.concat(validateCategoryTags(categoryData.tags));
@@ -262,7 +239,7 @@ export function useCategoryValidation(categories) {
   return {
     // Validation functions
     validateCategoryName,
-    validateCategoryColor,
+    // validateCategoryColor removed - colors are now automatically assigned by UI
     validateCategoryTags,
     validateCategoryData,
 

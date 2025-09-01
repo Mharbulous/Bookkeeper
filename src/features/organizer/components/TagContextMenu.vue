@@ -263,8 +263,7 @@ const handleShowInFolders = async () => {
         if (category) {
           organizerStore.addToHierarchy({
             categoryId: category.categoryId,
-            categoryName: category.categoryName,
-            color: category.color
+            categoryName: category.categoryName
           });
         }
       }

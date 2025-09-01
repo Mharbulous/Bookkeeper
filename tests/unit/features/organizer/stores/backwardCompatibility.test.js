@@ -155,17 +155,7 @@ describe('Backward Compatibility Tests', () => {
       expect(deleteResult).toBe(true);
     });
 
-    it('should maintain category color validation', () => {
-      const invalidCategory = {
-        name: 'Test Category',
-        color: 'invalid-color',
-        description: 'Test description'
-      };
-      
-      expect(() => {
-        organizer.validateCategory(invalidCategory);
-      }).toThrow();
-    });
+    // Color validation test removed - colors are now automatically assigned by UI
   });
 
   describe('Data Structure Compatibility', () => {

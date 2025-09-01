@@ -16,7 +16,7 @@
       </v-card-title>
       <v-card-text>
         <v-row>
-          <v-col cols="12" md="4">
+          <v-col cols="12" md="6">
             <v-text-field
               v-model="newCategory.name"
               label="Category Name"
@@ -26,15 +26,17 @@
               placeholder="e.g., Project Code"
             />
           </v-col>
-          <v-col cols="12" md="3">
-            <v-text-field
-              v-model="newCategory.color"
-              label="Category Color"
-              variant="outlined"
-              density="compact"
-              type="color"
-              :error-messages="newCategoryErrors.color"
-            />
+          <v-col cols="12" md="3" class="d-flex align-center">
+            <div class="d-flex align-center">
+              <v-icon 
+                :color="getAutomaticTagColorForTemplate(categories.length)"
+                size="24"
+                class="mr-2"
+              >
+                mdi-palette
+              </v-icon>
+              <span class="text-caption text-medium-emphasis">Auto-assigned color</span>
+            </div>
           </v-col>
           <v-col cols="12" md="3" class="d-flex align-center">
             <v-btn
@@ -81,7 +83,7 @@
             >
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
-                  <v-icon :color="category.color" class="mr-3">mdi-folder</v-icon>
+                  <v-icon :color="getAutomaticTagColorForTemplate(categories.findIndex(c => c.id === category.id))" class="mr-3">mdi-folder</v-icon>
                   <div>
                     <div class="font-weight-medium">{{ category.name }}</div>
                     <div class="text-caption text-medium-emphasis">
@@ -111,7 +113,7 @@
                       <v-chip
                         v-for="tag in category.tags"
                         :key="tag.id || tag.name"
-                        :color="category.color"
+                        :color="getAutomaticTagColorForTemplate(categories.findIndex(c => c.id === category.id))"
                         size="small"
                         class="ma-1"
                       >
@@ -172,6 +174,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
+import { getAutomaticTagColor } from '../utils/automaticTagColors.js';
 
 // Store
 const organizerStore = useOrganizerStore();
@@ -182,13 +185,11 @@ const creating = ref(false);
 const expandedPanels = ref([]);
 
 const newCategory = ref({
-  name: '',
-  color: '#1976d2'
+  name: ''
 });
 
 const newCategoryErrors = ref({
-  name: [],
-  color: []
+  name: []
 });
 
 const snackbar = ref({
@@ -199,13 +200,12 @@ const snackbar = ref({
 
 // Computed
 const canCreateCategory = computed(() => {
-  return newCategory.value.name.trim().length > 0 && 
-         newCategory.value.color.match(/^#[0-9A-Fa-f]{6}$/);
+  return newCategory.value.name.trim().length > 0;
 });
 
 // Methods
 const validateNewCategory = () => {
-  const errors = { name: [], color: [] };
+  const errors = { name: [] };
   
   if (!newCategory.value.name.trim()) {
     errors.name.push('Category name is required');
@@ -220,12 +220,8 @@ const validateNewCategory = () => {
     errors.name.push('Category name already exists');
   }
   
-  if (!newCategory.value.color.match(/^#[0-9A-Fa-f]{6}$/)) {
-    errors.color.push('Please select a valid color');
-  }
-  
   newCategoryErrors.value = errors;
-  return errors.name.length === 0 && errors.color.length === 0;
+  return errors.name.length === 0;
 };
 
 const createCategory = async () => {
@@ -233,18 +229,20 @@ const createCategory = async () => {
   
   creating.value = true;
   try {
+    // Auto-assign color based on category count
+    const autoColor = getAutomaticTagColor(categories.value.length);
+    
     await organizerStore.createCategory({
       name: newCategory.value.name.trim(),
-      color: newCategory.value.color,
+      color: autoColor,
       tags: [] // Start with empty tags, can be added later
     });
     
     // Reset form
     newCategory.value = {
-      name: '',
-      color: '#1976d2'
+      name: ''
     };
-    newCategoryErrors.value = { name: [], color: [] };
+    newCategoryErrors.value = { name: [] };
     
     showNotification(`Category "${newCategory.value.name}" created successfully`, 'success');
   } catch (error) {
@@ -282,6 +280,9 @@ const showNotification = (message, color = 'success') => {
     color
   };
 };
+
+// Expose color utility for template
+const getAutomaticTagColorForTemplate = getAutomaticTagColor;
 
 // Lifecycle
 onMounted(async () => {

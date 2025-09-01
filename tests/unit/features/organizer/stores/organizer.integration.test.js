@@ -263,7 +263,7 @@ describe('Organizer Store Integration', () => {
     });
 
     it('should delegate category methods to category store', () => {
-      const categoryData = { name: 'Test Category', color: '#ff0000' };
+      const categoryData = { name: 'Test Category' }; // color removed - automatically assigned by UI
       store.createCategory(categoryData);
       
       expect(store.stores.category.createCategory).toHaveBeenCalledWith(categoryData);

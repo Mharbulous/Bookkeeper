@@ -53,7 +53,7 @@
                     <v-chip
                       size="x-small"
                       variant="outlined"
-                      :color="category.color"
+                      :color="getCategoryColor(category.categoryId)"
                       class="mr-2"
                     >
                       {{ getCategoryTagCount(category.categoryId) }} tags
@@ -120,7 +120,7 @@
             <v-chip
               v-for="category in availableCategories"
               :key="category.categoryId"
-              :color="category.color"
+              :color="getCategoryColor(category.categoryId)"
               variant="outlined"
               size="small"
               clickable
@@ -181,6 +181,7 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useOrganizerStore } from '../stores/organizer.js';
+import { getAutomaticTagColor } from '../utils/automaticTagColors.js';
 // Note: Using move buttons instead of drag-and-drop since vuedraggable is not installed
 
 // Props
@@ -241,6 +242,14 @@ const getCategoryTagCount = (categoryId) => {
   return '?';
 };
 
+/**
+ * Get automatic color for a category by its ID
+ */
+const getCategoryColor = (categoryId) => {
+  const categoryIndex = allCategories.value.findIndex(cat => cat.categoryId === categoryId);
+  return getAutomaticTagColor(categoryIndex >= 0 ? categoryIndex : 0);
+};
+
 // Event handlers
 const openSelector = async () => {
   showSelector.value = true;
@@ -276,8 +285,7 @@ const handleHierarchyChange = (event) => {
 const addToHierarchy = (category) => {
   hierarchyItems.value.push({
     categoryId: category.categoryId,
-    categoryName: category.categoryName,
-    color: category.color
+    categoryName: category.categoryName
   });
   
   emit('hierarchy-changed', {

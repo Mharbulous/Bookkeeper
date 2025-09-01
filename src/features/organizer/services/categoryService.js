@@ -28,10 +28,7 @@ export class CategoryService {
       errors.push('Category name must be 50 characters or less');
     }
 
-    // Color validation
-    if (categoryData.color && !/^#[0-9A-Fa-f]{6}$/.test(categoryData.color)) {
-      errors.push('Category color must be a valid hex color (e.g., #1976d2)');
-    }
+    // Color validation removed - colors are now automatically assigned by UI
 
     // Tags validation
     if (categoryData.tags && !Array.isArray(categoryData.tags)) {
@@ -87,7 +84,6 @@ export class CategoryService {
       // Prepare category document
       const categoryDoc = {
         name: categoryData.name.trim(),
-        color: categoryData.color || '#1976d2',
         tags: categoryData.tags || [],
         isActive: true,
         createdAt: serverTimestamp(),
@@ -123,7 +119,7 @@ export class CategoryService {
       }
 
       // Validate updates
-      if (updates.name !== undefined || updates.tags !== undefined || updates.color !== undefined) {
+      if (updates.name !== undefined || updates.tags !== undefined) {
         this.validateCategoryData({ 
           name: updates.name || 'temp', // Temporary name for validation
           ...updates 

@@ -55,7 +55,10 @@ This document defines the Evidence document structure for Organizer v1.1, featur
 
   // === SELECTED TAG ===
   tagName: string,                 // The chosen tag within this category
-  color: string,                   // Category color for UI display (#4CAF50)
+
+  // === TAG DISPLAY (UI-Only) ===
+  // Note: Tag colors are automatically assigned by position in the category list
+  // using the triadic color pattern: Purple (#733381) → Green (#589C48) → Orange (#F58024)
 
   // === TAG SOURCE AND CONFIDENCE ===
   source: 'ai' | 'ai-auto' | 'human',    // How this tag was applied
@@ -144,11 +147,6 @@ The `aiAlternatives` field implements a no-cap approach that balances UX simplic
     type: 'string',
     maxLength: 30
   },
-  color: {
-    required: true,
-    type: 'string',
-    pattern: /^#[0-9A-Fa-f]{6}$/ // Valid hex color
-  },
   source: {
     required: true,
     type: 'string',
@@ -212,7 +210,7 @@ match /teams/{teamId}/evidence/{evidenceId}/tags/{categoryId} {
 }
 
 function validateTagDocument(data) {
-  return data.keys().hasAll(['categoryId', 'categoryName', 'tagName', 'color', 'source', 'confidence', 'autoApproved', 'reviewRequired', 'AIanalysis']) &&
+  return data.keys().hasAll(['categoryId', 'categoryName', 'tagName', 'source', 'confidence', 'autoApproved', 'reviewRequired', 'AIanalysis']) &&
     data.categoryId is string &&
     data.tagName is string &&
     data.source in ['ai', 'ai-auto', 'human'] &&
