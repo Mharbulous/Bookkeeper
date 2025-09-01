@@ -3,6 +3,8 @@ import { ref, computed } from 'vue';
 import { collection, query, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
+import tagSubcollectionService from '../services/tagSubcollectionService.js';
+import { useCategoryStore } from './categoryStore.js';
 
 export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   // State
@@ -14,11 +16,64 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   // Cache for display information
   const displayInfoCache = ref(new Map());
 
-  // Auth store reference
+  // Store references
   const authStore = useAuthStore();
+  const categoryStore = useCategoryStore();
+  
+  // Tag service instance (use imported singleton)
+  const tagService = tagSubcollectionService;
 
   // Computed
   const evidenceCount = computed(() => evidenceList.value.length);
+
+  /**
+   * Load tags for an evidence document and structure them for both query and virtual folder stores
+   */
+  const loadTagsForEvidence = async (evidenceId, teamId) => {
+    try {
+      const tags = await tagService.getTags(evidenceId, {}, teamId);
+      
+      // Create both data structures for compatibility
+      const subcollectionTags = []; // For organizerQueryStore (flat array)
+      const groupedTags = {}; // For virtualFolderStore (category-grouped)
+      
+      tags.forEach(tag => {
+        const categoryId = tag.id; // The document ID is the categoryId
+        const category = categoryStore.getCategoryById(categoryId);
+        const categoryName = category?.name || categoryId;
+        
+        const tagData = {
+          categoryId,
+          categoryName,
+          tagName: tag.tagName,
+          name: tag.tagName, // Add 'name' property for backward compatibility
+          confidence: tag.confidence,
+          status: tag.status,
+          autoApproved: tag.autoApproved
+        };
+        
+        // Add to flat array for queryStore
+        subcollectionTags.push(tagData);
+        
+        // Add to grouped structure for virtualFolderStore
+        if (!groupedTags[categoryId]) {
+          groupedTags[categoryId] = [];
+        }
+        groupedTags[categoryId].push(tagData);
+      });
+      
+      return {
+        subcollectionTags,
+        tags: groupedTags
+      };
+    } catch (error) {
+      console.warn(`[OrganizerCore] Failed to load tags for evidence ${evidenceId}:`, error);
+      return {
+        subcollectionTags: [],
+        tags: {}
+      };
+    }
+  };
 
   /**
    * Fetch display information from originalMetadata collection
@@ -99,12 +154,18 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
             // Fetch display information from referenced metadata
             const displayInfo = await getDisplayInfo(evidenceData.displayCopy?.metadataHash, teamId);
             
+            // Load tags for this evidence document
+            const tagData = await loadTagsForEvidence(doc.id, teamId);
+            
             evidence.push({
               id: doc.id,
               ...evidenceData,
               // Add computed display fields
               displayName: displayInfo.displayName,
               createdAt: displayInfo.createdAt,
+              // Add tag data for both store compatibility
+              subcollectionTags: tagData.subcollectionTags,
+              tags: tagData.tags,
             });
           }
 
