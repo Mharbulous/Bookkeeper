@@ -53,10 +53,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import FileListItemContent from './FileListItemContent.vue';
 import FileListItemTags from './FileListItemTags.vue';
 import FileListItemActions from './FileListItemActions.vue';
+
+// Debug logging helper
+const debugLog = (message, data = null) => {
+  const timestamp = new Date().toISOString().substring(11, 23);
+  console.log(`[${timestamp}] [FileListItem] ${message}`, data || '');
+};
+
+// Track render timing
+const renderStart = performance.now();
 
 // Props
 const props = defineProps({
@@ -166,6 +175,14 @@ const handleProcessWithAI = () => {
   console.log('DEBUG: handleProcessWithAI called with evidence:', props.evidence.id);
   emit('process-with-ai', props.evidence);
 };
+
+// Track component mount performance
+onMounted(() => {
+  const renderTime = performance.now() - renderStart;
+  if (renderTime > 10) { // Only log if render takes more than 10ms
+    debugLog(`🐌 Slow item render: ${renderTime.toFixed(2)}ms for ${props.evidence.name || props.evidence.id}`);
+  }
+});
 </script>
 
 <style scoped>
