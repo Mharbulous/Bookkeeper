@@ -7,6 +7,7 @@ import { useAuthStore } from '../../../core/stores/auth.js';
 import { useOrganizerCoreStore } from './organizerCore.js';
 import { useOrganizerQueryStore } from './organizerQueryStore.js';
 import { useCategoryStore } from './categoryStore.js';
+import { useVirtualFolderStore } from './virtualFolderStore.js';
 
 /**
  * Main Organizer Store - Facade pattern combining decomposed stores
@@ -17,13 +18,15 @@ export const useOrganizerStore = defineStore('organizer', () => {
   const coreStore = useOrganizerCoreStore();
   const queryStore = useOrganizerQueryStore();
   const categoryStore = useCategoryStore();
+  const virtualFolderStore = useVirtualFolderStore();
   const authStore = useAuthStore();
 
-  // Watch core store evidence changes to update query store
+  // Watch core store evidence changes to update query store and clear folder cache
   watch(
     () => coreStore.evidenceList,
     () => {
       queryStore.initializeFilters();
+      virtualFolderStore.clearFolderCache();
     },
     { deep: true }
   );
@@ -68,6 +71,7 @@ export const useOrganizerStore = defineStore('organizer', () => {
     coreStore.reset();
     queryStore.reset();
     categoryStore.reset();
+    virtualFolderStore.reset();
   };
 
   // Return interface maintaining backward compatibility + new features
@@ -119,11 +123,35 @@ export const useOrganizerStore = defineStore('organizer', () => {
     // Initialization
     initialize,
     
+    // === NEW v1.3 FEATURES - Virtual Folder System ===
+    // Virtual folder state
+    viewMode: computed(() => virtualFolderStore.viewMode),
+    isFolderMode: computed(() => virtualFolderStore.isFolderMode),
+    folderHierarchy: computed(() => virtualFolderStore.folderHierarchy),
+    currentPath: computed(() => virtualFolderStore.currentPath),
+    breadcrumbPath: computed(() => virtualFolderStore.breadcrumbPath),
+    isAtRoot: computed(() => virtualFolderStore.isAtRoot),
+    currentDepth: computed(() => virtualFolderStore.currentDepth),
+    
+    // Virtual folder navigation
+    setViewMode: virtualFolderStore.setViewMode,
+    setFolderHierarchy: virtualFolderStore.setFolderHierarchy,
+    navigateToFolder: virtualFolderStore.navigateToFolder,
+    navigateToDepth: virtualFolderStore.navigateToDepth,
+    navigateBack: virtualFolderStore.navigateBack,
+    navigateToRoot: virtualFolderStore.navigateToRoot,
+    
+    // Virtual folder structure generation
+    generateFolderStructure: virtualFolderStore.generateFolderStructure,
+    filterEvidenceByPath: virtualFolderStore.filterEvidenceByPath,
+    getFolderContext: virtualFolderStore.getFolderContext,
+
     // Store references for advanced usage
     stores: {
       core: coreStore,
       query: queryStore,
       category: categoryStore,
+      virtualFolder: virtualFolderStore,
     }
   };
 });

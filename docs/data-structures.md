@@ -4,7 +4,7 @@ Last Updated: 2025-08-31
 
 ## Overview
 
-This document defines a **simple, scalable** Firestore data structure for our multi-tenant team-based architecture supporting Multi-App SSO. Following the KISS principle, we've eliminated unnecessary complexity while maintaining all essential functionality.
+This document serves as the **central hub** for our Firestore data structure documentation. Following the KISS principle, we've designed a simple, scalable data structure for our multi-tenant team-based architecture supporting Multi-App SSO.
 
 **Key Design Decisions:**
 
@@ -14,749 +14,127 @@ This document defines a **simple, scalable** Firestore data structure for our mu
 - No audit trails in MVP
 - Flat structure for simplicity
 
-## Core Data Structure
+## Documentation Organization
 
-### 1. Users Collection: `/users/{userId}`
+This data structure documentation is organized into focused, specialized documents:
 
-2
-**Purpose**: Store user preferences and app-specific settings
+### 📚 Core Documentation Components
 
+#### [Firestore Collections Schema](./data-structures/firestore-collections.md)
+Complete Firestore collection schemas including:
+- Users and Teams collections
+- Team data collections (Clients, Matters, Upload Events)
+- File metadata and folder path systems  
+- Evidence collection and tag subcollections
+- Custom claims and query patterns
+- Required Firestore indexes
+
+#### [Firebase Storage Structure](./data-structures/firebase-storage.md)  
+Firebase Storage organization and file management:
+- File storage paths and deduplication
+- Processing folders (OCR, split, merged files)
+- Storage path examples and access control
+- Deduplication examples and optimization features
+
+#### [Security Rules and Access Control](./data-structures/security-rules.md)
+Comprehensive security implementation:
+- Firestore and Firebase Storage security rules
+- Custom claims structure and role-based access control
+- Access control matrix and data isolation guarantees
+- Security testing and monitoring guidelines
+
+#### [Team Workflows and User Management](./data-structures/team-workflows.md)
+User and team management processes:
+- Solo user to team workflow and new user registration
+- Team invitation process and data migration
+- Team management workflows (adding/removing members)
+- Team merger scenarios and invitation management
+
+## Architecture Summary
+
+### Solo User Design
+- New users automatically get a team where `teamId === userId`
+- Creates a "team of one" eliminating special cases
+- Easy upgrade path to collaborative teams
+- Perfect deduplication works consistently
+
+### Team-Based Multi-Tenancy
+- All data scoped by team ID for perfect isolation
+- Embedded members (optimal for 3-10 users)
+- Simple pending invitations system
+- Consistent security model across all apps
+
+### File Management
+- Content-based deduplication using SHA-256 hashes
+- Multiple metadata records for same file content
+- Smart folder path system with pattern recognition
+- Future-ready processing workflow folders
+
+### Security Model
+- Team-based access control with custom claims
+- Simple, consistent security rules
+- Solo users have `teamId === userId` 
+- Role-based permissions (admin/member)
+
+## Quick Reference
+
+### Key Collection Paths
+```
+/users/{userId}                                    // User preferences
+/teams/{teamId}                                    // Team info with embedded members
+/teams/{teamId}/clients/{clientId}                 // Client records
+/teams/{teamId}/matters/{matterId}                 // Matter/case records
+/teams/{teamId}/evidence/{evidenceId}              // File organization
+/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}  // AI/human tags
+```
+
+### Storage Paths
+```
+/teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{ext}  // Current uploads
+/teams/{teamId}/matters/{matterId}/OCRed/                    // Future OCR files
+/teams/{teamId}/matters/{matterId}/split/                    // Future split files
+/teams/{teamId}/matters/{matterId}/merged/                   // Future merged files
+```
+
+### Security Pattern
 ```javascript
-{
-  // User preferences only (identity comes from Firebase Auth)
-  defaultTeamId: 'team-abc-123',  // Primary team for quick access (could be userId for solo users)
-  preferences: {
-    theme: 'light',
-    notifications: true,
-    language: 'en'
-  },
-
-  // Activity tracking
-  lastLogin: Timestamp
+// All team data follows this pattern
+match /teams/{teamId}/{collection}/{document} {
+  allow read: if request.auth != null &&
+                 request.auth.token.teamId == teamId;
+  allow write: if request.auth != null &&
+                  request.auth.token.teamId == teamId;
 }
 ```
 
-### 2. Teams Collection: `/teams/{teamId}`
-
-**Purpose**: Store team info and embedded member list
-
-**Solo User Design**: New users automatically get a team where `teamId === userId`, making them a "team of one". This eliminates special cases in storage, security, and duplicate detection.
-
-```javascript
-{
-  // Team information
-  name: 'ACME Law Firm',  // For solo users: "John's Workspace"
-  description: 'Full-service law firm',  // For solo users: "Personal workspace"
-
-  // Embedded members (perfect for 3-10 users, or 1 for solo users)
-  members: {
-    'user-john-123': {
-      email: 'john@acme.com',
-      role: 'admin',  // 'admin' | 'member' (solo users are always admin)
-      joinedAt: Timestamp
-    },
-    'user-jane-456': {
-      email: 'jane@acme.com',
-      role: 'member',
-      joinedAt: Timestamp
-    }
-  },
-
-  // Simple pending invitations
-  pendingInvites: {
-    'newuser@acme.com': {
-      invitedBy: 'user-john-123',
-      invitedAt: Timestamp,
-      role: 'member',
-      fromTeam: 'team-abc-123'  // Track which team invited them
-    }
-  },
-
-  // Which apps this team has access to
-  apps: ['intranet', 'bookkeeper'],  // Simple array
-
-  // Basic settings
-  settings: {
-    timezone: 'America/New_York',
-    maxMembers: 100
-  },
-
-  // Team type flags
-  isPersonal: false,  // true for solo users (teamId === userId)
-
-  // Metadata
-  createdAt: Timestamp,
-  createdBy: 'user-john-123'
-}
-```
-
-### 3. Team Data Collections: `/teams/{teamId}/{collection}/{documentId}`
-
-**Purpose**: All team data lives in flat collections under the team
-
-#### Clients Collection: `/teams/{teamId}/clients/{clientId}`
-
-```javascript
-{
-  name: 'ABC Corporation',
-  email: 'contact@abc.com',
-  phone: '+1-555-0123',
-  address: {
-    street: '123 Business Ave',
-    city: 'New York',
-    state: 'NY',
-    zip: '10001'
-  },
-  status: 'active'  // 'active' | 'inactive'
-}
-```
-
-#### Matters Collection: `/teams/{teamId}/matters/{matterId}`
-
-**Reserved Matter ID**: Every team has a reserved `matterId` called **"general"** where the firm stores general information about the firm, company policies, and non-client-specific documents.
-
-```javascript
-{
-  title: 'ABC Corp - Contract Review',
-  description: 'Software licensing agreement review',
-  clientId: 'client-abc-123',  // Reference to client (null for 'general' matter)
-  matterNumber: '2024-001',
-  status: 'active',  // 'active' | 'closed' | 'on-hold'
-  priority: 'high',  // 'high' | 'medium' | 'low'
-  assignedTo: ['user-john-123', 'user-jane-456'],
-  openedDate: Timestamp,
-  dueDate: Timestamp
-}
-```
-
-#### Upload Events: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
-
-**Purpose**: Track essential upload events with minimal information
-
-This collection logs only the 4 essential upload events with basic information:
-
-- **upload_interrupted**: Upload started but not completed
-- **upload_success**: Upload completed successfully
-- **upload_failed**: Upload failed
-- **upload_skipped_metadata_recorded**: File skipped but metadata recorded
-
-```javascript
-{
-  eventType: 'upload_success',                    // Event type
-  timestamp: Timestamp,                           // When event occurred
-  fileName: 'document.pdf',                       // Original file name
-  fileHash: 'abc123def456789abcdef012345...',     // SHA-256 of file content
-  metadataHash: 'xyz789abc123def456...',          // SHA-256 of metadata
-  teamId: 'team-abc-123',                         // Team identifier
-  userId: 'user-john-123'                         // User identifier
-}
-```
-
-**Event Types**:
-
-- `upload_interrupted`: Upload started (may remain if process interrupted)
-- `upload_success`: Upload completed successfully
-- `upload_failed`: Upload failed for any reason
-- `upload_skipped_metadata_recorded`: File skipped but metadata was recorded
-
-#### File Metadata Records: `/teams/{teamId}/matters/{matterId}/originalMetadata/{metadataHash}`
-
-**Purpose**: Store unique combinations of file metadata using metadata hash as document ID
-
-**Hash Generation**:
-
-- **File Hash**: SHA-256 of file content (`abc123def456789abcdef012345...`)
-- **Metadata Hash**: SHA-256 of concatenated string: `originalName|lastModified|fileHash`
-
-```javascript
-{
-  // Core file metadata (only true file properties)
-  originalName: 'document.pdf',
-  lastModified: 1703123456789,  // Original files lastModified metadata info
-  fileHash: 'abc123def456789abcdef012345...',  // SHA-256 reference to actual file content
-  metadataHash: 'xyz789abc123'  // SHA-256 of concatenated metadata string (originalName|lastModified|fileHash)
-
-  // File path information (from folder uploads)
-  folderPaths: 'Documents/2023|Archive/Backup',  // Pipe-delimited paths, supports multiple contexts via pattern recognition
-
-
-}
-```
-
-### Folder Path System
-
-The `folderPaths` field stores folder path information for files uploaded through folder selection, supporting multiple organizational contexts for the same file content.
-
-**For complete documentation of the smart metadata capturing algorithm and pattern recognition logic, see:** **[docs/uploading.md - Smart Metadata Capturing](./uploading.md#smart-metadata-capturing-algorithm)**
-
-#### Field Schema
-
-**Field Name**: `folderPaths`  
-**Type**: `string`  
-**Format**: Pipe-delimited paths using `"|"` separator  
-**Purpose**: Store multiple folder contexts for files uploaded via `webkitdirectory`
-
-#### Data Format Examples
-
-**Single Path**:
-
-```javascript
-folderPaths: 'Documents/2023';
-```
-
-**Multiple Paths**:
-
-```javascript
-folderPaths: 'Documents/2023|Archive/Backup|Legal/Contracts';
-```
-
-**Root Level Files**:
-
-```javascript
-folderPaths: ''; // Empty string for files uploaded without folder context
-```
-
-#### Path Extraction Rules
-
-Folder paths are automatically extracted from the HTML5 `webkitRelativePath` property:
-
-- `"Documents/2023/invoices/invoice.pdf"` → `folderPaths: "Documents/2023/invoices"`
-- `"photos/vacation.jpg"` → `folderPaths: "photos"`
-- `"readme.txt"` → `folderPaths: ""` (root level)
-
-#### Field Properties
-
-- **Delimiter**: `"|"` character (invalid in most file systems, safe for separation)
-- **Path Format**: Forward slashes (`/`) regardless of operating system
-- **Normalization**: Leading slashes present, no trailing slashes (except root `"/"`)
-- **Empty Values**: Empty string `""` represents root-level files
-- **Multiple Contexts**: Same file content can have multiple folder contexts stored
-
-#### Evidence Collection: `/teams/{teamId}/evidence/{evidenceId}`
-
-**Purpose**: Store organizational and processing metadata for uploaded files, providing user-facing document management capabilities
-
-**Key Design Principles:**
-
-- **Single Source of Truth**: No redundant data - all display information references original metadata records
-- **Deduplication Aware**: Handles multiple original names and folder paths for identical files
-- **AI/Human Separation**: Distinguishes between AI-generated and human-applied tags
-
-```javascript
-{
-  // File reference (points to actual file content)
-  storageRef: {
-    storage: 'uploads',                     // Storage collection type
-    fileHash: 'abc123def456789abcdef012345', // SHA-256 content hash (links to Firebase Storage file)
-    fileTypes: '.pdf'                       // File extension/type
-  },
-
-  // Display configuration (references chosen metadata record)
-  displayCopy: 'xyz789abc123def456...',     // Metadata hash - points to chosen originalMetadata record
-
-  // File properties (for quick access without metadata lookup)
-  fileSize: 2048576,                        // File size in bytes
-
-  // Document processing status (for future Document Processing Workflow)
-  isProcessed: false,                       // Whether document has been processed
-  hasAllPages: null,                        // null=unknown, true/false after processing
-  processingStage: 'uploaded',              // 'uploaded' | 'splitting' | 'merging' | 'complete'
-
-  // Tag subcollection counters (for efficient querying without subcollection queries)
-  tagCount: 8,                              // Total tags across all categories
-  autoApprovedCount: 5,                     // AI tags that were auto-approved (confidence >= 85%)
-  reviewRequiredCount: 2,                   // AI tags needing human review (confidence < 85%)
-
-  // Timestamps
-  updatedAt: Timestamp                      // When evidence document was last modified
-}
-```
-
-**Field Details:**
-
-**`displayCopy` Field:**
-
-- **Purpose**: References the specific metadata record to use for display
-- **User Choice**: Users select from available metadata records
-- **Flexibility**: Allows switching display representation without data loss
-- **Simplified**: Direct metadata hash reference for streamlined access
-
-**Tag System Architecture:**
-
-- **Tag Subcollections** (`/tags/{categoryId}`): Category-based approach with confidence workflow
-- **Counters** (`tagCount`, `autoApprovedCount`, `reviewRequiredCount`): Quick access without subcollection query
-
-**Benefits of Subcollection Approach:**
-
-- **Mutually Exclusive Categories**: One tag per category prevents confusion (categoryId as document ID)
-- **Confidence-Based Auto-Approval**: 70-80% of AI tags auto-approved (confidence >= 85%), reducing manual review
-- **Atomic Updates**: Replace category tag without affecting other categories
-- **Scalable**: No document size limits as tags grow
-- **Queryable**: Direct access to specific category tags
-- **Clean Implementation**: Optimal structure from the start (no migration complexity)
-
-**Derived Information:**
-
-```javascript
-// All information derived from referenced data
-const metadata = await getOriginalMetadata(evidence.displayCopy);
-const displayName = metadata.originalName; // From chosen metadata record
-const createdDate = metadata.lastModified; // From chosen metadata record
-const fileExtension = evidence.storageRef.fileTypes; // From storageRef or derived from filename
-// Tags accessed through subcollection queries, not embedded arrays
-```
-
-**Why This Structure:**
-
-1. **No Redundancy**: `teamId` encoded in path, `originalName`/`createdAt` referenced from metadata
-2. **Deduplication Support**: Single file can have multiple evidence documents with different display choices
-3. **User Control**: Users choose which metadata record and folder path to display
-4. **Extensible**: Easy to add new organizational features without breaking existing data
-5. **Performance**: Quick access to common fields (fileSize) while maintaining data integrity
-
-#### Tag Subcollections: `/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}`
-
-**Purpose**: Store category-based tags with mutually exclusive categories and confidence-based auto-approval
-
-**Key Design Decision**: Using `categoryId` as the document ID ensures only one tag per category can exist, preventing tag explosion and making category-based logic simple.
-
-```javascript
-{
-  // Category identification
-  categoryId: 'cat-legal-123',              // Redundant but useful for queries
-  categoryName: 'Legal Documents',          // Display name for category
-
-  // Selected tag within this category
-  tagName: 'Contract',                      // The chosen tag (from AI suggestions or human input)
-  color: '#4CAF50',                         // Category color for UI display
-
-  // Tag source and confidence
-  source: 'ai' | 'ai-auto' | 'human',      // How this tag was applied
-  confidence: 95,                           // AI confidence (0-100), 100 for human tags
-
-  // Auto-approval workflow (for AI tags)
-  autoApproved: true,                       // Whether AI auto-approved (confidence >= 85%)
-  reviewRequired: false,                    // Whether human review is needed
-
-  // Human review tracking
-  reviewedAt: Timestamp | null,             // When human reviewed (if applicable)
-  reviewedBy: 'user-jane-456' | null,       // Who reviewed it (if applicable)
-  humanApproved: true | null,               // Whether human approved AI suggestion
-
-  // Timestamps and attribution
-  createdAt: Timestamp,                     // When tag was created
-  createdBy: 'ai-system' | 'user-john-456', // Who/what created it
-
-  // AI analysis and extended metadata
-  AIanalysis: {
-    aiSelection: 'Contract',                     // AI's selected tag
-    originalConfidence: 95,                     // Original AI confidence score (percentage)
-    aiAlternatives: ['Agreement', 'Legal Document', 'Report', 'Memo'], // All alternative tags AI considered (rank-ordered, excludes chosen tag)
-    processingModel: 'gemini-pro',              // AI model used (via Firebase AI Logic)
-    contentMatch: 'signature block detected',   // Why AI suggested this
-
-    // Human interaction
-    reviewReason: 'confidence_below_threshold', // Why review was needed
-    reviewNote: 'Confirmed - this is a contract', // Human reviewer note
-    userNote: 'Primary contract for Q1 project'   // User-added note
-  }
-}
-```
-
-**Advantages of categoryId as Document ID:**
-
-1. **Mutually Exclusive Categories**: Physically impossible to have multiple tags in same category
-2. **Direct Document Access**: `doc('cat-legal')` instead of querying by categoryId
-3. **Atomic Updates**: Replace category tag with single document write
-4. **Predictable Paths**: Always know where category data lives
-5. **Simplified UI Logic**: Direct subscription to specific categories
-6. **Natural Data Modeling**: Matches user mental model of "one classification per category"
-
-**Tag Source Types:**
-
-- **`ai`**: AI suggestion requiring human review (confidence < 85%)
-- **`ai-auto`**: AI suggestion auto-approved (confidence >= 85%)
-- **`human`**: Manually applied by user
-
-**Confidence-Based Workflow:**
-
-```javascript
-// High confidence AI tag (auto-approved)
-{
-  source: 'ai-auto',
-  confidence: 95,                           // Percentage format (95%)
-  autoApproved: true,
-  reviewRequired: false
-}
-
-// Low confidence AI tag (needs review)
-{
-  source: 'ai',
-  confidence: 72,                           // Percentage format (72%)
-  autoApproved: false,
-  reviewRequired: true
-}
-
-// Human-reviewed AI tag (originally needed review)
-{
-  source: 'ai',
-  confidence: 78,                           // Percentage format (78%)
-  autoApproved: false,
-  reviewRequired: false,  // No longer needs review
-  reviewedAt: Timestamp,
-  reviewedBy: 'user-jane-456',
-  humanApproved: true
-}
-```
-
-## Firebase Storage Structure
-
-### File Storage Paths
-
-**Purpose**: Store actual file content with automatic deduplication based on file hash
-
-```
-/teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{extension}
-```
-
-**Key Features**:
-
-- **Content Deduplication**: Identical files (same hash) stored only once
-- **Multi-Reference**: Single storage file can be referenced by multiple metadata records
-- **Matter-Scoped**: Files organized under specific matters for proper access control
-- **Extension Preservation**: Original file extensions maintained for proper file handling
-
-**Examples**:
-
-```
-/teams/team-abc-123/matters/general/uploads/abc123def456789abcdef012345.pdf
-/teams/team-abc-123/matters/matter-001/uploads/xyz789ghi012345fedcba678901.docx
-/teams/solo-user-789/matters/general/uploads/def456abc123789012345abcdef.jpg
-```
-
-**Storage Efficiency**:
-
-- Same file uploaded to multiple matters = single storage file + multiple metadata records
-- Same file with different original names = single storage file + multiple metadata records
-- Perfect deduplication while preserving all metadata variations
-
-### Processing Folders
-
-**Purpose**: Organize files based on processing status and operations performed
-
-The following folders are reserved for future file processing workflows:
-
-#### OCRed Files: `/teams/{teamId}/matters/{matterId}/OCRed/`
-
-**Purpose**: Store files that have been processed through Optical Character Recognition
-
-- Contains text-searchable versions of scanned documents
-- Maintains original file hash for deduplication
-- Enables full-text search capabilities
-
-#### Split Files: `/teams/{teamId}/matters/{matterId}/split/`
-
-**Purpose**: Store files that have been split from larger documents
-
-- Contains individual pages or sections from multi-page documents
-- Each split file gets its own hash and metadata record
-- Maintains reference to original source file
-
-#### Merged Files: `/teams/{teamId}/matters/{matterId}/merged/`
-
-**Purpose**: Store files that have been merged from multiple source files
-
-- Contains consolidated documents created from multiple inputs
-- New hash generated for merged content
-- Metadata tracks all source files used in merge operation
-
-**Processing Workflow**:
-
-```
-Original Upload → /uploads/
-     ↓
-OCR Processing → /OCRed/
-     ↓
-Document Split → /split/
-     ↓
-File Merging → /merged/
-```
-
-**Note**: These processing folders are documented for future implementation. Current file uploads use the `/uploads/` folder exclusively.
-
-## Custom Claims (Firebase Auth)
-
-Keep it **dead simple**. Solo users have `teamId === userId`:
-
-```javascript
-{
-  teamId: 'team-abc-123',  // For solo users: equals their userId
-  role: 'admin'            // Solo users are always 'admin', team members can be 'admin' | 'member'
-}
-```
-
-## Security Rules
-
-### Simple, Consistent Pattern
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Users can only access their own document
-    match /users/{userId} {
-      allow read, write: if request.auth != null &&
-                            request.auth.uid == userId;
-    }
-
-    // Team members can read team, admins can write
-    match /teams/{teamId} {
-      allow read: if request.auth != null &&
-                     request.auth.token.teamId == teamId;
-      allow write: if request.auth != null &&
-                      request.auth.token.teamId == teamId &&
-                      request.auth.token.role == 'admin';
-    }
-
-    // All team data follows same pattern
-    match /teams/{teamId}/{collection}/{document} {
-      allow read: if request.auth != null &&
-                     request.auth.token.teamId == teamId;
-      allow write: if request.auth != null &&
-                      request.auth.token.teamId == teamId;
-    }
-  }
-}
-```
-
-## Common Query Patterns
-
-### Simple, Efficient Queries
-
-````javascript
-// Get user's team
-const team = await db.collection('teams').doc(auth.currentUser.teamId).get()
-
-// Get team members (already embedded)
-const members = team.data().members
-
-// Get all active clients
-const clients = await db
-  .collection('teams').doc(teamId)
-  .collection('clients')
-  .where('status', '==', 'active')
-  .orderBy('name')
-  .get()
-
-// Get matters for a client
-const matters = await db
-  .collection('teams').doc(teamId)
-  .collection('matters')
-  .where('clientId', '==', clientId)
-  .where('status', '==', 'active')
-  .get()
-
-## Solo User to Team Workflow
-
-### New User Registration
-```javascript
-async function createNewUser(userId, email, displayName) {
-  // 1. Set custom claims (solo user is their own team)
-  await setCustomClaims(userId, {
-    teamId: userId,  // teamId === userId for solo users
-    role: 'admin'    // Solo users are admin of their own team
-  })
-
-  // 2. Create user document
-  await db.collection('users').doc(userId).set({
-    defaultTeamId: userId,
-    preferences: { theme: 'light', notifications: true },
-    lastLogin: new Date()
-  })
-
-  // 3. Create solo team
-  await db.collection('teams').doc(userId).set({
-    name: `${displayName}'s Workspace`,
-    description: 'Personal workspace',
-    members: {
-      [userId]: {
-        email: email,
-        role: 'admin',
-        joinedAt: new Date()
-      }
-    },
-    pendingInvites: {},
-    apps: ['intranet', 'bookkeeper'],
-    settings: { timezone: 'UTC', maxMembers: 100 },
-    isPersonal: true,  // Flag for solo teams
-    createdAt: new Date(),
-    createdBy: userId
-  })
-}
-````
-
-## Handling Team Invitations and Mergers
-
-### Invitation Process
-
-1. **Admin adds email to `pendingInvites`** in team document
-2. **User signs up** with that email (creates solo team)
-3. **On login**, check all teams for pending invites
-4. **User accepts** → migrate solo team data or merge teams
-
-### Team Migration Logic
-
-```javascript
-// Check for pending invitations on login
-async function checkAndProcessInvitations(userId, userEmail) {
-  const teamsSnapshot = await db
-    .collection('teams')
-    .where(`pendingInvites.${userEmail}`, '!=', null)
-    .get();
-
-  if (!teamsSnapshot.empty) {
-    const invitingTeam = teamsSnapshot.docs[0];
-    const invite = invitingTeam.data().pendingInvites[userEmail];
-
-    // Get user's current team (their solo team)
-    const currentTeam = await db.collection('teams').doc(userId).get();
-    const currentTeamData = currentTeam.data();
-
-    if (currentTeamData.isPersonal && Object.keys(currentTeamData.members).length === 1) {
-      // Solo user joining another team - migrate data
-      await migrateSoloUserToTeam(userId, invitingTeam.id, invite.role);
-    } else {
-      // Team founder with members - team merger scenario
-      await promptForTeamMerger(userId, invitingTeam.id, invite);
-    }
-  }
-}
-
-async function migrateSoloUserToTeam(userId, newTeamId, role) {
-  // 1. Update custom claims
-  await setCustomClaims(userId, {
-    teamId: newTeamId,
-    role: role,
-  });
-
-  // 2. Add user to new team
-  await db
-    .collection('teams')
-    .doc(newTeamId)
-    .update({
-      [`members.${userId}`]: {
-        email: auth.currentUser.email,
-        role: role,
-        joinedAt: new Date(),
-      },
-      [`pendingInvites.${auth.currentUser.email}`]: firebase.firestore.FieldValue.delete(),
-    });
-
-  // 3. Migrate data from solo team to new team
-  await migrateTeamData(userId, newTeamId);
-
-  // 4. Clean up solo team
-  await db.collection('teams').doc(userId).delete();
-}
-
-async function migrateTeamData(fromTeamId, toTeamId) {
-  // Migrate all subcollections: clients, matters, logs, originalMetadata, etc.
-  const collections = ['clients', 'matters', 'logs', 'originalMetadata'];
-
-  for (const collectionName of collections) {
-    const docs = await db.collection('teams').doc(fromTeamId).collection(collectionName).get();
-
-    // Copy documents to new team
-    const batch = db.batch();
-    docs.forEach((doc) => {
-      const newDocRef = db.collection('teams').doc(toTeamId).collection(collectionName).doc(doc.id);
-      batch.set(newDocRef, {
-        ...doc.data(),
-        migratedFrom: fromTeamId,
-        migratedAt: new Date(),
-      });
-    });
-    await batch.commit();
-  }
-
-  // Note: Firebase Storage files don't need to move -
-  // we'll update storage paths in future uploads
-  // or create a background job for this
-}
-```
-
-### Folder Path Querying
-
-The `folderPaths` field supports various query patterns for finding files by their organizational context:
-
-**Query Examples**:
-
-```javascript
-// Find all files in a specific folder path
-const docs = await db
-  .collection('teams')
-  .doc(teamId)
-  .collection('matters')
-  .doc(matterId)
-  .collection('originalMetadata')
-  .where('folderPaths', '==', 'Documents/2023')
-  .get();
-
-// Find files that contain a specific path (requires client-side filtering)
-const docs = await db
-  .collection('teams')
-  .doc(teamId)
-  .collection('matters')
-  .doc(matterId)
-  .collection('originalMetadata')
-  .get();
-
-const filtered = docs.docs.filter((doc) => {
-  const paths = doc.data().folderPaths.split('|');
-  return paths.some((path) => path.includes('2023'));
-});
-```
-
-**Note**: Complex folder path queries may require client-side filtering due to Firestore's limited string matching capabilities. For high-performance folder-based queries, consider adding specific indexes or denormalized fields based on actual usage patterns.
-
-## Required Firestore Indexes
-
-Keep indexes minimal:
-
-```javascript
-// Just the basics needed for common queries
-[
-  {
-    collection: 'teams/{teamId}/matters',
-    fields: [
-      { field: 'clientId', order: 'ASCENDING' },
-      { field: 'status', order: 'ASCENDING' },
-    ],
-  },
-  {
-    collection: 'teams/{teamId}/invoices',
-    fields: [
-      { field: 'clientId', order: 'ASCENDING' },
-      { field: 'lastLogin', order: 'DESCENDING' },
-    ],
-  },
-  {
-    collection: 'teams/{teamId}/time-entries',
-    fields: [
-      { field: 'invoiceId', order: 'ASCENDING' },
-      { field: 'billable', order: 'ASCENDING' },
-    ],
-  },
-];
-```
-
-## Future Considerations (Only If Needed)
-
-**YAGNI. Don't add these until you actually need them:**
+## Implementation Notes
+
+### Current Status
+- ✅ Core collections implemented
+- ✅ Solo user workflow active  
+- ✅ File deduplication working
+- ✅ Basic security rules deployed
+- 🔄 Team invitations (in development)
+- ⏳ Document processing workflows (planned)
+
+### Future Considerations
+
+**YAGNI Principle**: Don't add complexity until needed:
 
 1. **If teams grow beyond 100 members**: Move members to subcollection
-2. **If you need audit trails**: Add `history` array to documents
+2. **If you need audit trails**: Add `history` array to documents  
 3. **If you need per-app permissions**: Extend custom claims
 4. **If queries get complex**: Add specific denormalization
 
-Remember: **You can always add complexity later**. Keep it simple and add complexity only if the need arises based on real usage patterns.
+**Remember**: You can always add complexity later. Keep it simple and add complexity only when real usage patterns demand it.
+
+## Getting Started
+
+For detailed implementation guidance:
+
+1. **Start with** → [Firestore Collections Schema](./data-structures/firestore-collections.md)
+2. **Then review** → [Security Rules](./data-structures/security-rules.md)  
+3. **For file handling** → [Firebase Storage Structure](./data-structures/firebase-storage.md)
+4. **For user management** → [Team Workflows](./data-structures/team-workflows.md)
+
+Each document is self-contained with complete implementation details while maintaining this hub document as the single navigation point and architectural overview.
