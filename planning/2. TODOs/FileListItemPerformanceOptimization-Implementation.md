@@ -20,14 +20,14 @@
 ```
 FileListItem.vue (Main container - 227 lines)
 ├── FileListItemContent.vue (File info display - 196 lines)
-├── FileListItemTags.vue (Tag orchestration - 171 lines) ✅ DECOMPOSED
+├── FileListItemTags.vue (Tag orchestration - 170 lines) ✅ DECOMPOSED
 │   ├── FileListItemTagsDisplay.vue (Read-only display - 161 lines) ✅
 │   ├── FileListItemTagsEditor.vue (Tag editing - 74 lines) ✅  
 │   └── FileListItemTagsManager.vue (Context/state management - 195 lines) ✅
 └── FileListItemActions.vue (Action buttons - 151 lines)
 ```
 
-**Decomposition Completed**: FileListItemTags.vue successfully decomposed from 425 lines to 171 lines with three specialized sub-components handling distinct responsibilities.
+**Decomposition Completed**: FileListItemTags.vue successfully decomposed from 425 lines to 170 lines with three specialized sub-components handling distinct responsibilities.
 
 ## Step 1: Component Decomposition (FileListItemTags.vue)
 
@@ -276,7 +276,7 @@ onMounted(() => {
 ### Primary Files
 - `src/features/organizer/components/FileListItem.vue` (227 lines)
 - `src/features/organizer/components/FileListItemContent.vue` (196 lines)
-- `src/features/organizer/components/FileListItemTags.vue` (425 lines)
+- `src/features/organizer/components/FileListItemTags.vue` (170 lines)
 - `src/features/organizer/components/FileListItemActions.vue` (151 lines)
 
 ### Supporting Files
