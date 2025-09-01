@@ -32,29 +32,54 @@
         variant="outlined"
         :color="tag.metadata?.color || 'primary'"
         class="ma-1 human-tag"
+        @contextmenu.prevent="handleTagContextMenu($event, tag, 'human')"
       >
         {{ tag.tagName }}
       </v-chip>
       
       
       <!-- AI tags with confidence-based styling -->
-      <AITagChip
+      <div
         v-for="tag in structuredAITags"
         :key="`ai-${tag.id || tag.tagName}-${tag.confidence}`"
-        :tag="tag"
-        :show-status-actions="!readonly"
-        class="ma-1 ai-tag-item"
-        :class="{
-          'high-confidence': tag.confidence >= 85,
-          'medium-confidence': tag.confidence >= 70 && tag.confidence < 85,
-          'low-confidence': tag.confidence < 70
-        }"
-      />
+        class="ai-tag-wrapper"
+        @contextmenu.prevent="handleTagContextMenu($event, tag, 'ai')"
+      >
+        <AITagChip
+          :tag="tag"
+          :show-status-actions="!readonly"
+          class="ma-1 ai-tag-item"
+          :class="{
+            'high-confidence': tag.confidence >= 85,
+            'medium-confidence': tag.confidence >= 70 && tag.confidence < 85,
+            'low-confidence': tag.confidence < 70
+          }"
+        />
+      </div>
     </div>
     
     <div v-else-if="readonly" class="no-tags">
       <small class="text-medium-emphasis">No tags</small>
     </div>
+    
+    <!-- Context Menu -->
+    <TagContextMenu
+      v-if="currentContextTag"
+      ref="contextMenuRef"
+      :tag-info="currentContextTag"
+      :evidence="evidence"
+      :is-editable="!readonly"
+      @show-in-folders="handleShowInFolders"
+      @filter-by-tag="handleFilterByTag"
+      @search-similar="(data) => handleTagAction('search-similar', data)"
+      @edit-tag="(data) => handleTagAction('edit-tag', data)"
+      @copy-tag="(data) => handleTagAction('copy-tag', data)"
+      @show-statistics="(data) => handleTagAction('show-statistics', data)"
+      @approve-ai="handleApproveAI"
+      @reject-ai="handleRejectAI"
+      @remove-from-hierarchy="(data) => handleTagAction('remove-from-hierarchy', data)"
+      @menu-closed="currentContextTag = null"
+    />
   </div>
 </template>
 
@@ -63,6 +88,7 @@ import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useAuthStore } from '../../../core/stores/auth.js';
 import TagSelector from './TagSelector.vue';
 import AITagChip from './AITagChip.vue';
+import TagContextMenu from './TagContextMenu.vue';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
 
 // Props
@@ -95,8 +121,12 @@ const props = defineProps({
 // Emits
 const emit = defineEmits([
   'tags-updated',
-  'migrate-legacy',
+  'migrate-legacy', 
   'tag-error',
+  'tag-context-menu',
+  'show-in-folders',
+  'filter-by-tag',
+  'tag-action'
 ]);
 
 // Services and local state  
@@ -106,6 +136,8 @@ const pendingTags = ref([]);
 const approvedTags = ref([]);
 const rejectedTags = ref([]);
 const loadingTags = ref(false);
+const contextMenuRef = ref(null);
+const currentContextTag = ref(null);
 
 // Computed properties
 const structuredHumanTags = computed(() => {
@@ -177,6 +209,89 @@ const handleMigrateLegacy = () => {
 
 const handleTagError = (error) => {
   emit('tag-error', error);
+};
+
+// Context menu handlers
+const handleTagContextMenu = (event, tag, tagType) => {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  // Prepare tag info for context menu
+  const tagInfo = {
+    tagName: tag.tagName,
+    categoryId: tag.metadata?.categoryId || null,
+    categoryName: tag.metadata?.categoryName || tag.categoryName || 'Unknown',
+    color: tag.metadata?.color || 'primary',
+    source: tagType === 'ai' ? 'ai' : 'manual',
+    status: tag.status || tag.displayStatus,
+    confidence: tag.confidence,
+    reasoning: tag.reasoning,
+    id: tag.id
+  };
+  
+  currentContextTag.value = tagInfo;
+  
+  // Open context menu
+  if (contextMenuRef.value) {
+    contextMenuRef.value.openMenu(event, event.currentTarget);
+  }
+  
+  emit('tag-context-menu', {
+    tagInfo,
+    tagType,
+    event,
+    evidence: props.evidence
+  });
+};
+
+const handleShowInFolders = (data) => {
+  emit('show-in-folders', {
+    ...data,
+    evidence: props.evidence
+  });
+};
+
+const handleFilterByTag = (data) => {
+  emit('filter-by-tag', {
+    ...data,
+    evidence: props.evidence
+  });
+};
+
+const handleTagAction = (action, data) => {
+  emit('tag-action', {
+    action,
+    data,
+    evidence: props.evidence,
+    tagInfo: currentContextTag.value
+  });
+};
+
+// AI tag action handlers
+const handleApproveAI = async (tagInfo) => {
+  try {
+    // TODO: Implement AI tag approval logic
+    console.log('Approving AI tag:', tagInfo);
+    handleTagAction('approve-ai', tagInfo);
+    // Reload tags after action
+    await loadSubcollectionTags();
+  } catch (error) {
+    console.error('Failed to approve AI tag:', error);
+    handleTagError(error);
+  }
+};
+
+const handleRejectAI = async (tagInfo) => {
+  try {
+    // TODO: Implement AI tag rejection logic
+    console.log('Rejecting AI tag:', tagInfo);
+    handleTagAction('reject-ai', tagInfo);
+    // Reload tags after action
+    await loadSubcollectionTags();
+  } catch (error) {
+    console.error('Failed to reject AI tag:', error);
+    handleTagError(error);
+  }
 };
 
 // Lifecycle hooks
@@ -296,5 +411,16 @@ const loadSubcollectionTags = async () => {
 .legacy-tag {
   border-style: dashed;
   opacity: 0.7;
+}
+
+/* AI tag wrapper for context menu */
+.ai-tag-wrapper {
+  display: inline-block;
+  cursor: context-menu;
+}
+
+.ai-tag-wrapper:hover {
+  /* Slight elevation on hover to indicate interactivity */
+  filter: brightness(1.05);
 }
 </style>
