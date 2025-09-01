@@ -223,7 +223,7 @@ export const memoryTestUtils = {
     const controllers = [];
     const originalAbortController = global.AbortController;
 
-    global.AbortController = vi.fn((options) => {
+    global.AbortController = vi.fn().mockImplementation((options) => {
       const controller = new originalAbortController(options);
       controllers.push(controller);
       return controller;
@@ -237,6 +237,7 @@ export const memoryTestUtils = {
       verifyAllAborted: () => {
         return controllers.every((controller) => controller.signal.aborted);
       },
+      controllers: () => controllers, // Expose for debugging
     };
   },
 
