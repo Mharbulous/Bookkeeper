@@ -43,11 +43,15 @@ export const useOrganizerStore = defineStore('organizer', () => {
    */
   const initialize = async () => {
     try {
+      console.log(`[DEBUG ORGANIZER LOADING] Organizer initialization started at: ${new Date().toISOString()} (${Date.now()})`);
+      
       // Load evidence and categories in parallel
       const [evidenceUnsubscribe, categoryUnsubscribe] = await Promise.all([
         coreStore.loadEvidence(),
         categoryStore.loadCategories()
       ]);
+      
+      console.log(`[DEBUG ORGANIZER LOADING] Organizer initialization completed at: ${new Date().toISOString()} (${Date.now()})`);
       
       return { evidenceUnsubscribe, categoryUnsubscribe };
     } catch (err) {

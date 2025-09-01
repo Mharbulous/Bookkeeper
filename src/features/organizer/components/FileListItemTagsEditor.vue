@@ -11,7 +11,19 @@
 </template>
 
 <script setup>
+import { onMounted, onBeforeMount } from 'vue';
 import TagSelector from './TagSelector.vue';
+
+// Debug logging helper
+const debugLog = (message, data = null) => {
+  const timestamp = new Date().toISOString().substring(11, 23);
+  console.log(`[${timestamp}] [FileListItemTagsEditor] ${message}`, data || '');
+};
+
+// Performance tracking
+const renderStart = performance.now();
+let setupComplete = null;
+let beforeMountTime = null;
 
 // Props
 const props = defineProps({
@@ -54,6 +66,18 @@ const handleMigrateLegacy = () => {
 const handleTagError = (error) => {
   emit('tag-error', error);
 };
+
+// Performance tracking - mark setup completion
+setupComplete = performance.now();
+
+// Lifecycle performance tracking (disabled - optimization complete)
+onBeforeMount(() => {
+  beforeMountTime = performance.now();
+});
+
+onMounted(() => {
+  // Performance tracking disabled - optimization complete
+});
 </script>
 
 <style scoped>

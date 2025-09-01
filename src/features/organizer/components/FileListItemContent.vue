@@ -15,20 +15,30 @@
         {{ formattedDate }}
       </p>
       <div v-if="showProcessingStage && processingStage !== 'uploaded'" class="processing-stage">
-        <v-chip
-          size="x-small"
-          :color="processingStageColor"
-          variant="tonal"
+        <span
+          class="processing-badge"
+          :class="`processing-badge--${processingStage}`"
         >
           {{ processingStageText }}
-        </v-chip>
+        </span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, onBeforeMount } from 'vue';
+
+// Debug logging helper
+const debugLog = (message, data = null) => {
+  const timestamp = new Date().toISOString().substring(11, 23);
+  console.log(`[${timestamp}] [FileListItemContent] ${message}`, data || '');
+};
+
+// Performance tracking
+const renderStart = performance.now();
+let setupComplete = null;
+let beforeMountTime = null;
 
 // Props
 const props = defineProps({
@@ -117,15 +127,7 @@ const fileIconColor = computed(() => {
   return colorMap[ext] || 'grey-darken-1';
 });
 
-const processingStageColor = computed(() => {
-  const stageColors = {
-    'uploaded': 'grey',
-    'splitting': 'blue',
-    'merging': 'orange',
-    'complete': 'green'
-  };
-  return stageColors[processingStage.value] || 'grey';
-});
+// Removed processingStageColor computed property - using CSS classes instead
 
 const processingStageText = computed(() => {
   const stageTexts = {
@@ -135,6 +137,19 @@ const processingStageText = computed(() => {
     'complete': 'Complete'
   };
   return stageTexts[processingStage.value] || processingStage.value;
+});
+
+// Performance tracking - mark setup completion
+setupComplete = performance.now();
+
+// Lifecycle performance tracking (disabled - optimization complete)
+onBeforeMount(() => {
+  beforeMountTime = performance.now();
+  // Debugging disabled for production performance
+});
+
+onMounted(() => {
+  // Performance tracking disabled - optimization complete
 });
 </script>
 
@@ -176,6 +191,41 @@ const processingStageText = computed(() => {
 
 .processing-stage {
   margin-top: 4px;
+}
+
+.processing-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+.processing-badge--splitting {
+  background-color: rgba(33, 150, 243, 0.12);
+  color: rgb(33, 150, 243);
+  border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
+.processing-badge--merging {
+  background-color: rgba(255, 152, 0, 0.12);
+  color: rgb(255, 152, 0);
+  border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.processing-badge--complete {
+  background-color: rgba(76, 175, 80, 0.12);
+  color: rgb(76, 175, 80);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.processing-badge--uploaded {
+  background-color: rgba(158, 158, 158, 0.12);
+  color: rgb(158, 158, 158);
+  border: 1px solid rgba(158, 158, 158, 0.2);
 }
 
 /* Responsive design */

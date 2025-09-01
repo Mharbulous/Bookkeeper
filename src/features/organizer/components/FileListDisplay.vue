@@ -130,17 +130,18 @@ const handleViewModeChange = (event) => {
 // Debug: Watch filteredEvidence changes to track data loading timing
 watch(() => props.filteredEvidence, (newEvidence, oldEvidence) => {
   dataLoadTime = performance.now();
-  if (newEvidence?.length > 0) {
-    debugLog(`📊 Data loaded: ${newEvidence.length} documents`);
-  }
+  // Data loading log removed - focusing on loop-level timing only
 }, { immediate: true, deep: false });
 
-// Debug: Track lazy loading state
+// Debug: Track FileListItem loop start/completion
 watch(currentViewMode, (newMode) => {
   if (newMode === 'list') {
     renderStartTime = performance.now();
     
-    // Track render performance
+    // Log when FileListItem loop starts
+    debugLog(`🚀 Starting FileListItem loop processing...`);
+    
+    // Track render performance  
     nextTick(() => {
       const loadedCount = props.filteredEvidence?.reduce((count, _, index) => {
         return isItemLoaded(index) ? count + 1 : count;
@@ -148,7 +149,8 @@ watch(currentViewMode, (newMode) => {
       
       const renderTime = performance.now() - renderStartTime;
       
-      debugLog(`⚡ Rendered ${loadedCount}/${props.filteredEvidence?.length || 0} items in ${renderTime.toFixed(1)}ms`);
+      // Log when FileListItem loop completes
+      debugLog(`✅ FileListItem loop completed - rendered ${loadedCount}/${props.filteredEvidence?.length || 0} items in ${renderTime.toFixed(1)}ms`);
     });
   }
 }, { immediate: true });

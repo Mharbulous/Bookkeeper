@@ -13,30 +13,57 @@
           :show-processing-stage="showProcessingStage"
         />
 
-        <!-- Tags section -->
-        <FileListItemTags
-          :evidence="evidence"
-          :readonly="readonly"
-          :tag-update-loading="tagUpdateLoading"
-          :tag-input-placeholder="tagInputPlaceholder"
-          @tags-updated="handleTagsUpdated"
-          @migrate-legacy="handleMigrateLegacy"
-          @tag-error="handleTagError"
-        />
+        <!-- Tags section - conditionally lazy loaded -->
+        <div 
+          v-if="!enableProgressiveLoading || tagsVisible"
+          :key="`tags-${evidence.id}`"
+          :class="enableProgressiveLoading ? 'tags-section' : ''"
+        >
+          <FileListItemTags
+            :evidence="evidence"
+            :readonly="readonly"
+            :tag-update-loading="tagUpdateLoading"
+            :tag-input-placeholder="tagInputPlaceholder"
+            @tags-updated="handleTagsUpdated"
+            @migrate-legacy="handleMigrateLegacy"
+            @tag-error="handleTagError"
+          />
+        </div>
+        <div 
+          v-else-if="enableProgressiveLoading"
+          class="tags-placeholder"
+          @click.stop="loadTags"
+        >
+          <span class="placeholder-text">Tags loading...</span>
+        </div>
 
-        <!-- Actions section -->
-        <FileListItemActions
-          :evidence="evidence"
-          :readonly="readonly"
-          :show-actions="showActions"
-          :action-loading="actionLoading"
-          :ai-processing="aiProcessing"
-          @download="handleDownload"
-          @rename="handleRename"
-          @view-details="handleViewDetails"
-          @delete="handleDelete"
-          @process-with-ai="handleProcessWithAI"
-        />
+        <!-- Actions section - conditionally lazy loaded on hover -->
+        <div 
+          v-if="!enableProgressiveLoading || actionsVisible"
+          :key="`actions-${evidence.id}`"
+          :class="enableProgressiveLoading ? 'actions-section' : ''"
+        >
+          <FileListItemActions
+            :evidence="evidence"
+            :readonly="readonly"
+            :show-actions="showActions"
+            :action-loading="actionLoading"
+            :ai-processing="aiProcessing"
+            @download="handleDownload"
+            @rename="handleRename"
+            @view-details="handleViewDetails"
+            @delete="handleDelete"
+            @process-with-ai="handleProcessWithAI"
+          />
+        </div>
+        <div 
+          v-else-if="enableProgressiveLoading"
+          class="actions-placeholder"
+          @mouseenter="loadActions"
+          @click.stop="loadActions"
+        >
+          <span class="placeholder-text">⋯</span>
+        </div>
       </div>
     </v-card-text>
 
@@ -53,7 +80,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref, nextTick } from 'vue';
 import FileListItemContent from './FileListItemContent.vue';
 import FileListItemTags from './FileListItemTags.vue';
 import FileListItemActions from './FileListItemActions.vue';
@@ -116,6 +143,12 @@ const props = defineProps({
     type: String,
     default: 'Add tags...',
   },
+  
+  // Performance optimization flags
+  enableProgressiveLoading: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 // Emits
@@ -131,6 +164,53 @@ const emit = defineEmits([
   'selection-change',
   'process-with-ai',
 ]);
+
+// Progressive/lazy loading state
+const tagsVisible = ref(false);
+const actionsVisible = ref(false);
+const loadingPhase = ref(1); // 1: content only, 2: + tags, 3: + actions
+
+// Progressive loading methods
+const loadTags = async () => {
+  if (tagsVisible.value) return;
+  
+  tagsVisible.value = true;
+  loadingPhase.value = 2;
+  
+  await nextTick();
+  // Performance tracking disabled - optimization complete
+};
+
+const loadActions = async () => {
+  if (actionsVisible.value) return;
+  
+  actionsVisible.value = true;
+  loadingPhase.value = 3;
+  
+  await nextTick();
+  // Individual item logging disabled - using loop-level timing instead
+};
+
+// Auto-load tags after a short delay for better UX
+const autoLoadTags = () => {
+  if (!props.enableProgressiveLoading) return;
+  
+  setTimeout(() => {
+    if (!tagsVisible.value) {
+      loadTags();
+    }
+  }, 100); // 100ms delay to prioritize content rendering
+};
+
+// Auto-load everything after longer delay as fallback
+const autoLoadAll = () => {
+  if (!props.enableProgressiveLoading) return;
+  
+  setTimeout(() => {
+    if (!tagsVisible.value) loadTags();
+    if (!actionsVisible.value) loadActions();
+  }, 500); // 500ms fallback
+};
 
 // Computed properties - simplified since FileListItemContent handles file details
 
@@ -178,10 +258,11 @@ const handleProcessWithAI = () => {
 
 // Track component mount performance
 onMounted(() => {
-  const renderTime = performance.now() - renderStart;
-  if (renderTime > 10) { // Only log if render takes more than 10ms
-    debugLog(`🐌 Slow item render: ${renderTime.toFixed(2)}ms for ${props.evidence.name || props.evidence.id}`);
-  }
+  // Performance tracking disabled - optimization complete
+  
+  // Start progressive loading after content is mounted
+  autoLoadTags();
+  autoLoadAll();
 });
 </script>
 
@@ -205,6 +286,52 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 20px;
+}
+
+/* Progressive loading placeholders */
+.tags-placeholder,
+.actions-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  opacity: 0.6;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.tags-placeholder:hover,
+.actions-placeholder:hover {
+  opacity: 0.8;
+}
+
+.placeholder-text {
+  font-size: 12px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-style: italic;
+}
+
+.actions-placeholder .placeholder-text {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Progressive loading sections */
+.tags-section,
+.actions-section {
+  opacity: 0;
+  animation: fadeIn 0.2s ease-in-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .selection-indicator {

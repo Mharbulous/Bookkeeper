@@ -20,10 +20,21 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue';
+import { ref, watch, onMounted, onBeforeMount } from 'vue';
 import { useAuthStore } from '../../../core/stores/auth.js';
 import TagContextMenu from './TagContextMenu.vue';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
+
+// Debug logging helper
+const debugLog = (message, data = null) => {
+  const timestamp = new Date().toISOString().substring(11, 23);
+  console.log(`[${timestamp}] [FileListItemTagsManager] ${message}`, data || '');
+};
+
+// Performance tracking
+const renderStart = performance.now();
+let setupComplete = null;
+let beforeMountTime = null;
 
 // Props
 const props = defineProps({
@@ -188,6 +199,18 @@ const loadSubcollectionTags = async () => {
 // Expose the context menu handler for parent component
 defineExpose({
   handleTagContextMenu
+});
+
+// Performance tracking - mark setup completion
+setupComplete = performance.now();
+
+// Lifecycle performance tracking (disabled - optimization complete)
+onBeforeMount(() => {
+  beforeMountTime = performance.now();
+});
+
+onMounted(() => {
+  // Performance tracking disabled - optimization complete
 });
 </script>
 

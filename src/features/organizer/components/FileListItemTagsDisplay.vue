@@ -52,8 +52,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, onBeforeMount } from 'vue';
 import AITagChip from './AITagChip.vue';
+
+// Debug logging helper
+const debugLog = (message, data = null) => {
+  const timestamp = new Date().toISOString().substring(11, 23);
+  console.log(`[${timestamp}] [FileListItemTagsDisplay] ${message}`, data || '');
+};
+
+// Performance tracking
+const renderStart = performance.now();
+let setupComplete = null;
+let beforeMountTime = null;
 
 // Props
 const props = defineProps({
@@ -99,6 +110,18 @@ const handleTagContextMenu = (event, tag, tagType) => {
     tagType
   });
 };
+
+// Performance tracking - mark setup completion
+setupComplete = performance.now();
+
+// Lifecycle performance tracking (disabled - optimization complete)
+onBeforeMount(() => {
+  beforeMountTime = performance.now();
+});
+
+onMounted(() => {
+  // Performance tracking disabled - optimization complete
+});
 </script>
 
 <style scoped>

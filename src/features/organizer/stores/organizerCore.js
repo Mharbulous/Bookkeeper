@@ -127,6 +127,9 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
     try {
       loading.value = true;
       error.value = null;
+      
+      // DEBUG: Log when loading starts
+      console.log(`[DEBUG ORGANIZER LOADING] Core store loading started at: ${new Date().toISOString()} (${Date.now()})`);
 
       const teamId = authStore.currentTeam;
       if (!teamId) {
@@ -145,9 +148,12 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
       const unsubscribe = onSnapshot(
         evidenceQuery,
         async (snapshot) => {
+          console.log(`[DEBUG ORGANIZER LOADING] Firestore snapshot received at: ${new Date().toISOString()} (${Date.now()}) with ${snapshot.docs.length} documents`);
+          
           const evidence = [];
           
           // Process each evidence document
+          let processedCount = 0;
           for (const doc of snapshot.docs) {
             const evidenceData = doc.data();
             
@@ -156,6 +162,11 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
             
             // Load tags for this evidence document
             const tagData = await loadTagsForEvidence(doc.id, teamId);
+            
+            processedCount++;
+            if (processedCount % 10 === 0 || processedCount === snapshot.docs.length) {
+              console.log(`[DEBUG ORGANIZER LOADING] Processed ${processedCount}/${snapshot.docs.length} documents at: ${new Date().toISOString()}`);
+            }
             
             evidence.push({
               id: doc.id,
@@ -173,6 +184,7 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
           loading.value = false;
           isInitialized.value = true;
 
+          console.log(`[DEBUG ORGANIZER LOADING] Core store loading completed at: ${new Date().toISOString()} (${Date.now()})`);
           console.log(`[OrganizerCore] Loaded ${evidence.length} evidence documents with display info`);
           
           // Notify query store to update filters if it exists
