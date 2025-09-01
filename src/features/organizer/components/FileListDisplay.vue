@@ -6,27 +6,14 @@
         <h3 class="text-h6">Documents</h3>
       </div>
       <div class="list-controls">
-        <v-btn-toggle
-          :model-value="props.viewMode"
-          mandatory
-          variant="outlined"
-          size="small"
-          @update:model-value="$emit('update:viewMode', $event)"
-        >
-          <v-btn value="list">
-            <v-icon>mdi-view-list</v-icon>
-          </v-btn>
-          <v-btn value="grid">
-            <v-icon>mdi-view-grid</v-icon>
-          </v-btn>
-        </v-btn-toggle>
+        <ViewModeToggle :loading="false" @view-mode-changed="handleViewModeChange" />
       </div>
     </div>
 
-    <!-- File list/grid -->
+    <!-- File display with 3 view modes -->
     <div class="file-display">
       <!-- List view -->
-      <div v-if="props.viewMode === 'list'" class="file-list">
+      <div v-if="currentViewMode === 'list'" class="file-list">
         <FileListItem
           v-for="evidence in props.filteredEvidence"
           :key="evidence.id"
@@ -42,9 +29,18 @@
       </div>
 
       <!-- Grid view placeholder -->
-      <div v-else class="file-grid">
+      <div v-else-if="currentViewMode === 'grid'" class="file-grid">
         <p class="text-body-2 text-center text-medium-emphasis pa-8">
-          Grid view coming in future updates
+          <v-icon size="48" class="mb-2 d-block">mdi-view-grid</v-icon>
+          Folder Grid view coming in future updates
+        </p>
+      </div>
+
+      <!-- Tree view placeholder -->
+      <div v-else-if="currentViewMode === 'tree'" class="file-tree">
+        <p class="text-body-2 text-center text-medium-emphasis pa-8">
+          <v-icon size="48" class="mb-2 d-block">mdi-file-tree</v-icon>
+          Folder Tree view coming in future updates
         </p>
       </div>
     </div>
@@ -52,7 +48,9 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import FileListItem from './FileListItem.vue';
+import ViewModeToggle from './ViewModeToggle.vue';
 
 // Props
 const props = defineProps({
@@ -78,8 +76,11 @@ const props = defineProps({
   },
 });
 
+// Local state for current view mode
+const currentViewMode = ref('list');
+
 // Emits
-defineEmits([
+const emit = defineEmits([
   'update:viewMode',
   'tagsUpdated',
   'process-with-ai',
@@ -87,6 +88,12 @@ defineEmits([
   'rename',
   'viewDetails',
 ]);
+
+// Handle view mode changes from ViewModeToggle
+const handleViewModeChange = (event) => {
+  currentViewMode.value = event.mode;
+  emit('update:viewMode', event.mode);
+};
 </script>
 
 <style scoped>
@@ -107,7 +114,8 @@ defineEmits([
   min-height: 0;
 }
 
-.file-grid {
+.file-grid,
+.file-tree {
   min-height: 200px;
   display: flex;
   align-items: center;
