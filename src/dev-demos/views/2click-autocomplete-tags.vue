@@ -102,25 +102,26 @@
                       <span class="tag-text">{{ tag.tagName }}</span>
                     </div>
                     <div class="dropdown-menu">
-                      <!-- CSS-only pagination with radio buttons -->
+                      <!-- CSS-only pagination with radio buttons for proper multi-page support -->
                       <input 
+                        v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
+                        :key="pageNum"
                         type="radio" 
                         :name="`page-${tag.id}`" 
-                        :id="`page1-${tag.id}`" 
+                        :id="`page${pageNum}-${tag.id}`" 
                         class="page-radio" 
-                        checked 
-                      />
-                      <input 
-                        type="radio" 
-                        :name="`page-${tag.id}`" 
-                        :id="`page2-${tag.id}`" 
-                        class="page-radio" 
+                        :checked="pageNum === 1"
                       />
                       
-                      <!-- Page 1: First 12 items -->
-                      <div class="page-content page-1">
+                      <!-- Generate pages dynamically -->
+                      <div 
+                        v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
+                        :key="pageNum"
+                        :class="`page-content page-${pageNum}`"
+                      >
+                        <!-- Show 12 items for this page -->
                         <button
-                          v-for="option in getCategoryAlternatives(tag.categoryId).slice(0, 12)"
+                          v-for="option in getCategoryAlternatives(tag.categoryId).slice((pageNum - 1) * 12, pageNum * 12)"
                           :key="option.id"
                           class="dropdown-option"
                           tabindex="0"
@@ -129,36 +130,24 @@
                           {{ option.tagName }}
                         </button>
                         
-                        <!-- Next page button -->
+                        <!-- Next page button (if not the last page) -->
                         <label
-                          v-if="getCategoryAlternatives(tag.categoryId).length > 12"
-                          :for="`page2-${tag.id}`"
+                          v-if="pageNum < Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
+                          :for="`page${pageNum + 1}-${tag.id}`"
                           class="dropdown-ellipses dropdown-pagination"
                           tabindex="0"
                         >
-                          ... ({{ getCategoryAlternatives(tag.categoryId).length - 12 }} more)
+                          ...{{ getCategoryAlternatives(tag.categoryId).length - (pageNum * 12) }} more
                         </label>
-                      </div>
-                      
-                      <!-- Page 2: Remaining items -->
-                      <div class="page-content page-2">
-                        <button
-                          v-for="option in getCategoryAlternatives(tag.categoryId).slice(12)"
-                          :key="option.id"
-                          class="dropdown-option"
-                          tabindex="0"
-                          @click="selectFromDropdown(tag, option.tagName)"
-                        >
-                          {{ option.tagName }}
-                        </button>
                         
-                        <!-- Back to first page button -->
+                        <!-- Restart button (only on the last page) -->
                         <label
+                          v-if="pageNum === Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
                           :for="`page1-${tag.id}`"
-                          class="dropdown-ellipses dropdown-pagination"
+                          class="dropdown-ellipses dropdown-pagination restart-button"
                           tabindex="0"
                         >
-                          ... (restart)
+                          ...restart
                         </label>
                       </div>
                     </div>
@@ -534,6 +523,16 @@ const mockCategories = ref([
       { id: 's5', tagName: 'Archived', source: 'human', description: 'No longer active' },
       { id: 's6', tagName: 'Pending', source: 'ai', description: 'Awaiting action' }
     ]
+  },
+  {
+    id: 'year',
+    name: 'Year',
+    tags: Array.from({ length: 76 }, (_, i) => ({
+      id: `y${i + 1}`,
+      tagName: (2025 - i).toString(),
+      source: i % 3 === 0 ? 'ai' : 'human',
+      description: `Year ${2025 - i}`
+    }))
   }
 ]);
 
@@ -568,6 +567,16 @@ const demoFileTags = ref([
     isEditing: false,
     tempValue: '',
     originalValue: 'High'
+  },
+  {
+    id: 'demo4',
+    categoryId: 'year',
+    tagName: '2024',
+    source: 'human',
+    confidence: 95,
+    isEditing: false,
+    tempValue: '',
+    originalValue: '2024'
   }
 ]);
 
@@ -949,17 +958,17 @@ onMounted(() => {
 .v-card:has(.dropdown-pagination:focus),
 .v-card:has(.dropdown-pagination:active),
 .v-card:has(.dropdown-pagination:hover),
-.v-card:has(input[id*="page2"]:checked),
-.v-card:has(label[for*="page1"]:focus),
-.v-card:has(label[for*="page1"]:active),
-.v-card:has(label[for*="page1"]:hover),
+.v-card:has(input[id*="page"]:checked),
+.v-card:has(label[for*="page"]:focus),
+.v-card:has(label[for*="page"]:active),
+.v-card:has(label[for*="page"]:hover),
 .v-card-text:has(.dropdown-pagination:focus),
 .v-card-text:has(.dropdown-pagination:active),
 .v-card-text:has(.dropdown-pagination:hover),
-.v-card-text:has(input[id*="page2"]:checked),
-.v-card-text:has(label[for*="page1"]:focus),
-.v-card-text:has(label[for*="page1"]:active),
-.v-card-text:has(label[for*="page1"]:hover) {
+.v-card-text:has(input[id*="page"]:checked),
+.v-card-text:has(label[for*="page"]:focus),
+.v-card-text:has(label[for*="page"]:active),
+.v-card-text:has(label[for*="page"]:hover) {
   z-index: 1000 !important;
   position: relative;
 }
@@ -1073,16 +1082,57 @@ onMounted(() => {
   display: block;
 }
 
-.dropdown-menu .page-2 {
+.dropdown-menu .page-content:not(.page-1) {
   display: none;
 }
 
-/* Show page 2 when page2 radio is checked */
+/* Dynamic page switching for any page number */
+input[id*="page1"]:checked ~ .page-1 {
+  display: block;
+}
+input[id*="page1"]:checked ~ .page-content:not(.page-1) {
+  display: none;
+}
+
 input[id*="page2"]:checked ~ .page-2 {
   display: block;
 }
+input[id*="page2"]:checked ~ .page-content:not(.page-2) {
+  display: none;
+}
 
-input[id*="page2"]:checked ~ .page-1 {
+input[id*="page3"]:checked ~ .page-3 {
+  display: block;
+}
+input[id*="page3"]:checked ~ .page-content:not(.page-3) {
+  display: none;
+}
+
+input[id*="page4"]:checked ~ .page-4 {
+  display: block;
+}
+input[id*="page4"]:checked ~ .page-content:not(.page-4) {
+  display: none;
+}
+
+input[id*="page5"]:checked ~ .page-5 {
+  display: block;
+}
+input[id*="page5"]:checked ~ .page-content:not(.page-5) {
+  display: none;
+}
+
+input[id*="page6"]:checked ~ .page-6 {
+  display: block;
+}
+input[id*="page6"]:checked ~ .page-content:not(.page-6) {
+  display: none;
+}
+
+input[id*="page7"]:checked ~ .page-7 {
+  display: block;
+}
+input[id*="page7"]:checked ~ .page-content:not(.page-7) {
   display: none;
 }
 
@@ -1114,24 +1164,35 @@ input[id*="page2"]:checked ~ .page-1 {
   outline-offset: -2px;
 }
 
-/* Prevent dropdown from closing when pagination is used */
-.dropdown-overlay:has(input[type="radio"]:focus),
-.dropdown-overlay:has(.dropdown-pagination:focus),
-.dropdown-overlay:has(.dropdown-pagination:active) {
-  display: block !important;
-}
-
-/* Keep dropdown open when radio buttons are in use */
-.clean-tag:has(input[id*="page2"]:checked) .dropdown-overlay {
-  display: block !important;
-}
-
-/* Keep dropdown open during restart button interaction with longer duration */
+/* Keep dropdown open when pagination elements are actively being used */
 .clean-tag:has(.dropdown-pagination:focus) .dropdown-overlay,
-.clean-tag:has(.dropdown-pagination:active) .dropdown-overlay {
+.clean-tag:has(.dropdown-pagination:active) .dropdown-overlay,
+.clean-tag:has(.dropdown-pagination:hover) .dropdown-overlay {
   display: block !important;
-  /* Add a small transition delay to prevent flashing */
-  transition: display 0.1s;
+}
+
+/* Keep dropdown open when radio buttons are being toggled */
+.dropdown-overlay:has(.dropdown-pagination:focus),
+.dropdown-overlay:has(.dropdown-pagination:active),
+.dropdown-overlay:has(.dropdown-pagination:hover) {
+  display: block !important;
+}
+
+/* Keep dropdown open during radio button state changes */
+.clean-tag:has(input[type="radio"]:focus) .dropdown-overlay,
+.clean-tag:has(input[type="radio"]:active) .dropdown-overlay {
+  display: block !important;
+}
+
+/* CRITICAL: Keep dropdown open when any non-default page is selected */
+/* This catches the transition moment when pagination elements become hidden */
+.clean-tag:has(input[id*="page2"]:checked) .dropdown-overlay,
+.clean-tag:has(input[id*="page3"]:checked) .dropdown-overlay,
+.clean-tag:has(input[id*="page4"]:checked) .dropdown-overlay,
+.clean-tag:has(input[id*="page5"]:checked) .dropdown-overlay,
+.clean-tag:has(input[id*="page6"]:checked) .dropdown-overlay,
+.clean-tag:has(input[id*="page7"]:checked) .dropdown-overlay {
+  display: block !important;
 }
 
 /* Edit mode overlay */
