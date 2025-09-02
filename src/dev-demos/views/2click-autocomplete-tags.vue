@@ -1145,6 +1145,11 @@ input[id*="page7"]:checked ~ .page-content:not(.page-7) {
   border-top: 1px solid #eee;
   margin-top: 2px;
   margin-bottom: 4px;
+  /* Prevent text wrapping */
+  white-space: nowrap;
+  min-width: 80px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .dropdown-pagination {
