@@ -102,26 +102,10 @@
                       <span class="tag-text">{{ tag.tagName }}</span>
                     </div>
                     <div class="dropdown-menu">
-                      <!-- CSS-only pagination with radio buttons for proper multi-page support -->
-                      <input 
-                        v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
-                        :key="pageNum"
-                        type="radio" 
-                        :name="`page-${tag.id}`" 
-                        :id="`page${pageNum}-${tag.id}`" 
-                        class="page-radio" 
-                        :checked="pageNum === 1"
-                      />
-                      
-                      <!-- Generate pages dynamically -->
-                      <div 
-                        v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
-                        :key="pageNum"
-                        :class="`page-content page-${pageNum}`"
-                      >
-                        <!-- Show 12 items for this page -->
+                      <!-- Simple display for categories with 13 or fewer items -->
+                      <template v-if="getCategoryAlternatives(tag.categoryId).length <= 13">
                         <button
-                          v-for="option in getCategoryAlternatives(tag.categoryId).slice((pageNum - 1) * 12, pageNum * 12)"
+                          v-for="option in getCategoryAlternatives(tag.categoryId)"
                           :key="option.id"
                           class="dropdown-option"
                           tabindex="0"
@@ -129,27 +113,59 @@
                         >
                           {{ option.tagName }}
                         </button>
+                      </template>
+                      
+                      <!-- Pagination for categories with more than 13 items -->
+                      <template v-else>
+                        <!-- CSS-only pagination with radio buttons for proper multi-page support -->
+                        <input 
+                          v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
+                          :key="pageNum"
+                          type="radio" 
+                          :name="`page-${tag.id}`" 
+                          :id="`page${pageNum}-${tag.id}`" 
+                          class="page-radio" 
+                          :checked="pageNum === 1"
+                        />
                         
-                        <!-- Next page button (if not the last page) -->
-                        <label
-                          v-if="pageNum < Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
-                          :for="`page${pageNum + 1}-${tag.id}`"
-                          class="dropdown-ellipses dropdown-pagination"
-                          tabindex="0"
+                        <!-- Generate pages dynamically -->
+                        <div 
+                          v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
+                          :key="pageNum"
+                          :class="`page-content page-${pageNum}`"
                         >
-                          ...{{ getCategoryAlternatives(tag.categoryId).length - (pageNum * 12) }} more
-                        </label>
-                        
-                        <!-- Restart button (only on the last page) -->
-                        <label
-                          v-if="pageNum === Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
-                          :for="`page1-${tag.id}`"
-                          class="dropdown-ellipses dropdown-pagination restart-button"
-                          tabindex="0"
-                        >
-                          ...restart
-                        </label>
-                      </div>
+                          <!-- Show 12 items for this page -->
+                          <button
+                            v-for="option in getCategoryAlternatives(tag.categoryId).slice((pageNum - 1) * 12, pageNum * 12)"
+                            :key="option.id"
+                            class="dropdown-option"
+                            tabindex="0"
+                            @click="selectFromDropdown(tag, option.tagName)"
+                          >
+                            {{ option.tagName }}
+                          </button>
+                          
+                          <!-- Next page button (if not the last page) -->
+                          <label
+                            v-if="pageNum < Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
+                            :for="`page${pageNum + 1}-${tag.id}`"
+                            class="dropdown-ellipses dropdown-pagination"
+                            tabindex="0"
+                          >
+                            ...{{ getCategoryAlternatives(tag.categoryId).length - (pageNum * 12) }} more
+                          </label>
+                          
+                          <!-- Restart button (only on the last page) -->
+                          <label
+                            v-if="pageNum === Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
+                            :for="`page1-${tag.id}`"
+                            class="dropdown-ellipses dropdown-pagination restart-button"
+                            tabindex="0"
+                          >
+                            ...restart
+                          </label>
+                        </div>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -498,7 +514,12 @@ const mockCategories = ref([
       { id: 'd5', tagName: 'Statement', source: 'ai', description: 'Financial statement' },
       { id: 'd6', tagName: 'Memo', source: 'human', description: 'Internal note' },
       { id: 'd7', tagName: 'Proposal', source: 'human', description: 'Business proposal' },
-      { id: 'd8', tagName: 'Quote', source: 'ai', description: 'Price quotation' }
+      { id: 'd8', tagName: 'Quote', source: 'ai', description: 'Price quotation' },
+      { id: 'd9', tagName: 'Purchase Order', source: 'human', description: 'Order document' },
+      { id: 'd10', tagName: 'Bill of Lading', source: 'ai', description: 'Shipping document' },
+      { id: 'd11', tagName: 'Tax Document', source: 'human', description: 'Tax-related paperwork' },
+      { id: 'd12', tagName: 'Insurance Policy', source: 'ai', description: 'Insurance coverage document' },
+      { id: 'd13', tagName: 'Warranty', source: 'human', description: 'Product warranty document' }
     ]
   },
   {
