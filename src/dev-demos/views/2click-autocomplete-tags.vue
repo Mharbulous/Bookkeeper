@@ -45,7 +45,8 @@
                     <li>Click "March" tag → Type "April" → Press Enter or click elsewhere</li>
                   </ol>
                   <v-alert color="success" variant="tonal" class="mt-3">
-                    <strong>Benefits:</strong> Single interaction, contextual options, space efficient
+                    <strong>Benefits:</strong> Single interaction, contextual options, space
+                    efficient
                   </v-alert>
                 </v-card-text>
               </v-card>
@@ -62,8 +63,9 @@
         </v-card-title>
         <v-card-text>
           <v-alert color="info" variant="tonal" class="mb-4">
-            <strong>Instructions:</strong> Hover to see pencil icon. Single-click opens dropdown menu. Double-click opens text editor with autocomplete. 
-            Press Enter to confirm, Escape to cancel.
+            <strong>Instructions:</strong> Hover to see pencil icon. Single-click opens dropdown
+            menu. Double-click opens text editor with autocomplete. Press Enter to confirm, Escape
+            to cancel.
           </v-alert>
 
           <!-- Demo File with Tags -->
@@ -74,7 +76,7 @@
               <v-spacer />
               <v-chip size="small" color="primary" variant="outlined">Demo File</v-chip>
             </div>
-            
+
             <div class="tags-container">
               <!-- Render seamlessly editable tags -->
               <div
@@ -94,10 +96,13 @@
                     <span class="tag-text">{{ tag.tagName }}</span>
                   </button>
                 </div>
-                
+
                 <!-- Simple dropdown overlay -->
                 <div class="dropdown-overlay">
-                  <div class="dropdown-expanded" :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }">
+                  <div
+                    class="dropdown-expanded"
+                    :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
+                  >
                     <div class="dropdown-header-section">
                       <i class="tag-icon mdi mdi-tag"></i>
                       <span class="tag-text">{{ tag.tagName }}</span>
@@ -115,29 +120,36 @@
                           {{ option.tagName }}
                         </button>
                       </template>
-                      
+
                       <!-- Pagination for categories with more than 13 items -->
                       <template v-else>
                         <!-- CSS-only pagination with radio buttons for proper multi-page support -->
-                        <input 
-                          v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
+                        <input
+                          v-for="pageNum in Math.ceil(
+                            getCategoryAlternatives(tag.categoryId).length / 12
+                          )"
                           :key="pageNum"
-                          type="radio" 
-                          :name="`page-${tag.id}`" 
-                          :id="`page${pageNum}-${tag.id}`" 
-                          class="page-radio" 
+                          type="radio"
+                          :name="`page-${tag.id}`"
+                          :id="`page${pageNum}-${tag.id}`"
+                          class="page-radio"
                           :checked="pageNum === 1"
                         />
-                        
+
                         <!-- Generate pages dynamically -->
-                        <div 
-                          v-for="pageNum in Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)" 
+                        <div
+                          v-for="pageNum in Math.ceil(
+                            getCategoryAlternatives(tag.categoryId).length / 12
+                          )"
                           :key="pageNum"
                           :class="`page-content page-${pageNum}`"
                         >
                           <!-- Show 12 items for this page -->
                           <button
-                            v-for="option in getCategoryAlternatives(tag.categoryId).slice((pageNum - 1) * 12, pageNum * 12)"
+                            v-for="option in getCategoryAlternatives(tag.categoryId).slice(
+                              (pageNum - 1) * 12,
+                              pageNum * 12
+                            )"
                             :key="option.id"
                             class="dropdown-option"
                             tabindex="0"
@@ -145,20 +157,29 @@
                           >
                             {{ option.tagName }}
                           </button>
-                          
+
                           <!-- Next page button (if not the last page) -->
                           <label
-                            v-if="pageNum < Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
+                            v-if="
+                              pageNum <
+                              Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)
+                            "
                             :for="`page${pageNum + 1}-${tag.id}`"
                             class="dropdown-ellipses dropdown-pagination"
                             tabindex="0"
                           >
-                            ...{{ getCategoryAlternatives(tag.categoryId).length - (pageNum * 12) }} more
+                            ...{{
+                              getCategoryAlternatives(tag.categoryId).length - pageNum * 12
+                            }}
+                            more
                           </label>
-                          
+
                           <!-- Restart button (only on the last page) -->
                           <label
-                            v-if="pageNum === Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)"
+                            v-if="
+                              pageNum ===
+                              Math.ceil(getCategoryAlternatives(tag.categoryId).length / 12)
+                            "
                             :for="`page1-${tag.id}`"
                             class="dropdown-ellipses dropdown-pagination restart-button"
                             tabindex="0"
@@ -170,7 +191,7 @@
                     </div>
                   </div>
                 </div>
-                
+
                 <!-- Edit mode overlay -->
                 <div v-if="tag.isEditing" class="edit-overlay">
                   <i class="mdi mdi-pencil edit-mode-icon"></i>
@@ -193,9 +214,8 @@
                     />
                   </datalist>
                 </div>
-                
               </div>
-              
+
               <!-- Add new tag demo -->
               <v-btn
                 variant="outlined"
@@ -213,8 +233,8 @@
             <div v-if="performanceStats.lastEditTime" class="mt-3">
               <v-divider class="my-2" />
               <div class="text-caption text-medium-emphasis">
-                Last edit took {{ performanceStats.lastEditTime }}ms 
-                (Target: &lt;100ms for edit mode entry, &lt;50ms for autocomplete)
+                Last edit took {{ performanceStats.lastEditTime }}ms (Target: &lt;100ms for edit
+                mode entry, &lt;50ms for autocomplete)
                 <span v-if="performanceStats.lastEditTime < 100" class="text-success">✓ PASS</span>
                 <span v-else class="text-warning">⚠ SLOW</span>
               </div>
@@ -231,7 +251,8 @@
         </v-card-title>
         <v-card-text>
           <v-alert color="info" variant="tonal" class="mb-4">
-            <strong>Open Categories:</strong> Users and AI can add new options. Includes "Add new..." option.<br>
+            <strong>Open Categories:</strong> Users and AI can add new options. Includes "Add new"
+            option.<br />
             <strong>Locked Categories:</strong> Fixed set of options, no new additions allowed.
           </v-alert>
 
@@ -249,7 +270,7 @@
                     <v-icon icon="mdi-file-document" size="16" class="me-2" />
                     <strong class="text-body-2">client-proposal.pdf</strong>
                   </div>
-                  
+
                   <div class="tags-container mb-3">
                     <!-- Open category tag with extensible options -->
                     <div
@@ -268,19 +289,22 @@
                           <span class="tag-text">{{ tag.tagName }}</span>
                         </button>
                       </div>
-                      
-                      <!-- Open category dropdown with "Add new..." option -->
+
+                      <!-- Open category dropdown with "Add new" option -->
                       <div class="dropdown-overlay">
-                        <div class="dropdown-expanded" :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }">
+                        <div
+                          class="dropdown-expanded"
+                          :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
+                        >
                           <div class="dropdown-header-section">
                             <i class="tag-icon mdi mdi-tag"></i>
                             <span class="tag-text">{{ tag.tagName }}</span>
-                            <v-spacer />
-                            <v-icon color="green" size="12">mdi-lock-open-variant</v-icon>
                           </div>
                           <div class="dropdown-menu">
                             <!-- Simple display for categories with 13 or fewer items -->
-                            <template v-if="getOpenCategoryAlternatives(tag.categoryId).length <= 13">
+                            <template
+                              v-if="getOpenCategoryAlternatives(tag.categoryId).length <= 13"
+                            >
                               <button
                                 v-for="option in getOpenCategoryAlternatives(tag.categoryId)"
                                 :key="option.id"
@@ -297,32 +321,38 @@
                                 @click="showAddNewOption(tag)"
                               >
                                 <v-icon size="12" class="me-1">mdi-plus</v-icon>
-                                Add new...
+                                Add new
                               </button>
                             </template>
-                            
+
                             <!-- Pagination for categories with more than 13 items -->
                             <template v-else>
                               <!-- CSS-only pagination with radio buttons for proper multi-page support -->
-                              <input 
-                                v-for="pageNum in Math.ceil(getOpenCategoryAlternatives(tag.categoryId).length / 12)" 
+                              <input
+                                v-for="pageNum in Math.ceil(
+                                  getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                )"
                                 :key="pageNum"
-                                type="radio" 
-                                :name="`open-page-${tag.id}`" 
-                                :id="`open-page${pageNum}-${tag.id}`" 
-                                class="page-radio" 
+                                type="radio"
+                                :name="`open-page-${tag.id}`"
+                                :id="`open-page${pageNum}-${tag.id}`"
+                                class="page-radio"
                                 :checked="pageNum === 1"
                               />
-                              
+
                               <!-- Generate pages dynamically -->
-                              <div 
-                                v-for="pageNum in Math.ceil(getOpenCategoryAlternatives(tag.categoryId).length / 12)" 
+                              <div
+                                v-for="pageNum in Math.ceil(
+                                  getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                )"
                                 :key="pageNum"
                                 :class="`page-content page-${pageNum}`"
                               >
                                 <!-- Show 12 items for this page -->
                                 <button
-                                  v-for="option in getOpenCategoryAlternatives(tag.categoryId).slice((pageNum - 1) * 12, pageNum * 12)"
+                                  v-for="option in getOpenCategoryAlternatives(
+                                    tag.categoryId
+                                  ).slice((pageNum - 1) * 12, pageNum * 12)"
                                   :key="option.id"
                                   class="dropdown-option"
                                   tabindex="0"
@@ -330,7 +360,7 @@
                                 >
                                   {{ option.tagName }}
                                 </button>
-                                
+
                                 <!-- Add new option on every page for open categories -->
                                 <button
                                   class="dropdown-option add-new-option"
@@ -338,22 +368,36 @@
                                   @click="showAddNewOption(tag)"
                                 >
                                   <v-icon size="12" class="me-1">mdi-plus</v-icon>
-                                  Add new...
+                                  Add new
                                 </button>
-                                
+
                                 <!-- Next page button (if not the last page) -->
                                 <label
-                                  v-if="pageNum < Math.ceil(getOpenCategoryAlternatives(tag.categoryId).length / 12)"
+                                  v-if="
+                                    pageNum <
+                                    Math.ceil(
+                                      getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                    )
+                                  "
                                   :for="`open-page${pageNum + 1}-${tag.id}`"
                                   class="dropdown-ellipses dropdown-pagination"
                                   tabindex="0"
                                 >
-                                  ...{{ getOpenCategoryAlternatives(tag.categoryId).length - (pageNum * 12) }} more
+                                  ...{{
+                                    getOpenCategoryAlternatives(tag.categoryId).length -
+                                    pageNum * 12
+                                  }}
+                                  more
                                 </label>
-                                
+
                                 <!-- Restart button (only on the last page) -->
                                 <label
-                                  v-if="pageNum === Math.ceil(getOpenCategoryAlternatives(tag.categoryId).length / 12)"
+                                  v-if="
+                                    pageNum ===
+                                    Math.ceil(
+                                      getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                    )
+                                  "
                                   :for="`open-page1-${tag.id}`"
                                   class="dropdown-ellipses dropdown-pagination restart-button"
                                   tabindex="0"
@@ -365,7 +409,7 @@
                           </div>
                         </div>
                       </div>
-                      
+
                       <!-- Edit mode overlay -->
                       <div v-if="tag.isEditing" class="edit-overlay">
                         <i class="mdi mdi-pencil edit-mode-icon"></i>
@@ -389,15 +433,16 @@
                       </div>
                     </div>
                   </div>
-                  
+
                   <v-alert color="success" variant="tonal" density="compact">
                     <v-icon size="14">mdi-information</v-icon>
-                    Users and AI can add custom tags like "Custom Time Period", "Custom Priority", etc.
+                    Users and AI can add custom tags like "Custom Time Period", "Custom Priority",
+                    etc.
                   </v-alert>
                 </v-card-text>
               </v-card>
             </v-col>
-            
+
             <!-- Locked Category Example -->
             <v-col cols="12" md="6">
               <v-card variant="outlined" class="h-100">
@@ -411,7 +456,7 @@
                     <v-icon icon="mdi-file-document" size="16" class="me-2" />
                     <strong class="text-body-2">quarterly-report.pdf</strong>
                   </div>
-                  
+
                   <div class="tags-container mb-3">
                     <!-- Locked category tag with fixed options -->
                     <div
@@ -430,19 +475,22 @@
                           <span class="tag-text">{{ tag.tagName }}</span>
                         </button>
                       </div>
-                      
-                      <!-- Locked category dropdown without "Add new..." option -->
+
+                      <!-- Locked category dropdown without "Add new" option -->
                       <div class="dropdown-overlay">
-                        <div class="dropdown-expanded" :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }">
+                        <div
+                          class="dropdown-expanded"
+                          :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
+                        >
                           <div class="dropdown-header-section">
                             <i class="tag-icon mdi mdi-tag"></i>
                             <span class="tag-text">{{ tag.tagName }}</span>
-                            <v-spacer />
-                            <v-icon color="orange" size="12">mdi-lock</v-icon>
                           </div>
                           <div class="dropdown-menu">
                             <!-- Simple display for categories with 13 or fewer items -->
-                            <template v-if="getLockedCategoryAlternatives(tag.categoryId).length <= 13">
+                            <template
+                              v-if="getLockedCategoryAlternatives(tag.categoryId).length <= 13"
+                            >
                               <button
                                 v-for="option in getLockedCategoryAlternatives(tag.categoryId)"
                                 :key="option.id"
@@ -453,29 +501,35 @@
                                 {{ option.tagName }}
                               </button>
                             </template>
-                            
+
                             <!-- Pagination for categories with more than 13 items -->
                             <template v-else>
                               <!-- CSS-only pagination with radio buttons for proper multi-page support -->
-                              <input 
-                                v-for="pageNum in Math.ceil(getLockedCategoryAlternatives(tag.categoryId).length / 12)" 
+                              <input
+                                v-for="pageNum in Math.ceil(
+                                  getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                )"
                                 :key="pageNum"
-                                type="radio" 
-                                :name="`locked-page-${tag.id}`" 
-                                :id="`locked-page${pageNum}-${tag.id}`" 
-                                class="page-radio" 
+                                type="radio"
+                                :name="`locked-page-${tag.id}`"
+                                :id="`locked-page${pageNum}-${tag.id}`"
+                                class="page-radio"
                                 :checked="pageNum === 1"
                               />
-                              
+
                               <!-- Generate pages dynamically -->
-                              <div 
-                                v-for="pageNum in Math.ceil(getLockedCategoryAlternatives(tag.categoryId).length / 12)" 
+                              <div
+                                v-for="pageNum in Math.ceil(
+                                  getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                )"
                                 :key="pageNum"
                                 :class="`page-content page-${pageNum}`"
                               >
                                 <!-- Show 12 items for this page -->
                                 <button
-                                  v-for="option in getLockedCategoryAlternatives(tag.categoryId).slice((pageNum - 1) * 12, pageNum * 12)"
+                                  v-for="option in getLockedCategoryAlternatives(
+                                    tag.categoryId
+                                  ).slice((pageNum - 1) * 12, pageNum * 12)"
                                   :key="option.id"
                                   class="dropdown-option"
                                   tabindex="0"
@@ -483,20 +537,34 @@
                                 >
                                   {{ option.tagName }}
                                 </button>
-                                
+
                                 <!-- Next page button (if not the last page) -->
                                 <label
-                                  v-if="pageNum < Math.ceil(getLockedCategoryAlternatives(tag.categoryId).length / 12)"
+                                  v-if="
+                                    pageNum <
+                                    Math.ceil(
+                                      getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                    )
+                                  "
                                   :for="`locked-page${pageNum + 1}-${tag.id}`"
                                   class="dropdown-ellipses dropdown-pagination"
                                   tabindex="0"
                                 >
-                                  ...{{ getLockedCategoryAlternatives(tag.categoryId).length - (pageNum * 12) }} more
+                                  ...{{
+                                    getLockedCategoryAlternatives(tag.categoryId).length -
+                                    pageNum * 12
+                                  }}
+                                  more
                                 </label>
-                                
+
                                 <!-- Restart button (only on the last page) -->
                                 <label
-                                  v-if="pageNum === Math.ceil(getLockedCategoryAlternatives(tag.categoryId).length / 12)"
+                                  v-if="
+                                    pageNum ===
+                                    Math.ceil(
+                                      getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                    )
+                                  "
                                   :for="`locked-page1-${tag.id}`"
                                   class="dropdown-ellipses dropdown-pagination restart-button"
                                   tabindex="0"
@@ -505,11 +573,11 @@
                                 </label>
                               </div>
                             </template>
-                            <!-- No "Add new..." option for locked categories -->
+                            <!-- No "Add new" option for locked categories -->
                           </div>
                         </div>
                       </div>
-                      
+
                       <!-- Edit mode overlay -->
                       <div v-if="tag.isEditing" class="edit-overlay">
                         <i class="mdi mdi-pencil edit-mode-icon"></i>
@@ -533,7 +601,7 @@
                       </div>
                     </div>
                   </div>
-                  
+
                   <v-alert color="warning" variant="tonal" density="compact">
                     <v-icon size="14">mdi-information</v-icon>
                     Fixed options only - Document Types and Years are administratively controlled
@@ -553,15 +621,17 @@
         </v-card-title>
         <v-card-text>
           <v-alert color="info" variant="tonal" class="mb-4">
-            Test how autocomplete filters to show only tags within the same category.
-            Each category has different tag options.
+            Test how autocomplete filters to show only tags within the same category. Each category
+            has different tag options.
           </v-alert>
 
           <v-row>
             <v-col
               v-for="(category, index) in mockCategories"
               :key="category.id"
-              cols="12" md="6" lg="4"
+              cols="12"
+              md="6"
+              lg="4"
             >
               <v-card variant="outlined" class="h-100">
                 <v-card-subtitle>
@@ -605,8 +675,8 @@
         </v-card-title>
         <v-card-text>
           <v-alert color="info" variant="tonal" class="mb-4">
-            <strong>Test Scenario:</strong> Complete tag editing using only keyboard input.
-            No mouse clicks required after the initial double-click.
+            <strong>Test Scenario:</strong> Complete tag editing using only keyboard input. No mouse
+            clicks required after the initial double-click.
           </v-alert>
 
           <v-stepper :model-value="keyboardDemoStep" class="mb-4">
@@ -636,7 +706,11 @@
               </v-tooltip>
             </v-chip>
 
-            <div v-if="keyboardDemoActive" class="mt-3 pa-3" style="border: 2px dashed #ccc; border-radius: 4px;">
+            <div
+              v-if="keyboardDemoActive"
+              class="mt-3 pa-3"
+              style="border: 2px dashed #ccc; border-radius: 4px"
+            >
               <div class="text-body-2 mb-2">
                 <strong>Instructions:</strong> {{ keyboardInstructions }}
               </div>
@@ -656,20 +730,17 @@
         </v-card-title>
         <v-card-text>
           <div class="d-flex gap-2 mb-4">
-            <v-btn @click="runPerformanceTest" color="primary">
-              Run Performance Test
-            </v-btn>
-            <v-btn @click="runStressTest" color="warning">
-              Stress Test (1000 tags)
-            </v-btn>
-            <v-btn @click="clearPerformanceTests" color="secondary">
-              Clear Results
-            </v-btn>
+            <v-btn @click="runPerformanceTest" color="primary"> Run Performance Test </v-btn>
+            <v-btn @click="runStressTest" color="warning"> Stress Test (1000 tags) </v-btn>
+            <v-btn @click="clearPerformanceTests" color="secondary"> Clear Results </v-btn>
           </div>
 
           <v-row v-if="performanceResults">
             <v-col cols="12" md="4">
-              <v-card variant="tonal" :color="getPerformanceColor(performanceResults.editModeTime, 100)">
+              <v-card
+                variant="tonal"
+                :color="getPerformanceColor(performanceResults.editModeTime, 100)"
+              >
                 <v-card-text>
                   <div class="text-h6">{{ performanceResults.editModeTime }}ms</div>
                   <div class="text-subtitle-2">Edit Mode Entry</div>
@@ -678,7 +749,10 @@
               </v-card>
             </v-col>
             <v-col cols="12" md="4">
-              <v-card variant="tonal" :color="getPerformanceColor(performanceResults.autocompleteTime, 50)">
+              <v-card
+                variant="tonal"
+                :color="getPerformanceColor(performanceResults.autocompleteTime, 50)"
+              >
                 <v-card-text>
                   <div class="text-h6">{{ performanceResults.autocompleteTime }}ms</div>
                   <div class="text-subtitle-2">Autocomplete Filter</div>
@@ -687,7 +761,10 @@
               </v-card>
             </v-col>
             <v-col cols="12" md="4">
-              <v-card variant="tonal" :color="getPerformanceColor(performanceResults.confirmTime, 200)">
+              <v-card
+                variant="tonal"
+                :color="getPerformanceColor(performanceResults.confirmTime, 200)"
+              >
                 <v-card-text>
                   <div class="text-h6">{{ performanceResults.confirmTime }}ms</div>
                   <div class="text-subtitle-2">Confirm & Update</div>
@@ -704,7 +781,11 @@
             class="mt-4"
           >
             <strong>Overall Performance:</strong>
-            {{ performanceResults.allPassed ? 'All benchmarks passed ✓' : 'Some benchmarks need optimization ⚠' }}
+            {{
+              performanceResults.allPassed
+                ? 'All benchmarks passed ✓'
+                : 'Some benchmarks need optimization ⚠'
+            }}
           </v-alert>
         </v-card-text>
       </v-card>
@@ -752,19 +833,13 @@
             </v-col>
             <v-col cols="12" md="6">
               <div v-if="errorDemo.active" class="error-demo-result">
-                <v-alert
-                  :color="errorDemo.type === 'error' ? 'error' : 'warning'"
-                  variant="tonal"
-                >
-                  <strong>{{ errorDemo.title }}</strong><br>
+                <v-alert :color="errorDemo.type === 'error' ? 'error' : 'warning'" variant="tonal">
+                  <strong>{{ errorDemo.title }}</strong
+                  ><br />
                   {{ errorDemo.message }}
                 </v-alert>
-                
-                <v-progress-linear
-                  v-if="errorDemo.loading"
-                  indeterminate
-                  class="mt-2"
-                />
+
+                <v-progress-linear v-if="errorDemo.loading" indeterminate class="mt-2" />
               </div>
             </v-col>
           </v-row>
@@ -783,7 +858,7 @@ import { getAutomaticTagColor } from '@/features/organizer/utils/automaticTagCol
 const performanceStats = ref({
   lastEditTime: 0,
   autocompleteTime: 0,
-  totalOperations: 0
+  totalOperations: 0,
 });
 
 const performanceResults = ref(null);
@@ -791,7 +866,7 @@ const keyboardDemoStep = ref(1);
 const keyboardDemoActive = ref(false);
 const keyboardDemoTag = ref({
   displayValue: 'March',
-  originalValue: 'March'
+  originalValue: 'March',
 });
 
 const errorDemo = ref({
@@ -799,7 +874,7 @@ const errorDemo = ref({
   type: 'info',
   title: '',
   message: '',
-  loading: false
+  loading: false,
 });
 
 // Mock data structures
@@ -823,8 +898,8 @@ const mockCategories = ref([
       { id: 't13', tagName: 'Q1', source: 'ai', description: 'First quarter' },
       { id: 't14', tagName: 'Q2', source: 'ai', description: 'Second quarter' },
       { id: 't15', tagName: 'Q3', source: 'ai', description: 'Third quarter' },
-      { id: 't16', tagName: 'Q4', source: 'ai', description: 'Fourth quarter' }
-    ]
+      { id: 't16', tagName: 'Q4', source: 'ai', description: 'Fourth quarter' },
+    ],
   },
   {
     id: 'document-type',
@@ -841,9 +916,14 @@ const mockCategories = ref([
       { id: 'd9', tagName: 'Purchase Order', source: 'human', description: 'Order document' },
       { id: 'd10', tagName: 'Bill of Lading', source: 'ai', description: 'Shipping document' },
       { id: 'd11', tagName: 'Tax Document', source: 'human', description: 'Tax-related paperwork' },
-      { id: 'd12', tagName: 'Insurance Policy', source: 'ai', description: 'Insurance coverage document' },
-      { id: 'd13', tagName: 'Warranty', source: 'human', description: 'Product warranty document' }
-    ]
+      {
+        id: 'd12',
+        tagName: 'Insurance Policy',
+        source: 'ai',
+        description: 'Insurance coverage document',
+      },
+      { id: 'd13', tagName: 'Warranty', source: 'human', description: 'Product warranty document' },
+    ],
   },
   {
     id: 'priority',
@@ -853,8 +933,8 @@ const mockCategories = ref([
       { id: 'p2', tagName: 'High', source: 'ai', description: 'Important priority' },
       { id: 'p3', tagName: 'Medium', source: 'human', description: 'Standard priority' },
       { id: 'p4', tagName: 'Low', source: 'ai', description: 'Can be delayed' },
-      { id: 'p5', tagName: 'Critical', source: 'human', description: 'Business critical' }
-    ]
+      { id: 'p5', tagName: 'Critical', source: 'human', description: 'Business critical' },
+    ],
   },
   {
     id: 'status',
@@ -865,8 +945,8 @@ const mockCategories = ref([
       { id: 's3', tagName: 'Approved', source: 'human', description: 'Officially approved' },
       { id: 's4', tagName: 'Published', source: 'ai', description: 'Made public' },
       { id: 's5', tagName: 'Archived', source: 'human', description: 'No longer active' },
-      { id: 's6', tagName: 'Pending', source: 'ai', description: 'Awaiting action' }
-    ]
+      { id: 's6', tagName: 'Pending', source: 'ai', description: 'Awaiting action' },
+    ],
   },
   {
     id: 'year',
@@ -875,9 +955,9 @@ const mockCategories = ref([
       id: `y${i + 1}`,
       tagName: (2025 - i).toString(),
       source: i % 3 === 0 ? 'ai' : 'human',
-      description: `Year ${2025 - i}`
-    }))
-  }
+      description: `Year ${2025 - i}`,
+    })),
+  },
 ]);
 
 // Demo file tags (editable)
@@ -890,7 +970,7 @@ const demoFileTags = ref([
     confidence: 92,
     isEditing: false,
     tempValue: '',
-    originalValue: 'March'
+    originalValue: 'March',
   },
   {
     id: 'demo2',
@@ -900,7 +980,7 @@ const demoFileTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: 'Invoice'
+    originalValue: 'Invoice',
   },
   {
     id: 'demo3',
@@ -910,7 +990,7 @@ const demoFileTags = ref([
     confidence: 78,
     isEditing: false,
     tempValue: '',
-    originalValue: 'High'
+    originalValue: 'High',
   },
   {
     id: 'demo4',
@@ -920,8 +1000,8 @@ const demoFileTags = ref([
     confidence: 95,
     isEditing: false,
     tempValue: '',
-    originalValue: '2024'
-  }
+    originalValue: '2024',
+  },
 ]);
 
 // Open category demo tags (all categories as extensible)
@@ -934,7 +1014,7 @@ const openCategoryTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: 'March'
+    originalValue: 'March',
   },
   {
     id: 'open2',
@@ -944,7 +1024,7 @@ const openCategoryTags = ref([
     confidence: 95,
     isEditing: false,
     tempValue: '',
-    originalValue: 'Invoice'
+    originalValue: 'Invoice',
   },
   {
     id: 'open3',
@@ -954,7 +1034,7 @@ const openCategoryTags = ref([
     confidence: 88,
     isEditing: false,
     tempValue: '',
-    originalValue: 'High'
+    originalValue: 'High',
   },
   {
     id: 'open4',
@@ -964,7 +1044,7 @@ const openCategoryTags = ref([
     confidence: 92,
     isEditing: false,
     tempValue: '',
-    originalValue: 'Draft'
+    originalValue: 'Draft',
   },
   {
     id: 'open5',
@@ -974,8 +1054,8 @@ const openCategoryTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: '2024'
-  }
+    originalValue: '2024',
+  },
 ]);
 
 // Locked category demo tags (all categories as fixed sets)
@@ -988,7 +1068,7 @@ const lockedCategoryTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: 'April'
+    originalValue: 'April',
   },
   {
     id: 'locked2',
@@ -998,7 +1078,7 @@ const lockedCategoryTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: 'Receipt'
+    originalValue: 'Receipt',
   },
   {
     id: 'locked3',
@@ -1008,7 +1088,7 @@ const lockedCategoryTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: 'Medium'
+    originalValue: 'Medium',
   },
   {
     id: 'locked4',
@@ -1018,7 +1098,7 @@ const lockedCategoryTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: 'Approved'
+    originalValue: 'Approved',
   },
   {
     id: 'locked5',
@@ -1028,8 +1108,8 @@ const lockedCategoryTags = ref([
     confidence: 100,
     isEditing: false,
     tempValue: '',
-    originalValue: '2023'
-  }
+    originalValue: '2023',
+  },
 ]);
 
 // Computed properties
@@ -1038,37 +1118,37 @@ const keyboardInstructions = computed(() => {
     'Double-click the tag to enter edit mode',
     'Type to filter options (try typing "A" for April)',
     'Use arrow keys ↑↓ to navigate suggestions',
-    'Press Enter to confirm selection'
+    'Press Enter to confirm selection',
   ];
   return instructions[keyboardDemoStep.value - 1] || 'Demo completed!';
 });
 
 // Helper functions
 const getCategoryName = (categoryId) => {
-  const category = mockCategories.value.find(cat => cat.id === categoryId);
+  const category = mockCategories.value.find((cat) => cat.id === categoryId);
   return category ? category.name : 'Unknown';
 };
 
 const getCategoryAlternatives = (categoryId) => {
-  const category = mockCategories.value.find(cat => cat.id === categoryId);
+  const category = mockCategories.value.find((cat) => cat.id === categoryId);
   return category ? category.tags : [];
 };
 
 // Helper functions for open/locked categories
 // Open categories use the same data as mockCategories but allow adding new options
 const getOpenCategoryAlternatives = (categoryId) => {
-  const category = mockCategories.value.find(cat => cat.id === categoryId);
+  const category = mockCategories.value.find((cat) => cat.id === categoryId);
   return category ? category.tags : [];
 };
 
 // Locked categories use the same data as mockCategories but don't allow adding new options
 const getLockedCategoryAlternatives = (categoryId) => {
-  const category = mockCategories.value.find(cat => cat.id === categoryId);
+  const category = mockCategories.value.find((cat) => cat.id === categoryId);
   return category ? category.tags : [];
 };
 
 const getTagColor = (tag) => {
-  const categoryIndex = mockCategories.value.findIndex(cat => cat.id === tag.categoryId);
+  const categoryIndex = mockCategories.value.findIndex((cat) => cat.id === tag.categoryId);
   return getAutomaticTagColor(categoryIndex >= 0 ? categoryIndex : 0);
 };
 
@@ -1081,13 +1161,13 @@ const getPerformanceColor = (actual, target) => {
 // Simple tag interaction functions
 const startEditMode = async (tag) => {
   const startTime = performance.now();
-  
+
   // Store original value for potential cancellation
   tag.originalValue = tag.tagName;
   tag.isEditing = true;
-  
+
   await nextTick();
-  
+
   // Auto-focus the input
   setTimeout(() => {
     const inputs = document.querySelectorAll('.tag-input');
@@ -1096,7 +1176,7 @@ const startEditMode = async (tag) => {
       inputs[inputs.length - 1].select();
     }
   }, 10);
-  
+
   const endTime = performance.now();
   performanceStats.value.lastEditTime = Math.round((endTime - startTime) * 100) / 100;
   console.log(`Edit mode entered in ${performanceStats.value.lastEditTime}ms`);
@@ -1104,13 +1184,13 @@ const startEditMode = async (tag) => {
 
 const selectFromDropdown = (tag, newValue) => {
   const startTime = performance.now();
-  
+
   tag.tagName = newValue;
   console.log(`Tag updated via dropdown: ${tag.originalValue || 'previous'} → ${newValue}`);
-  
+
   // Reset pagination state for this tag to allow dropdown to close properly
   resetPaginationState(tag.id);
-  
+
   const endTime = performance.now();
   console.log(`Dropdown selection completed in ${Math.round((endTime - startTime) * 100) / 100}ms`);
 };
@@ -1119,7 +1199,7 @@ const selectFromDropdown = (tag, newValue) => {
 const resetPaginationState = (tagId) => {
   // Reset all pagination radio buttons for this tag to page 1
   const pageRadios = document.querySelectorAll(`input[name*="${tagId}"]`);
-  pageRadios.forEach(radio => {
+  pageRadios.forEach((radio) => {
     radio.checked = radio.id.includes('page1');
   });
 };
@@ -1132,10 +1212,10 @@ const onTagFocus = (tag) => {
   if (currentFocusedTag.value && currentFocusedTag.value.id !== tag.id) {
     resetPaginationState(currentFocusedTag.value.id);
   }
-  
+
   // Update the currently focused tag
   currentFocusedTag.value = tag;
-  
+
   console.log(`Tag focused: ${tag.tagName}`);
 };
 
@@ -1154,14 +1234,14 @@ const onTagBlur = (tag) => {
 
 const confirmEdit = (tag, event) => {
   const startTime = performance.now();
-  
+
   if (tag.originalValue && tag.tagName !== tag.originalValue) {
     console.log(`Tag updated: ${tag.originalValue} → ${tag.tagName}`);
   }
-  
+
   // Remove focus from input
   event.target.blur();
-  
+
   const endTime = performance.now();
   const confirmTime = Math.round((endTime - startTime) * 100) / 100;
   console.log(`Tag update confirmed in ${confirmTime}ms`);
@@ -1173,10 +1253,10 @@ const cancelEdit = (tag, event) => {
     tag.tagName = tag.originalValue;
     tag.originalValue = '';
   }
-  
+
   // Remove focus from input
   event.target.blur();
-  
+
   console.log('Tag edit cancelled');
 };
 
@@ -1198,7 +1278,7 @@ const showTagInfo = (tag) => {
     name: tag.tagName,
     category: getCategoryName(tag.categoryId),
     source: tag.source,
-    confidence: tag.confidence
+    confidence: tag.confidence,
   });
 };
 
@@ -1206,11 +1286,16 @@ const showTagInfo = (tag) => {
 const demonstrateTagEdit = (categoryId, tagName) => {
   console.log(`Demonstrating edit for ${tagName} in category ${getCategoryName(categoryId)}`);
   const alternatives = getCategoryAlternatives(categoryId);
-  console.log('Available alternatives:', alternatives.map(alt => alt.tagName));
+  console.log(
+    'Available alternatives:',
+    alternatives.map((alt) => alt.tagName)
+  );
 };
 
 const showAddTagDemo = () => {
-  console.log('Add Tag Demo: This would show the traditional category selector for adding new tags');
+  console.log(
+    'Add Tag Demo: This would show the traditional category selector for adding new tags'
+  );
 };
 
 // Open category functions
@@ -1221,21 +1306,21 @@ const showAddNewOption = (tag) => {
   console.log('2. Validate the new tag name');
   console.log('3. Add it to the category options');
   console.log('4. Update the current tag to the new value');
-  
+
   // Demo: simulate adding a new option to the mockCategories
   const categoryId = tag.categoryId;
-  const category = mockCategories.value.find(cat => cat.id === categoryId);
+  const category = mockCategories.value.find((cat) => cat.id === categoryId);
   if (category) {
     const newTagName = `Custom ${category.name} ${category.tags.length + 1}`;
     const newId = `custom-${Date.now()}`;
-    
+
     category.tags.push({
       id: newId,
       tagName: newTagName,
       source: 'human',
-      description: 'User-created custom tag'
+      description: 'User-created custom tag',
     });
-    
+
     // Update the current tag to the new value
     tag.tagName = newTagName;
     console.log(`✓ Added "${newTagName}" to ${category.name} category`);
@@ -1253,53 +1338,53 @@ const startKeyboardDemo = () => {
 // Performance testing functions
 const runPerformanceTest = async () => {
   console.log('Running performance benchmark...');
-  
+
   // Test 1: Edit mode entry time
   const editStart = performance.now();
   await simulateEditModeEntry();
   const editEnd = performance.now();
   const editModeTime = Math.round((editEnd - editStart) * 100) / 100;
-  
+
   // Test 2: Autocomplete filtering time
   const autocompleteStart = performance.now();
   await simulateAutocompleteFilter();
   const autocompleteEnd = performance.now();
   const autocompleteTime = Math.round((autocompleteEnd - autocompleteStart) * 100) / 100;
-  
+
   // Test 3: Confirm and update time
   const confirmStart = performance.now();
   await simulateConfirmUpdate();
   const confirmEnd = performance.now();
   const confirmTime = Math.round((confirmEnd - confirmStart) * 100) / 100;
-  
+
   performanceResults.value = {
     editModeTime,
     autocompleteTime,
     confirmTime,
-    allPassed: editModeTime < 100 && autocompleteTime < 50 && confirmTime < 200
+    allPassed: editModeTime < 100 && autocompleteTime < 50 && confirmTime < 200,
   };
-  
+
   console.log('Performance test completed:', performanceResults.value);
 };
 
 const simulateEditModeEntry = () => {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     // Simulate DOM updates and focus management
     setTimeout(resolve, Math.random() * 50 + 20);
   });
 };
 
 const simulateAutocompleteFilter = () => {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     // Simulate filtering large datasets
     const largeDataset = Array.from({ length: 1000 }, (_, i) => ({ name: `Item ${i}` }));
-    const filtered = largeDataset.filter(item => item.name.includes('5'));
+    const filtered = largeDataset.filter((item) => item.name.includes('5'));
     setTimeout(resolve, Math.random() * 30 + 10);
   });
 };
 
 const simulateConfirmUpdate = () => {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     // Simulate API call and UI update
     setTimeout(resolve, Math.random() * 100 + 50);
   });
@@ -1307,27 +1392,29 @@ const simulateConfirmUpdate = () => {
 
 const runStressTest = async () => {
   console.log('Running stress test with 1000 tags...');
-  
+
   const stressStart = performance.now();
-  
+
   // Simulate rendering 1000 tags
   const largeCategoryData = Array.from({ length: 1000 }, (_, i) => ({
     id: `stress-${i}`,
     tagName: `StressTag${i}`,
-    source: i % 2 === 0 ? 'ai' : 'human'
+    source: i % 2 === 0 ? 'ai' : 'human',
   }));
-  
+
   // Simulate filtering performance
   const filterTests = ['A', 'B', 'C', 'Stress', '1', '5', '9'];
   for (const filter of filterTests) {
     const filterStart = performance.now();
-    const filtered = largeCategoryData.filter(tag => 
+    const filtered = largeCategoryData.filter((tag) =>
       tag.tagName.toLowerCase().includes(filter.toLowerCase())
     );
     const filterEnd = performance.now();
-    console.log(`Filter "${filter}": ${filtered.length} results in ${Math.round((filterEnd - filterStart) * 100) / 100}ms`);
+    console.log(
+      `Filter "${filter}": ${filtered.length} results in ${Math.round((filterEnd - filterStart) * 100) / 100}ms`
+    );
   }
-  
+
   const stressEnd = performance.now();
   console.log(`Stress test completed in ${Math.round((stressEnd - stressStart) * 100) / 100}ms`);
 };
@@ -1337,7 +1424,7 @@ const clearPerformanceTests = () => {
   performanceStats.value = {
     lastEditTime: 0,
     autocompleteTime: 0,
-    totalOperations: 0
+    totalOperations: 0,
   };
   console.log('Performance test results cleared');
 };
@@ -1348,10 +1435,11 @@ const simulateNetworkError = () => {
     active: true,
     type: 'error',
     title: 'Network Error Simulation',
-    message: 'Failed to save tag changes. The system should show an error message and allow retry or rollback.',
-    loading: false
+    message:
+      'Failed to save tag changes. The system should show an error message and allow retry or rollback.',
+    loading: false,
   };
-  
+
   setTimeout(() => {
     errorDemo.value.active = false;
   }, 5000);
@@ -1362,10 +1450,11 @@ const simulateInvalidInput = () => {
     active: true,
     type: 'warning',
     title: 'Invalid Input Handling',
-    message: 'User entered invalid characters or selected non-existent tag. System should validate input and show helpful feedback.',
-    loading: false
+    message:
+      'User entered invalid characters or selected non-existent tag. System should validate input and show helpful feedback.',
+    loading: false,
   };
-  
+
   setTimeout(() => {
     errorDemo.value.active = false;
   }, 5000);
@@ -1376,15 +1465,16 @@ const simulateSlowResponse = () => {
     active: true,
     type: 'info',
     title: 'Slow Response Handling',
-    message: 'Simulating slow network conditions. System should show loading states and prevent duplicate actions.',
-    loading: true
+    message:
+      'Simulating slow network conditions. System should show loading states and prevent duplicate actions.',
+    loading: true,
   };
-  
+
   setTimeout(() => {
     errorDemo.value.loading = false;
     errorDemo.value.message = 'Response completed. Loading state cleared and UI re-enabled.';
   }, 3000);
-  
+
   setTimeout(() => {
     errorDemo.value.active = false;
   }, 6000);
@@ -1416,7 +1506,7 @@ onMounted(() => {
   console.log('Clickable Tag Demo loaded');
   console.log('Mock categories:', mockCategories.value.length);
   console.log('Demo tags:', demoFileTags.value.length);
-  
+
   // Add global click handler
   document.addEventListener('click', handleGlobalClick);
 });
@@ -1456,7 +1546,7 @@ onUnmounted(() => {
 
 .tag-container:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .tag-button {
@@ -1500,17 +1590,17 @@ onUnmounted(() => {
 .v-card:has(.dropdown-pagination:focus),
 .v-card:has(.dropdown-pagination:active),
 .v-card:has(.dropdown-pagination:hover),
-.v-card:has(input[id*="page"]:checked),
-.v-card:has(label[for*="page"]:focus),
-.v-card:has(label[for*="page"]:active),
-.v-card:has(label[for*="page"]:hover),
+.v-card:has(input[id*='page']:checked),
+.v-card:has(label[for*='page']:focus),
+.v-card:has(label[for*='page']:active),
+.v-card:has(label[for*='page']:hover),
 .v-card-text:has(.dropdown-pagination:focus),
 .v-card-text:has(.dropdown-pagination:active),
 .v-card-text:has(.dropdown-pagination:hover),
-.v-card-text:has(input[id*="page"]:checked),
-.v-card-text:has(label[for*="page"]:focus),
-.v-card-text:has(label[for*="page"]:active),
-.v-card-text:has(label[for*="page"]:hover) {
+.v-card-text:has(input[id*='page']:checked),
+.v-card-text:has(label[for*='page']:focus),
+.v-card-text:has(label[for*='page']:active),
+.v-card-text:has(label[for*='page']:hover) {
   z-index: 1000 !important;
   position: relative;
 }
@@ -1529,14 +1619,12 @@ onUnmounted(() => {
   display: block;
 }
 
-
 /* Keep dropdown open when pagination elements are active */
 .clean-tag:has(.dropdown-pagination:focus) .dropdown-overlay,
 .clean-tag:has(.dropdown-pagination:active) .dropdown-overlay,
 .clean-tag:has(.dropdown-pagination:hover) .dropdown-overlay {
   display: block !important;
 }
-
 
 /* Dropdown expanded version */
 .dropdown-overlay .dropdown-expanded {
@@ -1553,7 +1641,7 @@ onUnmounted(() => {
   border: 1px solid;
   border-color: inherit;
   border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   min-width: 100%;
 }
 
@@ -1610,7 +1698,7 @@ onUnmounted(() => {
   margin-bottom: 4px;
 }
 
-/* Special styling for "Add new..." option */
+/* Special styling for "Add new" option */
 .add-new-option {
   border-top: 1px solid #eee;
   margin-top: 4px;
@@ -1646,152 +1734,152 @@ onUnmounted(() => {
 }
 
 /* Dynamic page switching for any page number */
-input[id*="page1"]:checked ~ .page-1 {
+input[id*='page1']:checked ~ .page-1 {
   display: block;
 }
-input[id*="page1"]:checked ~ .page-content:not(.page-1) {
+input[id*='page1']:checked ~ .page-content:not(.page-1) {
   display: none;
 }
 
-input[id*="page2"]:checked ~ .page-2 {
+input[id*='page2']:checked ~ .page-2 {
   display: block;
 }
-input[id*="page2"]:checked ~ .page-content:not(.page-2) {
+input[id*='page2']:checked ~ .page-content:not(.page-2) {
   display: none;
 }
 
-input[id*="page3"]:checked ~ .page-3 {
+input[id*='page3']:checked ~ .page-3 {
   display: block;
 }
-input[id*="page3"]:checked ~ .page-content:not(.page-3) {
+input[id*='page3']:checked ~ .page-content:not(.page-3) {
   display: none;
 }
 
-input[id*="page4"]:checked ~ .page-4 {
+input[id*='page4']:checked ~ .page-4 {
   display: block;
 }
-input[id*="page4"]:checked ~ .page-content:not(.page-4) {
+input[id*='page4']:checked ~ .page-content:not(.page-4) {
   display: none;
 }
 
-input[id*="page5"]:checked ~ .page-5 {
+input[id*='page5']:checked ~ .page-5 {
   display: block;
 }
-input[id*="page5"]:checked ~ .page-content:not(.page-5) {
+input[id*='page5']:checked ~ .page-content:not(.page-5) {
   display: none;
 }
 
-input[id*="page6"]:checked ~ .page-6 {
+input[id*='page6']:checked ~ .page-6 {
   display: block;
 }
-input[id*="page6"]:checked ~ .page-content:not(.page-6) {
+input[id*='page6']:checked ~ .page-content:not(.page-6) {
   display: none;
 }
 
-input[id*="page7"]:checked ~ .page-7 {
+input[id*='page7']:checked ~ .page-7 {
   display: block;
 }
-input[id*="page7"]:checked ~ .page-content:not(.page-7) {
+input[id*='page7']:checked ~ .page-content:not(.page-7) {
   display: none;
 }
 
 /* Locked category pagination rules */
-input[id*="locked-page1"]:checked ~ .page-1 {
+input[id*='locked-page1']:checked ~ .page-1 {
   display: block;
 }
-input[id*="locked-page1"]:checked ~ .page-content:not(.page-1) {
+input[id*='locked-page1']:checked ~ .page-content:not(.page-1) {
   display: none;
 }
 
-input[id*="locked-page2"]:checked ~ .page-2 {
+input[id*='locked-page2']:checked ~ .page-2 {
   display: block;
 }
-input[id*="locked-page2"]:checked ~ .page-content:not(.page-2) {
+input[id*='locked-page2']:checked ~ .page-content:not(.page-2) {
   display: none;
 }
 
-input[id*="locked-page3"]:checked ~ .page-3 {
+input[id*='locked-page3']:checked ~ .page-3 {
   display: block;
 }
-input[id*="locked-page3"]:checked ~ .page-content:not(.page-3) {
+input[id*='locked-page3']:checked ~ .page-content:not(.page-3) {
   display: none;
 }
 
-input[id*="locked-page4"]:checked ~ .page-4 {
+input[id*='locked-page4']:checked ~ .page-4 {
   display: block;
 }
-input[id*="locked-page4"]:checked ~ .page-content:not(.page-4) {
+input[id*='locked-page4']:checked ~ .page-content:not(.page-4) {
   display: none;
 }
 
-input[id*="locked-page5"]:checked ~ .page-5 {
+input[id*='locked-page5']:checked ~ .page-5 {
   display: block;
 }
-input[id*="locked-page5"]:checked ~ .page-content:not(.page-5) {
+input[id*='locked-page5']:checked ~ .page-content:not(.page-5) {
   display: none;
 }
 
-input[id*="locked-page6"]:checked ~ .page-6 {
+input[id*='locked-page6']:checked ~ .page-6 {
   display: block;
 }
-input[id*="locked-page6"]:checked ~ .page-content:not(.page-6) {
+input[id*='locked-page6']:checked ~ .page-content:not(.page-6) {
   display: none;
 }
 
-input[id*="locked-page7"]:checked ~ .page-7 {
+input[id*='locked-page7']:checked ~ .page-7 {
   display: block;
 }
-input[id*="locked-page7"]:checked ~ .page-content:not(.page-7) {
+input[id*='locked-page7']:checked ~ .page-content:not(.page-7) {
   display: none;
 }
 
 /* Open category pagination rules */
-input[id*="open-page1"]:checked ~ .page-1 {
+input[id*='open-page1']:checked ~ .page-1 {
   display: block;
 }
-input[id*="open-page1"]:checked ~ .page-content:not(.page-1) {
+input[id*='open-page1']:checked ~ .page-content:not(.page-1) {
   display: none;
 }
 
-input[id*="open-page2"]:checked ~ .page-2 {
+input[id*='open-page2']:checked ~ .page-2 {
   display: block;
 }
-input[id*="open-page2"]:checked ~ .page-content:not(.page-2) {
+input[id*='open-page2']:checked ~ .page-content:not(.page-2) {
   display: none;
 }
 
-input[id*="open-page3"]:checked ~ .page-3 {
+input[id*='open-page3']:checked ~ .page-3 {
   display: block;
 }
-input[id*="open-page3"]:checked ~ .page-content:not(.page-3) {
+input[id*='open-page3']:checked ~ .page-content:not(.page-3) {
   display: none;
 }
 
-input[id*="open-page4"]:checked ~ .page-4 {
+input[id*='open-page4']:checked ~ .page-4 {
   display: block;
 }
-input[id*="open-page4"]:checked ~ .page-content:not(.page-4) {
+input[id*='open-page4']:checked ~ .page-content:not(.page-4) {
   display: none;
 }
 
-input[id*="open-page5"]:checked ~ .page-5 {
+input[id*='open-page5']:checked ~ .page-5 {
   display: block;
 }
-input[id*="open-page5"]:checked ~ .page-content:not(.page-5) {
+input[id*='open-page5']:checked ~ .page-content:not(.page-5) {
   display: none;
 }
 
-input[id*="open-page6"]:checked ~ .page-6 {
+input[id*='open-page6']:checked ~ .page-6 {
   display: block;
 }
-input[id*="open-page6"]:checked ~ .page-content:not(.page-6) {
+input[id*='open-page6']:checked ~ .page-content:not(.page-6) {
   display: none;
 }
 
-input[id*="open-page7"]:checked ~ .page-7 {
+input[id*='open-page7']:checked ~ .page-7 {
   display: block;
 }
-input[id*="open-page7"]:checked ~ .page-content:not(.page-7) {
+input[id*='open-page7']:checked ~ .page-content:not(.page-7) {
   display: none;
 }
 
@@ -1843,39 +1931,39 @@ input[id*="open-page7"]:checked ~ .page-content:not(.page-7) {
 }
 
 /* Keep dropdown open during radio button state changes */
-.clean-tag:has(input[type="radio"]:focus) .dropdown-overlay,
-.clean-tag:has(input[type="radio"]:active) .dropdown-overlay {
+.clean-tag:has(input[type='radio']:focus) .dropdown-overlay,
+.clean-tag:has(input[type='radio']:active) .dropdown-overlay {
   display: block !important;
 }
 
 /* CRITICAL: Keep dropdown open when any non-default page is selected */
 /* This catches the transition moment when pagination elements become hidden */
-.clean-tag:has(input[id*="page2"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="page3"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="page4"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="page5"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="page6"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="page7"]:checked) .dropdown-overlay {
+.clean-tag:has(input[id*='page2']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='page3']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='page4']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='page5']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='page6']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='page7']:checked) .dropdown-overlay {
   display: block !important;
 }
 
 /* Support locked category pagination as well */
-.clean-tag:has(input[id*="locked-page2"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="locked-page3"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="locked-page4"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="locked-page5"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="locked-page6"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="locked-page7"]:checked) .dropdown-overlay {
+.clean-tag:has(input[id*='locked-page2']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='locked-page3']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='locked-page4']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='locked-page5']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='locked-page6']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='locked-page7']:checked) .dropdown-overlay {
   display: block !important;
 }
 
 /* Support open category pagination as well */
-.clean-tag:has(input[id*="open-page2"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="open-page3"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="open-page4"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="open-page5"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="open-page6"]:checked) .dropdown-overlay,
-.clean-tag:has(input[id*="open-page7"]:checked) .dropdown-overlay {
+.clean-tag:has(input[id*='open-page2']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='open-page3']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='open-page4']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='open-page5']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='open-page6']:checked) .dropdown-overlay,
+.clean-tag:has(input[id*='open-page7']:checked) .dropdown-overlay {
   display: block !important;
 }
 
