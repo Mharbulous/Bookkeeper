@@ -14,6 +14,17 @@ export const demoRoutes = [
     },
   },
   {
+    path: '/dev/clickable-tags',
+    name: 'ClickableTagsDemo',
+    component: () => import('../views/2click-autocomplete-tags.vue'),
+    meta: {
+      requiresAuth: false,
+      devOnly: true,
+      title: 'Clickable Tag System Demo',
+      description: 'Double-click inline editing with autocomplete functionality for improved UX',
+    },
+  },
+  {
     path: '/dev',
     name: 'DevDemoIndex',
     component: () => import('../views/DemoIndex.vue'),

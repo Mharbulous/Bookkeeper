@@ -115,6 +115,14 @@ const availableDemos = computed(() => [
     tags: ['Performance', 'UI Optimization', 'Lazy Loading', 'Vue 3'],
     status: 'Active',
   },
+  {
+    title: 'Clickable Tag System',
+    description:
+      'Seamless inline editing with hover-to-edit icons and native autocomplete. Test the intuitive UX improvement that reduces tag editing from 3 clicks to 1 click.',
+    route: '/dev/clickable-tags',
+    tags: ['UX Improvement', 'Inline Editing', 'Autocomplete', 'Performance', 'Vue 3'],
+    status: 'Active',
+  },
   // Future demos will be added here
 ]);
 </script>
