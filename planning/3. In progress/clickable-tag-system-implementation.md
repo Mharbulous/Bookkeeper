@@ -49,10 +49,14 @@ Replace the current 3-click tag editing system with **vue-tags-input library** -
 - **Performance**: All categories and tags loaded upfront
 - **Poor UX for simple edits**: Complex workflow for straightforward tag changes
 
-### Current Architecture
-- **TagDisplaySection.vue**: Shows tags as chips with close buttons only
-- **CategoryTagSelector.vue**: Two dropdowns (category + tag) + Add button
-- **TagSelector.vue**: Coordinates between display and selection components
+### Current Architecture (Post-Decomposition)
+- **TagManagementService.vue** (177 lines): Tag data loading, AI operations, lifecycle management
+- **TagOperationsHandler.vue** (152 lines): Tag CRUD operations, validation, business logic  
+- **TagSelector.vue** (178 lines): Component orchestration, prop management, event delegation
+- **TagDisplaySection.vue** (57 lines): Tag display as chips with close buttons
+- **CategoryTagSelector.vue** (162 lines): Category/tag selection dropdowns with Add button
+
+**Note**: TagSelector.vue was decomposed from 354 lines into focused components to support the vue-tags-input integration. Each component now has a single, well-defined responsibility.
 
 ## Proposed Solution
 
@@ -294,54 +298,180 @@ const props = {
 ## Risk Assessment
 
 ### Technical Risks
-- **Low**: Uses existing Vue/Vuetify patterns and current tag services
-- **Medium**: Dropdown positioning edge cases on mobile devices
-- **Low**: Performance impact from lazy loading (likely improvement)
 
-### UX Risks  
-- **Low**: Familiar interaction pattern from other applications
-- **Medium**: User discovery of new functionality
-- **Low**: Fallback to existing system available
+#### Library Dependency Risk (Medium)
+**Risk**: `@sipec/vue3-tags-input` library maintenance or compatibility issues
+**Mitigation Strategy**:
+- **Pre-implementation**: Verify library maintenance status, recent commits, community activity
+- **Contingency**: Prepare fallback to v-chip display if library fails
+- **Testing**: Create automated tests that detect library breaking changes
+- **Alternative**: Evaluate backup library (`vue-tagsinput`) as secondary option
 
-### Mitigation Strategies
-- Comprehensive testing across devices and screen sizes
-- User onboarding tooltips or brief tutorial
-- Feature flag for instant rollback if issues arise
-- Gradual rollout to identify issues early
+#### Mobile Dropdown Positioning (Medium)  
+**Risk**: Autocomplete dropdown positioning issues on small screens/viewport edges
+**Mitigation Strategy**:
+- **Specific Testing**: Test on iOS Safari (notch handling), Android Chrome (keyboard overlay)
+- **Implementation**: Use `teleport` for dropdown rendering outside component tree
+- **Fallback**: Implement modal-style dropdown for mobile viewport widths <768px
+- **Detection**: Add viewport size detection to switch positioning strategies
+
+#### Performance Regression Risk (Low-Medium)
+**Risk**: New library increases bundle size or runtime overhead
+**Mitigation Strategy**:
+- **Baseline Measurement**: Record current page load and tag interaction times
+- **Bundle Analysis**: Measure library impact on build size (target: <50KB added)
+- **Performance Budget**: Set hard limits (e.g., tag edit response time <100ms)
+- **Monitoring**: Add performance tracking to detect regressions in production
+
+### UX Risks
+
+#### Feature Discovery Risk (Medium)
+**Risk**: Users don't discover double-click functionality, continue using old workflow
+**Mitigation Strategy**:
+- **Visual Affordance**: Add subtle hover state showing "Double-click to edit" tooltip
+- **Onboarding**: Implement first-time user guide highlighting new functionality
+- **Analytics**: Track usage patterns to identify users still using old workflow
+- **Progressive Enhancement**: Maintain old workflow as backup option during transition
+
+#### Interaction Conflict Risk (Medium)
+**Risk**: Double-click conflicts with other interactions (selection, copy/paste)
+**Mitigation Strategy**:
+- **Alternative Triggers**: Implement right-click context menu as secondary access method
+- **Gesture Detection**: Prevent text selection during double-click edit trigger
+- **User Testing**: Test with power users who might have established interaction patterns
+- **Escape Hatch**: Provide preference toggle to disable inline editing if needed
+
+### Business Continuity Risks
+
+#### Rollback Complexity (Low)
+**Risk**: Inability to quickly revert if critical issues arise
+**Mitigation Strategy**:
+- **Feature Toggle**: Implement `ENABLE_INLINE_TAG_EDITING` environment variable
+- **Component Isolation**: Keep old TagDisplaySection as `TagDisplaySection_Legacy.vue`
+- **Database Compatibility**: No data model changes required, seamless rollback
+- **Rollback SOP**: Document exact steps for immediate reversion (estimated <30 minutes)
+
+### Mitigation Timeline
+- **Pre-implementation**: Library evaluation, baseline measurements (Phase 0)
+- **During development**: Cross-device testing, performance monitoring (Phases 1-3)  
+- **Pre-deployment**: User acceptance testing, rollback procedure verification (Phase 4)
+- **Post-deployment**: Usage analytics monitoring, performance tracking (ongoing)
 
 ## Testing Strategy
 
 ### Unit Tests
-- ClickableTag component rendering and interactions
-- Alternative loading and caching logic
-- Tag change event handling
-- Error states and loading states
+**EditableTag Component Testing**:
+- **Rendering Tests**: Verify tags display correctly in both view and edit modes
+- **Double-click Interaction**: Test transition from display → edit mode with text selection
+- **Autocomplete Behavior**: Verify filtering accuracy (e.g., "J" filters to "January, June, July")
+- **Keyboard Navigation**: Test arrow keys, Enter/Escape functionality with specific key sequences
+- **Data Transformation**: Test conversion between internal tag format and vue-tags-input format
+- **Error State Handling**: Test behavior with network failures, invalid inputs, missing categories
+
+**Tag Service Integration**:
+- **API Call Verification**: Mock tag update/replace operations with success/failure scenarios
+- **Data Persistence**: Verify tag changes persist correctly with proper metadata preservation
+- **Event Emission**: Test all component events emit with correct payloads
 
 ### Integration Tests
-- TagDisplaySection with ClickableTag integration  
-- Tag service operations (replace, remove)
-- Event propagation through component hierarchy
-- Responsive behavior across screen sizes
+**Component Hierarchy Testing**:
+- **TagDisplaySection Integration**: Test EditableTag component replaces chip display correctly
+- **Event Propagation**: Verify tag change events bubble up through TagOperationsHandler → TagSelector
+- **Loading State Coordination**: Test loading states during category data fetching
+- **Error Boundary Testing**: Verify graceful degradation if vue-tags-input fails to load
 
-### User Testing
-- Task completion time comparison (old vs new system)
-- User satisfaction and ease of use metrics
-- Error rate and confusion points
-- Mobile device usability testing
+**Cross-Device Testing**:
+- **Mobile Responsiveness**: Test dropdown positioning on iOS Safari, Android Chrome
+- **Touch Interactions**: Verify double-tap vs scroll gesture conflicts resolved
+- **Viewport Edge Cases**: Test autocomplete dropdown positioning at screen edges
+
+### Accessibility Tests
+**Screen Reader Compatibility**:
+- **ARIA Label Testing**: Verify proper ARIA labels for edit mode transitions
+- **Keyboard Navigation**: Test complete workflows using only keyboard input
+- **Focus Management**: Ensure logical focus flow during edit mode entry/exit
+
+### Performance Tests
+**Baseline Measurements**:
+- **Task Completion Time**: Establish baseline for current 3-click workflow (target: <10 seconds)
+- **Component Load Time**: Measure EditableTag render time (target: <100ms)
+- **Autocomplete Response**: Test filtering speed with large category sets (target: <50ms)
+
+### User Acceptance Tests
+**Specific Test Scenarios**:
+- **Scenario 1**: Change "March" tag to "April" - target completion in <3 seconds
+- **Scenario 2**: Use keyboard only to edit tag and select alternative - target success rate >90%
+- **Scenario 3**: Edit tag on mobile device - target no positioning issues
+- **Scenario 4**: Cancel tag edit with Escape key - verify no unintended changes
 
 ## Success Metrics
 
-### Quantitative
-- **Interaction reduction**: 3 clicks → 1 click for tag changes
-- **Time savings**: Measure task completion time improvement
-- **Error reduction**: Fewer failed tag operations
-- **Performance**: Faster initial page load due to lazy loading
+### Functional Testing Criteria (Human Verification)
 
-### Qualitative  
-- **User satisfaction**: Improved ease of use ratings
-- **Discoverability**: Users naturally discover tag editing capability
-- **Efficiency**: Users report faster document organization workflow
-- **Adoption**: High usage of new tag editing vs old system
+#### Core Functionality
+- **Double-click to edit**: User can double-click any tag to enter edit mode
+- **Text selection on edit**: When entering edit mode, existing tag text is selected/highlighted for overwrite
+- **Autocomplete display**: Typing in edit mode shows filtered dropdown with category alternatives
+- **Keyboard navigation**: Arrow keys navigate dropdown options, Enter selects, Escape cancels
+- **Tag replacement**: Selected alternative replaces original tag and persists after page refresh
+- **Tag deletion**: User can remove tags using provided removal mechanism
+- **Cancel behavior**: Escape key or click outside cancels edit without changes
+
+#### Cross-Device Compatibility
+- **Desktop browsers**: Functionality works in Chrome, Firefox, Safari, Edge
+- **Mobile devices**: Touch interactions work on iOS Safari and Android Chrome
+- **Responsive layout**: Component displays properly at mobile viewport widths
+- **Dropdown positioning**: Autocomplete dropdown positions correctly at viewport edges
+
+#### Integration Verification  
+- **Component replacement**: EditableTag replaces existing chip display without breaking layout
+- **Event propagation**: Tag changes trigger appropriate parent component updates
+- **Data persistence**: Tag metadata (source, confidence, status) preserved through edits
+- **Service integration**: Tag changes call existing tag service APIs correctly
+
+### Automated Testing Criteria (Vitest Verification)
+
+#### Component Rendering
+- **Initial render**: EditableTag component renders with provided tag data
+- **Edit mode transition**: Component switches between display and edit modes
+- **Autocomplete integration**: vue-tags-input library loads and integrates correctly
+- **Event emission**: Component emits expected events with correct payloads
+
+#### Data Handling
+- **Format transformation**: Internal tag format converts to/from library format correctly  
+- **Category filtering**: Autocomplete shows only tags from same category
+- **Metadata preservation**: All original tag fields maintained through edit operations
+- **Error handling**: Component handles network failures and invalid inputs gracefully
+
+#### Performance Requirements
+- **Component render time**: EditableTag renders in <200ms (measurable via performance API)
+- **Bundle size impact**: Added library increases bundle by <100KB (measurable via build analysis)
+- **Memory leaks**: No memory growth during repeated edit operations (measurable via heap snapshots)
+- **DOM performance**: No excessive DOM manipulations during autocomplete filtering
+
+#### Integration Testing
+- **Parent component communication**: Proper event bubbling through component hierarchy
+- **Tag service operations**: Mocked API calls execute with correct parameters
+- **Loading state coordination**: Loading states display appropriately during operations
+- **Error boundary behavior**: Graceful fallback if library fails to load
+
+### Acceptance Testing Checklist
+
+#### Pre-deployment Verification
+- [ ] All Vitest unit tests pass
+- [ ] All integration tests pass  
+- [ ] Manual functional testing completed on desktop
+- [ ] Manual functional testing completed on mobile
+- [ ] Performance benchmarks within targets
+- [ ] No console errors during normal operation
+
+#### Post-deployment Verification  
+- [ ] EditableTag component displays correctly in production
+- [ ] Double-click editing works across different tag types
+- [ ] Autocomplete suggestions load and filter correctly
+- [ ] Tag changes persist correctly in database
+- [ ] No JavaScript errors in production console
+- [ ] Component performs within established benchmarks
 
 ## Future Enhancements
 

@@ -1,36 +1,54 @@
 <template>
   <div class="tag-selector">
+    <!-- Tag Management Service (handles data loading and AI operations) -->
+    <TagManagementService
+      ref="tagManagementService"
+      :evidence="evidence"
+      @tags-loaded="handleTagsLoaded"
+      @approve-ai-tag="(tagId) => emit('approve-ai-tag', tagId)"
+      @reject-ai-tag="(tagId) => emit('reject-ai-tag', tagId)"
+      @bulk-approve-ai-tags="(tagIds) => emit('bulk-approve-ai-tags', tagIds)"
+      @bulk-reject-ai-tags="(tagIds) => emit('bulk-reject-ai-tags', tagIds)"
+    />
+
+    <!-- Tag Operations Handler (handles CRUD operations) -->
+    <TagOperationsHandler
+      ref="tagOperationsHandler"
+      :evidence="evidence"
+      :approved-tags="approvedTags"
+      @tags-updated="emit('tags-updated')"
+      @reload-tags="reloadTags"
+    />
+
     <!-- Display existing structured tags as colored chips -->
     <TagDisplaySection
       :structured-tags="structuredTags"
       :disabled="disabled"
-      :loading="loading"
+      :loading="loading || loadingTags"
       @remove-tag="removeStructuredTag"
     />
-
 
     <!-- Category-based tag assignment -->
     <CategoryTagSelector
       ref="categoryTagSelector"
       :categories="categories"
       :disabled="disabled"
-      :loading="loading"
+      :loading="loading || loadingTags"
       @add-tag="addSelectedTag"
       @category-change="onCategoryChange"
       @tag-change="onTagChange"
     />
-
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
-import { useAuthStore } from '../../../core/stores/auth.js';
-import tagSubcollectionService from '../services/tagSubcollectionService.js';
 import TagDisplaySection from './TagDisplaySection.vue';
 import CategoryTagSelector from './CategoryTagSelector.vue';
+import TagManagementService from './TagManagementService.vue';
+import TagOperationsHandler from './TagOperationsHandler.vue';
 
 const props = defineProps({
   evidence: {
@@ -58,34 +76,22 @@ const emit = defineEmits([
 
 // Stores
 const organizerStore = useOrganizerStore();
-const authStore = useAuthStore();
 const { categories } = storeToRefs(organizerStore);
 
-// Services
-const tagService = tagSubcollectionService;
+// Component refs
+const tagManagementService = ref(null);
+const tagOperationsHandler = ref(null);
+const categoryTagSelector = ref(null);
 
-// Local state
-const hideMigrationPrompt = ref(false);
+// Local state from child components
 const pendingTags = ref([]);
 const approvedTags = ref([]);
 const rejectedTags = ref([]);
 const loadingTags = ref(false);
-const unsubscribeTags = ref(null);
-const categoryTagSelector = ref(null);
 
 // Computed properties
 const structuredTags = computed(() => {
-  // Combine approved tags (including auto-approved AI tags) with manually added tags
-  const allApprovedTags = approvedTags.value;
-  
-  // If no subcollection tags, fallback to embedded arrays for backward compatibility
-  if (allApprovedTags.length === 0 && pendingTags.value.length === 0) {
-    return [
-      // Legacy embedded tags no longer supported - using subcollection only
-    ];
-  }
-  
-  return allApprovedTags;
+  return tagOperationsHandler.value?.structuredTags || approvedTags.value;
 });
 
 // Computed property for AI pending tags (awaiting review)
@@ -96,244 +102,62 @@ const allAITags = computed(() => {
   return [...pendingTags.value, ...approvedTags.value.filter(tag => tag.source === 'ai'), ...rejectedTags.value];
 });
 
-// Legacy tags no longer supported - using subcollection tags only
-
-// Methods
+// Methods - delegate to child components
 const onCategoryChange = (categoryId) => {
-  // Category change is now handled by child component
-  console.log('Category changed:', categoryId);
+  tagOperationsHandler.value?.onCategoryChange(categoryId);
 };
 
 const onTagChange = (tagId) => {
-  // Tag change is now handled by child component
-  console.log('Tag changed:', tagId);
+  tagOperationsHandler.value?.onTagChange(tagId);
 };
 
 const addSelectedTag = async (selection) => {
-  if (!selection || !selection.category || !selection.tag) return;
-  
-  const { category: selectedCategory, tag: selectedTag } = selection;
-  
-  // Check if tag already exists (exact same tag)
-  const tagExists = structuredTags.value.some(tag => 
-    tag.metadata?.categoryId === selectedCategory.id && tag.tagName === selectedTag.name
-  );
-  
-  if (tagExists) {
-    console.warn('Tag already exists:', selectedTag.name);
-    return;
-  }
-  
-  try {
-    // Remove existing tags from same category (mutual exclusivity) first
-    const existingTagsInCategory = structuredTags.value.filter(tag => 
-      tag.metadata?.categoryId === selectedCategory.id
-    );
-    
-    for (const existingTag of existingTagsInCategory) {
-      if (existingTag.id) {
-        const teamId = authStore.currentTeam;
-      if (teamId) {
-        await tagService.deleteTag(props.evidence.id, existingTag.id, teamId);
-      }
-      }
-    }
-    
-    // Create new structured tag data (using NEW data structure from migration plan)
-    const newTagData = {
-      categoryId: selectedCategory.id,
-      categoryName: selectedCategory.name,
-      tagName: selectedTag.name,
-      // Removed color field - use category color as single source of truth
-      source: 'human',
-      confidence: 100, // Human tags have 100% confidence (percentage format to match AI tags)
-      status: 'approved', // Manual tags are immediately approved
-      autoApproved: false, // Manual tags are not auto-approved by AI
-      reviewRequired: false, // Human tags don't need review
-      createdBy: authStore.user?.uid || 'unknown-user',
-      metadata: {
-        userNote: 'Manual tag selection',
-        manuallyApplied: true,
-        selectedFromOptions: [selectedTag.name] // Could be expanded to show other options
-      }
-    };
-    
-    // Add tag using subcollection service (auto-approved since it's manual)
-    const teamId = authStore.currentTeam;
-    if (!teamId) {
-      console.error('No team ID available for tag operations');
-      return;
-    }
-    await tagService.addTag(props.evidence.id, newTagData, teamId);
-    
-    // Reload tags to update UI immediately
-    await loadSubcollectionTags();
-    
-    emit('tags-updated');
-    
-    // Reset selections in child component
-    if (categoryTagSelector.value) {
-      categoryTagSelector.value.clearSelections();
-    }
-    
-  } catch (error) {
-    console.error('Failed to add structured tag:', error);
+  await tagOperationsHandler.value?.addSelectedTag(selection);
+  // Reset selections in child component
+  if (categoryTagSelector.value) {
+    categoryTagSelector.value.clearSelections();
   }
 };
 
 const removeStructuredTag = async (tagToRemove) => {
-  try {
-    // Use subcollection service to remove tag
-    if (tagToRemove.id) {
-      // Tag has subcollection ID - use subcollection service
-      const teamId = authStore.currentTeam;
-      if (!teamId) {
-        console.error('No team ID available for tag operations');
-        return;
-      }
-      await tagService.deleteTag(props.evidence.id, tagToRemove.id, teamId);
-    } else {
-      // Fallback to embedded array method for backward compatibility
-      const freshEvidence = organizerStore.stores.core.getEvidenceById(props.evidence.id);
-      if (!freshEvidence) {
-        throw new Error('Evidence not found in store');
-      }
-      
-      // Legacy embedded tag updates no longer supported - using subcollection only
-      console.warn('Legacy embedded tag removal attempted - use subcollection service instead');
-    }
-    
-    // Small delay to ensure Firestore operation is committed before reloading
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Reload tags to update UI immediately
-    await loadSubcollectionTags();
-    
-    emit('tags-updated');
-    
-  } catch (error) {
-    console.error('Failed to remove structured tag:', error);
-  }
+  await tagOperationsHandler.value?.removeStructuredTag(tagToRemove);
 };
 
-// New methods for handling AI tag approvals
+// Handle tags loaded from management service
+const handleTagsLoaded = (tagsData) => {
+  pendingTags.value = tagsData.pending;
+  approvedTags.value = tagsData.approved;
+  rejectedTags.value = tagsData.rejected;
+  loadingTags.value = tagsData.loading;
+};
+
+// Reload tags from management service
+const reloadTags = async () => {
+  await tagManagementService.value?.loadSubcollectionTags();
+};
+
+// AI tag operations - delegate to management service
 const approveAITag = async (tagId) => {
-  try {
-    const teamId = authStore.currentTeam;
-    if (!teamId) {
-      console.error('No team ID available for tag operations');
-      return;
-    }
-    await tagService.approveTag(props.evidence.id, tagId, teamId);
-    await loadSubcollectionTags(); // Reload to update state
-    emit('tags-updated');
-    emit('approve-ai-tag', tagId);
-  } catch (error) {
-    console.error('Failed to approve AI tag:', error);
-  }
+  await tagManagementService.value?.approveAITag(tagId);
+  emit('tags-updated');
 };
 
 const rejectAITag = async (tagId) => {
-  try {
-    const teamId = authStore.currentTeam;
-    if (!teamId) {
-      console.error('No team ID available for tag operations');
-      return;
-    }
-    await tagService.rejectTag(props.evidence.id, tagId, teamId);
-    await loadSubcollectionTags(); // Reload to update state
-    emit('tags-updated');
-    emit('reject-ai-tag', tagId);
-  } catch (error) {
-    console.error('Failed to reject AI tag:', error);
-  }
+  await tagManagementService.value?.rejectAITag(tagId);
+  emit('tags-updated');
 };
 
 const bulkApproveAITags = async (tagIds) => {
-  try {
-    const teamId = authStore.currentTeam;
-    if (!teamId) {
-      console.error('No team ID available for tag operations');
-      return;
-    }
-    await tagService.approveTagsBatch(props.evidence.id, tagIds, teamId);
-    await loadSubcollectionTags(); // Reload to update state
-    emit('tags-updated');
-    emit('bulk-approve-ai-tags', tagIds);
-  } catch (error) {
-    console.error('Failed to bulk approve AI tags:', error);
-  }
+  await tagManagementService.value?.bulkApproveAITags(tagIds);
+  emit('tags-updated');
 };
 
 const bulkRejectAITags = async (tagIds) => {
-  try {
-    const teamId = authStore.currentTeam;
-    if (!teamId) {
-      console.error('No team ID available for tag operations');
-      return;
-    }
-    await tagService.rejectTagsBatch(props.evidence.id, tagIds, teamId);
-    await loadSubcollectionTags(); // Reload to update state
-    emit('tags-updated');
-    emit('bulk-reject-ai-tags', tagIds);
-  } catch (error) {
-    console.error('Failed to bulk reject AI tags:', error);
-  }
+  await tagManagementService.value?.bulkRejectAITags(tagIds);
+  emit('tags-updated');
 };
 
-// Legacy tag removal no longer supported
-// Lifecycle hooks
-onMounted(async () => {
-  await loadSubcollectionTags();
-});
-
-onUnmounted(() => {
-  if (unsubscribeTags.value) {
-    unsubscribeTags.value();
-    unsubscribeTags.value = null;
-  }
-});
-
-// Watch for evidence changes to reload tags
-watch(() => props.evidence.id, async () => {
-  if (unsubscribeTags.value) {
-    unsubscribeTags.value();
-    unsubscribeTags.value = null;
-  }
-  await loadSubcollectionTags();
-});
-
-/**
- * Load tags from subcollection grouped by status
- */
-const loadSubcollectionTags = async () => {
-  if (!props.evidence.id) return;
-  
-  try {
-    loadingTags.value = true;
-    
-    // Load tags grouped by status
-    const teamId = authStore.currentTeam;
-    if (!teamId) {
-      console.error('[TagSelector] No team ID available');
-      return;
-    }
-    
-    const tagsByStatus = await tagService.getTagsByStatus(props.evidence.id, teamId);
-    
-    pendingTags.value = tagsByStatus.pending || [];
-    approvedTags.value = tagsByStatus.approved || [];
-    rejectedTags.value = tagsByStatus.rejected || [];
-    
-    loadingTags.value = false;
-    
-  } catch (error) {
-    console.error('Failed to load subcollection tags:', error);
-    loadingTags.value = false;
-    // Don't clear existing tags on error - keep the current state
-    // This prevents the UI from temporarily showing no tags
-  }
-};
+// Lifecycle and data management is handled by TagManagementService
 
 // Expose methods for parent component access
 defineExpose({
@@ -343,7 +167,7 @@ defineExpose({
   bulkRejectAITags,
   aiPendingTags,
   allAITags,
-  loadSubcollectionTags
+  loadSubcollectionTags: reloadTags
 });
 
 </script>
