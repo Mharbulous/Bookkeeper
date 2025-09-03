@@ -841,10 +841,17 @@ const getFilteredOptions = (categoryId, filterText, isOpen = false) => {
 };
 
 const handleTagClick = (tag) => {
+  // Check if already in editing mode before making changes
+  const wasAlreadyEditing = tag.isHeaderEditing;
+  
   // Open dropdown and enter edit mode in one action
   tag.isOpen = true;
   tag.isHeaderEditing = true;
-  tag.hasStartedTyping = false;
+  
+  // Only reset hasStartedTyping on initial click, not during editing (prevents spacebar resets)
+  if (!wasAlreadyEditing) {
+    tag.hasStartedTyping = false;
+  }
   
   // Update focused tag for pagination management
   if (currentFocusedTag.value && currentFocusedTag.value.id !== tag.id) {
@@ -945,9 +952,12 @@ const handleTypeToFilter = (event, tag, isOpen = false) => {
   tag.isFiltering = capitalizedText.length > 0;
   
   // Mark that user has started typing (for cursor positioning)
+  // Once user starts typing, keep cursor on right - NEVER reset to false during typing
   if (isOpen && capitalizedText.length > 0) {
     tag.hasStartedTyping = true;
+    console.log(`Set hasStartedTyping=true for text: "${capitalizedText}" (length: ${capitalizedText.length})`);
   }
+  // Note: We never reset hasStartedTyping to false here - only in explicit reset functions
   
   if (isOpen) {
     tag.customInputValue = capitalizedText;
@@ -1348,7 +1358,6 @@ onUnmounted(() => {
 /* Expanded state - becomes pill header */
 .smart-tag.expanded .tag-button {
   border-radius: 12px 12px 0 0;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   padding: 6px 10px;
   background: white;
   border: 1px solid;
@@ -1360,16 +1369,17 @@ onUnmounted(() => {
 /* Dropdown options container */
 .dropdown-options {
   position: absolute;
-  top: 100%;
+  top: calc(100% - 5px);
   left: 0;
   right: 0;
   background: white;
   border: 1px solid;
   border-color: inherit;
-  border-top: none;
+  border-top: 1px solid;
   border-radius: 0 0 12px 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   z-index: 1000;
+  padding-top: 5px;
 }
 
 .tag-icon {
