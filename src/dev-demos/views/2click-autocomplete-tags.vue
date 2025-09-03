@@ -56,6 +56,9 @@
                         @click="handleTagClick(tag)"
                         @keydown="handleTypeToFilter($event, tag, true)"
                         @blur="handleTagBlur($event, tag)"
+                        :class="{ 
+                          'no-options': tag.isOpen && getFilteredOptions(tag.categoryId, tag.filterText, true).length === 0 
+                        }"
                         :tabindex="0"
                       >
                         <i class="tag-icon mdi mdi-tag"></i>
@@ -71,7 +74,10 @@
                       </button>
                       
                       <!-- Options appear below expanded button -->
-                      <div class="dropdown-options" v-show="tag.isOpen">
+                      <div 
+                        class="dropdown-options" 
+                        v-show="tag.isOpen && getFilteredOptions(tag.categoryId, tag.filterText, true).length > 0"
+                      >
                         <div class="dropdown-menu">
                             <!-- Simple display for categories with 13 or fewer items -->
                             <template
@@ -189,126 +195,17 @@
                   </div>
 
                   <div class="tags-container mb-3">
-                    <!-- Locked category tag with fixed options -->
-                    <div
+                    <!-- Locked category tags using reusable EditableTag component -->
+                    <EditableTag
                       v-for="tag in lockedCategoryTags"
                       :key="tag.id"
-                      class="clean-tag ma-1"
-                      :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
-                    >
-                      <div class="tag-container">
-                        <button
-                          class="tag-button"
-                                                    @focus="onTagFocus(tag)"
-                        >
-                          <i class="tag-icon mdi mdi-tag"></i>
-                          <span class="tag-text">{{ tag.tagName }}</span>
-                        </button>
-                      </div>
-
-                      <!-- Locked category dropdown -->
-                      <div class="dropdown-overlay" @keydown="handleTypeToFilter($event, tag, false)" tabindex="0">
-                        <div
-                          class="dropdown-expanded"
-                          :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
-                        >
-                          <div class="dropdown-header-section">
-                            <i class="tag-icon mdi mdi-tag"></i>
-                            <span class="tag-text">{{ tag.tagName }}</span>
-                          </div>
-                          <div class="dropdown-menu">
-                            <!-- Simple display for categories with 13 or fewer items -->
-                            <template
-                              v-if="getFilteredOptions(tag.categoryId, tag.filterText, false).length <= 13"
-                            >
-                              <button
-                                v-for="(option, index) in getFilteredOptions(tag.categoryId, tag.filterText, false)"
-                                :key="option.id"
-                                :class="['dropdown-option', { 'highlighted': index === tag.highlightedIndex }]"
-                                tabindex="0"
-                                @click="selectFromDropdown(tag, option.tagName)"
-                              >
-                                {{ option.tagName }}
-                              </button>
-                            </template>
-
-                            <!-- Pagination for categories with more than 13 items -->
-                            <template v-else>
-                              <!-- CSS-only pagination with radio buttons for proper multi-page support -->
-                              <input
-                                v-for="pageNum in Math.ceil(
-                                  getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
-                                )"
-                                :key="pageNum"
-                                type="radio"
-                                :name="`locked-page-${tag.id}`"
-                                :id="`locked-page${pageNum}-${tag.id}`"
-                                class="page-radio"
-                                :checked="pageNum === 1"
-                              />
-
-                              <!-- Generate pages dynamically -->
-                              <div
-                                v-for="pageNum in Math.ceil(
-                                  getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
-                                )"
-                                :key="pageNum"
-                                :class="`page-content page-${pageNum}`"
-                              >
-                                <!-- Show 12 items for this page -->
-                                <button
-                                  v-for="(option, index) in getFilteredOptions(
-                                    tag.categoryId, tag.filterText, false
-                                  ).slice((pageNum - 1) * 12, pageNum * 12)"
-                                  :key="option.id"
-                                  :class="['dropdown-option', { 'highlighted': (pageNum - 1) * 12 + index === tag.highlightedIndex }]"
-                                  tabindex="0"
-                                  @click="selectFromDropdown(tag, option.tagName)"
-                                >
-                                  {{ option.tagName }}
-                                </button>
-
-                                <!-- Next page button (if not the last page) -->
-                                <label
-                                  v-if="
-                                    pageNum <
-                                    Math.ceil(
-                                      getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
-                                    )
-                                  "
-                                  :for="`locked-page${pageNum + 1}-${tag.id}`"
-                                  class="dropdown-ellipses dropdown-pagination"
-                                  tabindex="0"
-                                >
-                                  ...{{
-                                    getFilteredOptions(tag.categoryId, tag.filterText, false).length -
-                                    pageNum * 12
-                                  }}
-                                  more
-                                </label>
-
-                                <!-- Restart button (only on the last page) -->
-                                <label
-                                  v-if="
-                                    pageNum ===
-                                    Math.ceil(
-                                      getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
-                                    )
-                                  "
-                                  :for="`locked-page1-${tag.id}`"
-                                  class="dropdown-ellipses dropdown-pagination restart-button"
-                                  tabindex="0"
-                                >
-                                  ...restart
-                                </label>
-                              </div>
-                            </template>
-                            <!-- No "Add new" option for locked categories -->
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
+                      :tag="tag"
+                      :categoryOptions="getLockedCategoryAlternatives(tag.categoryId)"
+                      :allowCustomInput="false"
+                      :tagColor="getTagColor(tag)"
+                      @tag-updated="handleLockedTagUpdate"
+                      @tag-selected="handleLockedTagSelected"
+                    />
                   </div>
 
                   <v-alert color="warning" variant="tonal" density="compact">
@@ -507,6 +404,7 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import DemoContainer from '../components/DemoContainer.vue';
+import EditableTag from '@/components/features/tags/EditableTag.vue';
 import { getAutomaticTagColor } from '@/features/organizer/utils/automaticTagColors.js';
 
 // Demo state management
@@ -747,8 +645,13 @@ const lockedCategoryTags = ref([
     source: 'system',
     confidence: 100,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'locked2',
@@ -757,8 +660,13 @@ const lockedCategoryTags = ref([
     source: 'system',
     confidence: 100,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'locked3',
@@ -767,8 +675,13 @@ const lockedCategoryTags = ref([
     source: 'system',
     confidence: 100,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'locked4',
@@ -777,8 +690,13 @@ const lockedCategoryTags = ref([
     source: 'system',
     confidence: 100,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'locked5',
@@ -787,8 +705,13 @@ const lockedCategoryTags = ref([
     source: 'system',
     confidence: 100,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
 ]);
 
@@ -974,6 +897,10 @@ const handleTypeToFilter = (event, tag, isOpen = false) => {
   }
   
   console.log(`Filtering ${getCategoryName(tag.categoryId)} with: "${capitalizedText}"`);
+  
+  // Debug: Check filtered options count
+  const debugFilteredCount = getFilteredOptions(tag.categoryId, capitalizedText, true).length;
+  console.log(`Filtered options count: ${debugFilteredCount}, should hide line: ${debugFilteredCount === 0}`);
 };
 
 const handleEnterKey = (tag, isOpen) => {
@@ -1266,6 +1193,18 @@ const trackAutocompletePerformance = () => {
   }, 0);
 };
 
+// Event handlers for locked tags using EditableTag component
+const handleLockedTagUpdate = (updatedTag) => {
+  console.log(`Locked tag updated:`, updatedTag);
+  // For locked tags, we don't allow custom creation, so this mainly handles tag selection
+};
+
+const handleLockedTagSelected = ({ oldValue, newValue, tag }) => {
+  console.log(`Locked tag selected: ${oldValue} → ${newValue}`);
+  // The tag object is already updated by the composable
+  // Could trigger any additional side effects here
+};
+
 // Global click handler to close open dropdowns and reset pagination
 const handleGlobalClick = (event) => {
   // Check if click is outside any smart-tag container
@@ -1337,7 +1276,7 @@ onUnmounted(() => {
   transition: all 0.2s ease-in-out;
   display: inline-block;
   position: relative;
-  z-index: 1001;
+  z-index: 2001;
 }
 
 /* Compact state hover */
@@ -1382,8 +1321,20 @@ onUnmounted(() => {
   border-top: 1px solid;
   border-radius: 0 0 12px 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
+  z-index: 2000;
   padding-top: 5px;
+}
+
+/* Hide horizontal dividing line when no options exist */
+.dropdown-options.no-options {
+  border-top: none;
+}
+
+/* Also hide pill header bottom border when no options */
+.smart-tag.expanded .tag-button.no-options {
+  border-bottom: 1px solid;
+  border-color: inherit;
+  border-radius: 12px;
 }
 
 .tag-icon {
