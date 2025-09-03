@@ -1317,7 +1317,7 @@ onUnmounted(() => {
 .tag-button {
   border: 1px solid;
   border-color: inherit;
-  border-radius: 16px;
+  border-radius: 12px;
   background-color: transparent;
   transition: all 0.2s ease-in-out;
   display: inline-block;
@@ -1351,6 +1351,8 @@ onUnmounted(() => {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   padding: 6px 10px;
   background: white;
+  border: 1px solid;
+  border-color: inherit;
   border-bottom: none;
   transform: none;
 }
@@ -1368,7 +1370,6 @@ onUnmounted(() => {
   border-radius: 0 0 12px 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
   z-index: 1000;
-  min-width: 200px;
 }
 
 .tag-icon {
