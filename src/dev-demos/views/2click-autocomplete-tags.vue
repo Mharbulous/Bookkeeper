@@ -668,6 +668,7 @@ const openCategoryTags = ref([
     source: 'human',
     confidence: 100,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
     customInputValue: '',
@@ -682,6 +683,7 @@ const openCategoryTags = ref([
     source: 'ai',
     confidence: 95,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
     customInputValue: '',
@@ -696,6 +698,7 @@ const openCategoryTags = ref([
     source: 'human',
     confidence: 88,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
     customInputValue: '',
@@ -710,6 +713,7 @@ const openCategoryTags = ref([
     source: 'ai',
     confidence: 92,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
     customInputValue: '',
@@ -724,6 +728,7 @@ const openCategoryTags = ref([
     source: 'human',
     confidence: 100,
     filterText: '',
+    filterTextRaw: '',
     highlightedIndex: -1,
     isFiltering: false,
     customInputValue: '',
@@ -799,6 +804,11 @@ const keyboardInstructions = computed(() => {
 });
 
 // Helper functions
+const capitalizeFirstLetter = (str) => {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 const getCategoryName = (categoryId) => {
   const category = mockCategories.value.find((cat) => cat.id === categoryId);
   return category ? category.name : 'Unknown';
@@ -860,6 +870,7 @@ const handleTagBlur = (event, tag) => {
     if (!focusStillInTag && !focusInDropdownOption && !focusInPagination) {
       // Discard any typed text and revert to original value
       tag.filterText = '';
+      tag.filterTextRaw = '';
       tag.isFiltering = false;
       tag.hasStartedTyping = false;
       tag.isHeaderEditing = false;
@@ -896,6 +907,7 @@ const handleTypeToFilter = (event, tag, isOpen = false) => {
   if (event.key === 'Escape') {
     // Discard typed text and revert to original value
     tag.filterText = '';
+    tag.filterTextRaw = '';
     tag.isFiltering = false;
     tag.hasStartedTyping = false;
     tag.isHeaderEditing = false;
@@ -926,25 +938,27 @@ const handleTypeToFilter = (event, tag, isOpen = false) => {
     newFilterText += event.key;
   }
   
-  // Update filter state
-  tag.filterText = newFilterText;
-  tag.isFiltering = newFilterText.length > 0;
+  // Update filter state with capitalization
+  const capitalizedText = capitalizeFirstLetter(newFilterText);
+  tag.filterText = capitalizedText;  // Display capitalized version
+  tag.filterTextRaw = newFilterText;  // Store original for filtering
+  tag.isFiltering = capitalizedText.length > 0;
   
   // Mark that user has started typing (for cursor positioning)
-  if (isOpen && newFilterText.length > 0) {
+  if (isOpen && capitalizedText.length > 0) {
     tag.hasStartedTyping = true;
   }
   
   if (isOpen) {
-    tag.customInputValue = newFilterText;
+    tag.customInputValue = capitalizedText;
     tag.highlightedIndex = -1; // No auto-highlight for open categories
   } else {
-    // For locked categories, highlight first match
+    // For locked categories, highlight first match (use original text for filtering)
     const filteredOptions = getFilteredOptions(tag.categoryId, newFilterText, false);
     tag.highlightedIndex = filteredOptions.length > 0 ? 0 : -1;
   }
   
-  console.log(`Filtering ${getCategoryName(tag.categoryId)} with: "${newFilterText}"`);
+  console.log(`Filtering ${getCategoryName(tag.categoryId)} with: "${capitalizedText}"`);
 };
 
 const handleEnterKey = (tag, isOpen) => {
@@ -996,6 +1010,7 @@ const handleArrowNavigation = (event, tag, isOpen) => {
 
 const resetFilterState = (tag) => {
   tag.filterText = '';
+  tag.filterTextRaw = '';
   tag.isFiltering = false;
   tag.highlightedIndex = -1;
   tag.customInputValue = '';
@@ -1248,6 +1263,7 @@ const handleGlobalClick = (event) => {
       if (!smartTagElement || !smartTagElement.contains(event.target)) {
         // Discard typed text and close dropdown
         tag.filterText = '';
+        tag.filterTextRaw = '';
         tag.isFiltering = false;
         tag.hasStartedTyping = false;
         tag.isHeaderEditing = false;
