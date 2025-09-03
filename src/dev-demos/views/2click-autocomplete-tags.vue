@@ -863,10 +863,13 @@ const handleTagClick = (tag) => {
 };
 
 const handleTagBlur = (event, tag) => {
+  // Capture event data before timeout (event becomes stale inside setTimeout)
+  const relatedTarget = event.relatedTarget;
+  const currentTarget = event.currentTarget;
+  
   // Add a small delay to allow clicks on dropdown options to register
   setTimeout(() => {
-    const relatedTarget = event.relatedTarget;
-    const smartTagContainer = event.currentTarget.closest('.smart-tag');
+    const smartTagContainer = currentTarget ? currentTarget.closest('.smart-tag') : null;
     
     // Check if focus is still within the smart-tag container or dropdown elements
     const focusStillInTag = relatedTarget && smartTagContainer && smartTagContainer.contains(relatedTarget);
@@ -952,12 +955,14 @@ const handleTypeToFilter = (event, tag, isOpen = false) => {
   tag.isFiltering = capitalizedText.length > 0;
   
   // Mark that user has started typing (for cursor positioning)
-  // Once user starts typing, keep cursor on right - NEVER reset to false during typing
   if (isOpen && capitalizedText.length > 0) {
     tag.hasStartedTyping = true;
     console.log(`Set hasStartedTyping=true for text: "${capitalizedText}" (length: ${capitalizedText.length})`);
+  } else if (isOpen && capitalizedText.length === 0) {
+    // Reset to left cursor when user has deleted all content
+    tag.hasStartedTyping = false;
+    console.log(`Reset hasStartedTyping=false - user deleted all content`);
   }
-  // Note: We never reset hasStartedTyping to false here - only in explicit reset functions
   
   if (isOpen) {
     tag.customInputValue = capitalizedText;
@@ -1352,7 +1357,6 @@ onUnmounted(() => {
   cursor: pointer;
   width: 100%;
   outline: none;
-  border: none;
 }
 
 /* Expanded state - becomes pill header */
