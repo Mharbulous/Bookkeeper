@@ -18,8 +18,7 @@
         </v-card-title>
         <v-card-text>
           <v-alert color="info" variant="tonal" class="mb-4">
-            <strong>Open Categories:</strong> Users and AI can add new options. Includes "Add new"
-            option.<br />
+            <strong>Open Categories:</strong> Users and AI can edit tags with inline editing while maintaining tag appearance.<br />
             <strong>Locked Categories:</strong> Fixed set of options, no new additions allowed.
           </v-alert>
 
@@ -43,52 +42,49 @@
                     <div
                       v-for="tag in openCategoryTags"
                       :key="tag.id"
-                      class="clean-tag ma-1"
+                      :data-tag-id="tag.id"
+                      class="smart-tag ma-1"
+                      :class="{ 
+                        'expanded': tag.isOpen, 
+                        'editing': tag.isHeaderEditing 
+                      }"
                       :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
                     >
-                      <div class="tag-container">
-                        <button
-                          class="tag-button"
-                          @dblclick="startEditMode(tag)"
-                          @focus="onTagFocus(tag)"
+                      <!-- Single transforming button -->
+                      <button
+                        class="tag-button"
+                        @click="handleTagClick(tag)"
+                        @keydown="handleTypeToFilter($event, tag, true)"
+                        @blur="handleTagBlur($event, tag)"
+                        :tabindex="0"
+                      >
+                        <i class="tag-icon mdi mdi-tag"></i>
+                        <span 
+                          class="tag-text"
+                          :class="{ 
+                            'cursor-left': tag.isHeaderEditing && !tag.hasStartedTyping,
+                            'cursor-right': tag.isHeaderEditing && tag.hasStartedTyping 
+                          }"
                         >
-                          <i class="tag-icon mdi mdi-tag"></i>
-                          <span class="tag-text">{{ tag.tagName }}</span>
-                        </button>
-                      </div>
-
-                      <!-- Open category dropdown with "Add new" option -->
-                      <div class="dropdown-overlay">
-                        <div
-                          class="dropdown-expanded"
-                          :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
-                        >
-                          <div class="dropdown-header-section">
-                            <i class="tag-icon mdi mdi-tag"></i>
-                            <span class="tag-text">{{ tag.tagName }}</span>
-                          </div>
-                          <div class="dropdown-menu">
+                          {{ tag.filterText || tag.tagName }}
+                        </span>
+                      </button>
+                      
+                      <!-- Options appear below expanded button -->
+                      <div class="dropdown-options" v-show="tag.isOpen">
+                        <div class="dropdown-menu">
                             <!-- Simple display for categories with 13 or fewer items -->
                             <template
-                              v-if="getOpenCategoryAlternatives(tag.categoryId).length <= 13"
+                              v-if="getFilteredOptions(tag.categoryId, tag.filterText, true).length <= 13"
                             >
                               <button
-                                v-for="option in getOpenCategoryAlternatives(tag.categoryId)"
+                                v-for="option in getFilteredOptions(tag.categoryId, tag.filterText, true)"
                                 :key="option.id"
                                 class="dropdown-option"
                                 tabindex="0"
                                 @click="selectFromDropdown(tag, option.tagName)"
                               >
                                 {{ option.tagName }}
-                              </button>
-                              <!-- Add new option for open categories -->
-                              <button
-                                class="dropdown-option add-new-option"
-                                tabindex="0"
-                                @click="showAddNewOption(tag)"
-                              >
-                                <v-icon size="12" class="me-1">mdi-plus</v-icon>
-                                Add new
                               </button>
                             </template>
 
@@ -97,7 +93,7 @@
                               <!-- CSS-only pagination with radio buttons for proper multi-page support -->
                               <input
                                 v-for="pageNum in Math.ceil(
-                                  getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                  getFilteredOptions(tag.categoryId, tag.filterText, true).length / 12
                                 )"
                                 :key="pageNum"
                                 type="radio"
@@ -110,15 +106,15 @@
                               <!-- Generate pages dynamically -->
                               <div
                                 v-for="pageNum in Math.ceil(
-                                  getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                  getFilteredOptions(tag.categoryId, tag.filterText, true).length / 12
                                 )"
                                 :key="pageNum"
                                 :class="`page-content page-${pageNum}`"
                               >
                                 <!-- Show 12 items for this page -->
                                 <button
-                                  v-for="option in getOpenCategoryAlternatives(
-                                    tag.categoryId
+                                  v-for="option in getFilteredOptions(
+                                    tag.categoryId, tag.filterText, true
                                   ).slice((pageNum - 1) * 12, pageNum * 12)"
                                   :key="option.id"
                                   class="dropdown-option"
@@ -128,22 +124,13 @@
                                   {{ option.tagName }}
                                 </button>
 
-                                <!-- Add new option on every page for open categories -->
-                                <button
-                                  class="dropdown-option add-new-option"
-                                  tabindex="0"
-                                  @click="showAddNewOption(tag)"
-                                >
-                                  <v-icon size="12" class="me-1">mdi-plus</v-icon>
-                                  Add new
-                                </button>
 
                                 <!-- Next page button (if not the last page) -->
                                 <label
                                   v-if="
                                     pageNum <
                                     Math.ceil(
-                                      getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                      getFilteredOptions(tag.categoryId, tag.filterText, true).length / 12
                                     )
                                   "
                                   :for="`open-page${pageNum + 1}-${tag.id}`"
@@ -151,7 +138,7 @@
                                   tabindex="0"
                                 >
                                   ...{{
-                                    getOpenCategoryAlternatives(tag.categoryId).length -
+                                    getFilteredOptions(tag.categoryId, tag.filterText, true).length -
                                     pageNum * 12
                                   }}
                                   more
@@ -162,7 +149,7 @@
                                   v-if="
                                     pageNum ===
                                     Math.ceil(
-                                      getOpenCategoryAlternatives(tag.categoryId).length / 12
+                                      getFilteredOptions(tag.categoryId, tag.filterText, true).length / 12
                                     )
                                   "
                                   :for="`open-page1-${tag.id}`"
@@ -177,34 +164,11 @@
                         </div>
                       </div>
 
-                      <!-- Edit mode overlay -->
-                      <div v-if="tag.isEditing" class="edit-overlay">
-                        <i class="mdi mdi-pencil edit-mode-icon"></i>
-                        <input
-                          ref="editInput"
-                          v-model="tag.tagName"
-                          :list="`open-alternatives-${tag.id}`"
-                          class="tag-input"
-                          :style="{ color: getTagColor(tag) }"
-                          @blur="onTagBlur(tag)"
-                          @keydown.enter="confirmEdit(tag, $event)"
-                          @keydown.escape="cancelEdit(tag, $event)"
-                        />
-                        <datalist :id="`open-alternatives-${tag.id}`">
-                          <option
-                            v-for="option in getOpenCategoryAlternatives(tag.categoryId)"
-                            :key="option.id"
-                            :value="option.tagName"
-                          />
-                        </datalist>
-                      </div>
                     </div>
-                  </div>
 
                   <v-alert color="success" variant="tonal" density="compact">
                     <v-icon size="14">mdi-information</v-icon>
-                    Users and AI can add custom tags like "Custom Time Period", "Custom Priority",
-                    etc.
+                    Users and AI can edit tags inline while maintaining the visual tag appearance.
                   </v-alert>
                 </v-card-text>
               </v-card>
@@ -235,16 +199,15 @@
                       <div class="tag-container">
                         <button
                           class="tag-button"
-                          @dblclick="startEditMode(tag)"
-                          @focus="onTagFocus(tag)"
+                                                    @focus="onTagFocus(tag)"
                         >
                           <i class="tag-icon mdi mdi-tag"></i>
                           <span class="tag-text">{{ tag.tagName }}</span>
                         </button>
                       </div>
 
-                      <!-- Locked category dropdown without "Add new" option -->
-                      <div class="dropdown-overlay">
+                      <!-- Locked category dropdown -->
+                      <div class="dropdown-overlay" @keydown="handleTypeToFilter($event, tag, false)" tabindex="0">
                         <div
                           class="dropdown-expanded"
                           :style="{ borderColor: getTagColor(tag), color: getTagColor(tag) }"
@@ -256,12 +219,12 @@
                           <div class="dropdown-menu">
                             <!-- Simple display for categories with 13 or fewer items -->
                             <template
-                              v-if="getLockedCategoryAlternatives(tag.categoryId).length <= 13"
+                              v-if="getFilteredOptions(tag.categoryId, tag.filterText, false).length <= 13"
                             >
                               <button
-                                v-for="option in getLockedCategoryAlternatives(tag.categoryId)"
+                                v-for="(option, index) in getFilteredOptions(tag.categoryId, tag.filterText, false)"
                                 :key="option.id"
-                                class="dropdown-option"
+                                :class="['dropdown-option', { 'highlighted': index === tag.highlightedIndex }]"
                                 tabindex="0"
                                 @click="selectFromDropdown(tag, option.tagName)"
                               >
@@ -274,7 +237,7 @@
                               <!-- CSS-only pagination with radio buttons for proper multi-page support -->
                               <input
                                 v-for="pageNum in Math.ceil(
-                                  getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                  getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
                                 )"
                                 :key="pageNum"
                                 type="radio"
@@ -287,18 +250,18 @@
                               <!-- Generate pages dynamically -->
                               <div
                                 v-for="pageNum in Math.ceil(
-                                  getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                  getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
                                 )"
                                 :key="pageNum"
                                 :class="`page-content page-${pageNum}`"
                               >
                                 <!-- Show 12 items for this page -->
                                 <button
-                                  v-for="option in getLockedCategoryAlternatives(
-                                    tag.categoryId
+                                  v-for="(option, index) in getFilteredOptions(
+                                    tag.categoryId, tag.filterText, false
                                   ).slice((pageNum - 1) * 12, pageNum * 12)"
                                   :key="option.id"
-                                  class="dropdown-option"
+                                  :class="['dropdown-option', { 'highlighted': (pageNum - 1) * 12 + index === tag.highlightedIndex }]"
                                   tabindex="0"
                                   @click="selectFromDropdown(tag, option.tagName)"
                                 >
@@ -310,7 +273,7 @@
                                   v-if="
                                     pageNum <
                                     Math.ceil(
-                                      getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                      getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
                                     )
                                   "
                                   :for="`locked-page${pageNum + 1}-${tag.id}`"
@@ -318,7 +281,7 @@
                                   tabindex="0"
                                 >
                                   ...{{
-                                    getLockedCategoryAlternatives(tag.categoryId).length -
+                                    getFilteredOptions(tag.categoryId, tag.filterText, false).length -
                                     pageNum * 12
                                   }}
                                   more
@@ -329,7 +292,7 @@
                                   v-if="
                                     pageNum ===
                                     Math.ceil(
-                                      getLockedCategoryAlternatives(tag.categoryId).length / 12
+                                      getFilteredOptions(tag.categoryId, tag.filterText, false).length / 12
                                     )
                                   "
                                   :for="`locked-page1-${tag.id}`"
@@ -345,27 +308,6 @@
                         </div>
                       </div>
 
-                      <!-- Edit mode overlay -->
-                      <div v-if="tag.isEditing" class="edit-overlay">
-                        <i class="mdi mdi-pencil edit-mode-icon"></i>
-                        <input
-                          ref="editInput"
-                          v-model="tag.tagName"
-                          :list="`locked-alternatives-${tag.id}`"
-                          class="tag-input"
-                          :style="{ color: getTagColor(tag) }"
-                          @blur="onTagBlur(tag)"
-                          @keydown.enter="confirmEdit(tag, $event)"
-                          @keydown.escape="cancelEdit(tag, $event)"
-                        />
-                        <datalist :id="`locked-alternatives-${tag.id}`">
-                          <option
-                            v-for="option in getLockedCategoryAlternatives(tag.categoryId)"
-                            :key="option.id"
-                            :value="option.tagName"
-                          />
-                        </datalist>
-                      </div>
                     </div>
                   </div>
 
@@ -681,9 +623,9 @@ const demoFileTags = ref([
     tagName: 'March',
     source: 'ai',
     confidence: 92,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'March',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
   {
     id: 'demo2',
@@ -691,9 +633,9 @@ const demoFileTags = ref([
     tagName: 'Invoice',
     source: 'human',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'Invoice',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
   {
     id: 'demo3',
@@ -701,9 +643,9 @@ const demoFileTags = ref([
     tagName: 'High',
     source: 'ai',
     confidence: 78,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'High',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
   {
     id: 'demo4',
@@ -711,9 +653,9 @@ const demoFileTags = ref([
     tagName: '2024',
     source: 'human',
     confidence: 95,
-    isEditing: false,
-    tempValue: '',
-    originalValue: '2024',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
 ]);
 
@@ -725,9 +667,13 @@ const openCategoryTags = ref([
     tagName: 'March',
     source: 'human',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'March',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'open2',
@@ -735,9 +681,13 @@ const openCategoryTags = ref([
     tagName: 'Invoice',
     source: 'ai',
     confidence: 95,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'Invoice',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'open3',
@@ -745,9 +695,13 @@ const openCategoryTags = ref([
     tagName: 'High',
     source: 'human',
     confidence: 88,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'High',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'open4',
@@ -755,9 +709,13 @@ const openCategoryTags = ref([
     tagName: 'Draft',
     source: 'ai',
     confidence: 92,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'Draft',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
   {
     id: 'open5',
@@ -765,9 +723,13 @@ const openCategoryTags = ref([
     tagName: '2024',
     source: 'human',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: '2024',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
+    customInputValue: '',
+    isHeaderEditing: false,
+    hasStartedTyping: false,
+    isOpen: false,
   },
 ]);
 
@@ -779,9 +741,9 @@ const lockedCategoryTags = ref([
     tagName: 'April',
     source: 'system',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'April',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
   {
     id: 'locked2',
@@ -789,9 +751,9 @@ const lockedCategoryTags = ref([
     tagName: 'Receipt',
     source: 'system',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'Receipt',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
   {
     id: 'locked3',
@@ -799,9 +761,9 @@ const lockedCategoryTags = ref([
     tagName: 'Medium',
     source: 'system',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'Medium',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
   {
     id: 'locked4',
@@ -809,9 +771,9 @@ const lockedCategoryTags = ref([
     tagName: 'Approved',
     source: 'system',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: 'Approved',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
   {
     id: 'locked5',
@@ -819,9 +781,9 @@ const lockedCategoryTags = ref([
     tagName: '2023',
     source: 'system',
     confidence: 100,
-    isEditing: false,
-    tempValue: '',
-    originalValue: '2023',
+    filterText: '',
+    highlightedIndex: -1,
+    isFiltering: false,
   },
 ]);
 
@@ -847,17 +809,199 @@ const getCategoryAlternatives = (categoryId) => {
   return category ? category.tags : [];
 };
 
-// Helper functions for open/locked categories
-// Open categories use the same data as mockCategories but allow adding new options
+// Helper functions for filtering and getting alternatives
 const getOpenCategoryAlternatives = (categoryId) => {
   const category = mockCategories.value.find((cat) => cat.id === categoryId);
   return category ? category.tags : [];
 };
 
-// Locked categories use the same data as mockCategories but don't allow adding new options
 const getLockedCategoryAlternatives = (categoryId) => {
   const category = mockCategories.value.find((cat) => cat.id === categoryId);
   return category ? category.tags : [];
+};
+
+// Filtering functions
+const getFilteredOptions = (categoryId, filterText, isOpen = false) => {
+  const alternatives = isOpen ? getOpenCategoryAlternatives(categoryId) : getLockedCategoryAlternatives(categoryId);
+  if (!filterText) return alternatives;
+  
+  return alternatives.filter(option => 
+    option.tagName.toLowerCase().startsWith(filterText.toLowerCase())
+  );
+};
+
+const handleTagClick = (tag) => {
+  // Open dropdown and enter edit mode in one action
+  tag.isOpen = true;
+  tag.isHeaderEditing = true;
+  tag.hasStartedTyping = false;
+  
+  // Update focused tag for pagination management
+  if (currentFocusedTag.value && currentFocusedTag.value.id !== tag.id) {
+    resetPaginationState(currentFocusedTag.value.id);
+  }
+  currentFocusedTag.value = tag;
+  
+  console.log(`Tag clicked and opened: ${tag.tagName}`);
+};
+
+const handleTagBlur = (event, tag) => {
+  // Add a small delay to allow clicks on dropdown options to register
+  setTimeout(() => {
+    const relatedTarget = event.relatedTarget;
+    const smartTagContainer = event.currentTarget.closest('.smart-tag');
+    
+    // Check if focus is still within the smart-tag container or dropdown elements
+    const focusStillInTag = relatedTarget && smartTagContainer && smartTagContainer.contains(relatedTarget);
+    const focusInDropdownOption = relatedTarget && relatedTarget.closest('.dropdown-option');
+    const focusInPagination = relatedTarget && relatedTarget.closest('.dropdown-pagination');
+    
+    // Only keep dropdown open if focus is explicitly within dropdown elements
+    if (!focusStillInTag && !focusInDropdownOption && !focusInPagination) {
+      // Discard any typed text and revert to original value
+      tag.filterText = '';
+      tag.isFiltering = false;
+      tag.hasStartedTyping = false;
+      tag.isHeaderEditing = false;
+      tag.isOpen = false;
+      console.log(`Focus lost - discarded typed text, reverted to: ${tag.tagName}`);
+    } else {
+      console.log(`Focus still within dropdown area, keeping open`);
+    }
+  }, 150); // Slightly longer delay
+};
+
+const startHeaderEdit = (tag) => {
+  tag.isHeaderEditing = true;
+  console.log(`Started editing header for: ${tag.tagName}`);
+};
+
+const stopHeaderEdit = (tag) => {
+  tag.isHeaderEditing = false;
+  console.log(`Stopped editing header for: ${tag.tagName}`);
+};
+
+const handleTypeToFilter = (event, tag, isOpen = false) => {
+  // Only handle typing when header is in edit mode (for open categories)
+  if (isOpen && !tag.isHeaderEditing) {
+    return;
+  }
+  
+  // Ignore non-alphanumeric keys except backspace
+  if (event.key.length > 1 && event.key !== 'Backspace' && event.key !== 'Enter' && event.key !== 'Escape' && event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+    return;
+  }
+  
+  // Handle special keys
+  if (event.key === 'Escape') {
+    // Discard typed text and revert to original value
+    tag.filterText = '';
+    tag.isFiltering = false;
+    tag.hasStartedTyping = false;
+    tag.isHeaderEditing = false;
+    tag.isOpen = false;
+    console.log(`Escaped - reverted to original: ${tag.tagName}`);
+    return;
+  }
+  
+  if (event.key === 'Enter') {
+    handleEnterKey(tag, isOpen);
+    // Close dropdown after accepting value
+    tag.isOpen = false;
+    tag.isHeaderEditing = false;
+    return;
+  }
+  
+  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    handleArrowNavigation(event, tag, isOpen);
+    return;
+  }
+  
+  // Handle text input
+  let newFilterText = tag.filterText;
+  
+  if (event.key === 'Backspace') {
+    newFilterText = newFilterText.slice(0, -1);
+  } else if (event.key.length === 1) {
+    newFilterText += event.key;
+  }
+  
+  // Update filter state
+  tag.filterText = newFilterText;
+  tag.isFiltering = newFilterText.length > 0;
+  
+  // Mark that user has started typing (for cursor positioning)
+  if (isOpen && newFilterText.length > 0) {
+    tag.hasStartedTyping = true;
+  }
+  
+  if (isOpen) {
+    tag.customInputValue = newFilterText;
+    tag.highlightedIndex = -1; // No auto-highlight for open categories
+  } else {
+    // For locked categories, highlight first match
+    const filteredOptions = getFilteredOptions(tag.categoryId, newFilterText, false);
+    tag.highlightedIndex = filteredOptions.length > 0 ? 0 : -1;
+  }
+  
+  console.log(`Filtering ${getCategoryName(tag.categoryId)} with: "${newFilterText}"`);
+};
+
+const handleEnterKey = (tag, isOpen) => {
+  if (isOpen) {
+    // For open categories, use filter text or current tag name
+    const newValue = tag.filterText || tag.tagName;
+    if (newValue && newValue !== tag.tagName) {
+      // Add new option to category if it doesn't exist
+      const category = mockCategories.value.find(cat => cat.id === tag.categoryId);
+      if (category && !category.tags.some(option => option.tagName.toLowerCase() === newValue.toLowerCase())) {
+        category.tags.push({
+          id: `custom-${Date.now()}`,
+          tagName: newValue,
+          source: 'human',
+          description: 'User-created custom tag'
+        });
+        console.log(`✓ Added "${newValue}" to ${getCategoryName(tag.categoryId)} category`);
+      }
+      tag.tagName = newValue;
+      console.log(`Tag updated to: ${newValue}`);
+    }
+  } else {
+    // For locked categories, use highlighted option
+    const filteredOptions = getFilteredOptions(tag.categoryId, tag.filterText, false);
+    if (tag.highlightedIndex >= 0 && tag.highlightedIndex < filteredOptions.length) {
+      const selectedOption = filteredOptions[tag.highlightedIndex];
+      tag.tagName = selectedOption.tagName;
+      console.log(`Tag updated to: ${selectedOption.tagName}`);
+    }
+  }
+  
+  resetFilterState(tag);
+};
+
+const handleArrowNavigation = (event, tag, isOpen) => {
+  if (isOpen) return; // No arrow navigation for open categories
+  
+  event.preventDefault();
+  const filteredOptions = getFilteredOptions(tag.categoryId, tag.filterText, false);
+  
+  if (filteredOptions.length === 0) return;
+  
+  if (event.key === 'ArrowDown') {
+    tag.highlightedIndex = (tag.highlightedIndex + 1) % filteredOptions.length;
+  } else if (event.key === 'ArrowUp') {
+    tag.highlightedIndex = tag.highlightedIndex <= 0 ? filteredOptions.length - 1 : tag.highlightedIndex - 1;
+  }
+};
+
+const resetFilterState = (tag) => {
+  tag.filterText = '';
+  tag.isFiltering = false;
+  tag.highlightedIndex = -1;
+  tag.customInputValue = '';
+  tag.isHeaderEditing = false;
+  tag.hasStartedTyping = false;
+  tag.isOpen = false;
 };
 
 const getTagColor = (tag) => {
@@ -872,36 +1016,15 @@ const getPerformanceColor = (actual, target) => {
 };
 
 // Simple tag interaction functions
-const startEditMode = async (tag) => {
-  const startTime = performance.now();
-
-  // Store original value for potential cancellation
-  tag.originalValue = tag.tagName;
-  tag.isEditing = true;
-
-  await nextTick();
-
-  // Auto-focus the input
-  setTimeout(() => {
-    const inputs = document.querySelectorAll('.tag-input');
-    if (inputs.length > 0) {
-      inputs[inputs.length - 1].focus();
-      inputs[inputs.length - 1].select();
-    }
-  }, 10);
-
-  const endTime = performance.now();
-  performanceStats.value.lastEditTime = Math.round((endTime - startTime) * 100) / 100;
-  console.log(`Edit mode entered in ${performanceStats.value.lastEditTime}ms`);
-};
 
 const selectFromDropdown = (tag, newValue) => {
   const startTime = performance.now();
 
   tag.tagName = newValue;
-  console.log(`Tag updated via dropdown: ${tag.originalValue || 'previous'} → ${newValue}`);
+  console.log(`Tag updated via dropdown: ${tag.tagName} → ${newValue}`);
 
-  // Reset pagination state for this tag to allow dropdown to close properly
+  // Reset filter state and pagination
+  resetFilterState(tag);
   resetPaginationState(tag.id);
 
   const endTime = performance.now();
@@ -920,71 +1043,11 @@ const resetPaginationState = (tagId) => {
 // Track which tag currently has focus to manage pagination state
 const currentFocusedTag = ref(null);
 
-const onTagFocus = (tag) => {
-  // If a different tag is getting focus, reset the previous tag's pagination
-  if (currentFocusedTag.value && currentFocusedTag.value.id !== tag.id) {
-    resetPaginationState(currentFocusedTag.value.id);
-  }
+// onTagFocus removed - replaced by handleTagClick single-element approach
 
-  // Update the currently focused tag
-  currentFocusedTag.value = tag;
 
-  console.log(`Tag focused: ${tag.tagName}`);
-};
 
-const onTagBlur = (tag) => {
-  // Save the current value when losing focus
-  if (tag.originalValue && tag.tagName !== tag.originalValue) {
-    console.log(`Tag updated: ${tag.originalValue} → ${tag.tagName}`);
-    // Simulate saving
-    setTimeout(() => {
-      console.log('Tag change saved successfully');
-    }, 200);
-  }
-  // Clear the stored original value
-  tag.originalValue = '';
-};
 
-const confirmEdit = (tag, event) => {
-  const startTime = performance.now();
-
-  if (tag.originalValue && tag.tagName !== tag.originalValue) {
-    console.log(`Tag updated: ${tag.originalValue} → ${tag.tagName}`);
-  }
-
-  // Remove focus from input
-  event.target.blur();
-
-  const endTime = performance.now();
-  const confirmTime = Math.round((endTime - startTime) * 100) / 100;
-  console.log(`Tag update confirmed in ${confirmTime}ms`);
-};
-
-const cancelEdit = (tag, event) => {
-  // Restore original value
-  if (tag.originalValue) {
-    tag.tagName = tag.originalValue;
-    tag.originalValue = '';
-  }
-
-  // Remove focus from input
-  event.target.blur();
-
-  console.log('Tag edit cancelled');
-};
-
-const handleEditBlur = (tag) => {
-  // Small delay to allow click events to process first
-  setTimeout(() => {
-    if (tag.isEditing) {
-      if (tag.tempValue && tag.tempValue !== tag.originalValue) {
-        confirmEdit(tag);
-      } else {
-        cancelEdit(tag);
-      }
-    }
-  }, 150);
-};
 
 const showTagInfo = (tag) => {
   console.log('Tag Info:', {
@@ -1011,35 +1074,6 @@ const showAddTagDemo = () => {
   );
 };
 
-// Open category functions
-const showAddNewOption = (tag) => {
-  console.log(`Add new option for ${getCategoryName(tag.categoryId)} category`);
-  console.log('In a real implementation, this would:');
-  console.log('1. Show a dialog for entering new tag name');
-  console.log('2. Validate the new tag name');
-  console.log('3. Add it to the category options');
-  console.log('4. Update the current tag to the new value');
-
-  // Demo: simulate adding a new option to the mockCategories
-  const categoryId = tag.categoryId;
-  const category = mockCategories.value.find((cat) => cat.id === categoryId);
-  if (category) {
-    const newTagName = `Custom ${category.name} ${category.tags.length + 1}`;
-    const newId = `custom-${Date.now()}`;
-
-    category.tags.push({
-      id: newId,
-      tagName: newTagName,
-      source: 'human',
-      description: 'User-created custom tag',
-    });
-
-    // Update the current tag to the new value
-    tag.tagName = newTagName;
-    console.log(`✓ Added "${newTagName}" to ${category.name} category`);
-    console.log(`Category now has ${category.tags.length} tags`);
-  }
-};
 
 // Keyboard demo functions
 const startKeyboardDemo = () => {
@@ -1202,12 +1236,29 @@ const trackAutocompletePerformance = () => {
   }, 0);
 };
 
-// Global click handler to reset pagination when clicking outside tags
+// Global click handler to close open dropdowns and reset pagination
 const handleGlobalClick = (event) => {
-  // Check if click is outside any tag container
-  const clickedTag = event.target.closest('.clean-tag');
-  if (!clickedTag && currentFocusedTag.value) {
-    // Reset pagination for the previously focused tag
+  // Check if click is outside any smart-tag container
+  const clickedSmartTag = event.target.closest('.smart-tag');
+  
+  // Close any open dropdowns when clicking outside
+  openCategoryTags.value.forEach(tag => {
+    if (tag.isOpen) {
+      const smartTagElement = document.querySelector(`[data-tag-id="${tag.id}"]`);
+      if (!smartTagElement || !smartTagElement.contains(event.target)) {
+        // Discard typed text and close dropdown
+        tag.filterText = '';
+        tag.isFiltering = false;
+        tag.hasStartedTyping = false;
+        tag.isHeaderEditing = false;
+        tag.isOpen = false;
+        console.log(`Global click - closed dropdown for: ${tag.tagName}`);
+      }
+    }
+  });
+  
+  // Reset pagination for previously focused tag
+  if (!clickedSmartTag && currentFocusedTag.value) {
     resetPaginationState(currentFocusedTag.value.id);
     currentFocusedTag.value = null;
     console.log('Clicked outside tags - reset pagination');
@@ -1239,40 +1290,69 @@ onUnmounted(() => {
   min-height: 40px;
 }
 
-/* Clean CSS-only tag implementation */
-.clean-tag {
+/* Smart tag implementation - single element transformation */
+.smart-tag {
   position: relative;
   display: inline-block;
-  /* Maintain space for absolute positioning */
   vertical-align: top;
 }
 
-/* Original tag container - always stays in layout */
-.tag-container {
+/* Tag button - transforms from compact to expanded */
+.tag-button {
   border: 1px solid;
   border-color: inherit;
   border-radius: 16px;
   background-color: transparent;
   transition: all 0.2s ease-in-out;
   display: inline-block;
+  position: relative;
+  z-index: 1001;
 }
 
-.tag-container:hover {
+/* Compact state hover */
+.smart-tag:not(.expanded) .tag-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Base button styling */
 .tag-button {
   display: flex;
   align-items: center;
   padding: 4px 8px;
   background: none;
-  border: none;
   color: inherit;
   font-size: 12px;
   cursor: pointer;
   width: 100%;
   outline: none;
+  border: none;
+}
+
+/* Expanded state - becomes pill header */
+.smart-tag.expanded .tag-button {
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  padding: 6px 10px;
+  background: white;
+  border-bottom: none;
+  transform: none;
+}
+
+/* Dropdown options container */
+.dropdown-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid;
+  border-color: inherit;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 200px;
 }
 
 .tag-icon {
@@ -1282,7 +1362,7 @@ onUnmounted(() => {
 }
 
 /* Transform tag icon to pencil on hover */
-.clean-tag:hover .tag-icon::before {
+.smart-tag:hover .tag-icon::before {
   content: '\F064F'; /* mdi-pencil icon code */
 }
 
@@ -1297,73 +1377,11 @@ onUnmounted(() => {
   overflow: visible !important;
 }
 
-/* Boost parent card z-index when dropdown is open */
-.v-card:has(.clean-tag:focus-within),
-.v-card-text:has(.clean-tag:focus-within),
-.v-card:has(.dropdown-pagination:focus),
-.v-card:has(.dropdown-pagination:active),
-.v-card:has(.dropdown-pagination:hover),
-.v-card:has(input[id*='page']:checked),
-.v-card:has(label[for*='page']:focus),
-.v-card:has(label[for*='page']:active),
-.v-card:has(label[for*='page']:hover),
-.v-card-text:has(.dropdown-pagination:focus),
-.v-card-text:has(.dropdown-pagination:active),
-.v-card-text:has(.dropdown-pagination:hover),
-.v-card-text:has(input[id*='page']:checked),
-.v-card-text:has(label[for*='page']:focus),
-.v-card-text:has(label[for*='page']:active),
-.v-card-text:has(label[for*='page']:hover) {
-  z-index: 1000 !important;
-  position: relative;
-}
+/* Remove old z-index focus management - no longer needed */
 
-/* Simple dropdown overlay positioned at tag location */
-.dropdown-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1001;
-  display: none;
-}
+/* Remove old dropdown overlay CSS - no longer needed */
 
-/* Show dropdown when tag has focus */
-.clean-tag:focus-within .dropdown-overlay {
-  display: block;
-}
-
-/* Keep dropdown open when pagination elements are active */
-.clean-tag:has(.dropdown-pagination:focus) .dropdown-overlay,
-.clean-tag:has(.dropdown-pagination:active) .dropdown-overlay,
-.clean-tag:has(.dropdown-pagination:hover) .dropdown-overlay {
-  display: block !important;
-}
-
-/* Dropdown expanded version */
-.dropdown-overlay .dropdown-expanded {
-  position: relative;
-}
-
-/* Hide original tag when dropdown is open */
-.clean-tag:focus-within .tag-container {
-  opacity: 0;
-}
-
-.dropdown-expanded {
-  background: white;
-  border: 1px solid;
-  border-color: inherit;
-  border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  min-width: 100%;
-}
-
-.dropdown-header-section {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  font-size: 12px;
-}
+/* Remove old dropdown-expanded CSS - now handled by dropdown-options */
 
 .dropdown-menu {
   border-top: 1px solid #eee;
@@ -1411,22 +1429,6 @@ onUnmounted(() => {
   margin-bottom: 4px;
 }
 
-/* Special styling for "Add new" option */
-.add-new-option {
-  border-top: 1px solid #eee;
-  margin-top: 4px;
-  padding-top: 6px;
-  color: #1976d2;
-  font-style: italic;
-  display: flex;
-  align-items: center;
-}
-
-.add-new-option:hover,
-.add-new-option:focus {
-  background-color: rgba(25, 118, 210, 0.08);
-  color: #1565c0;
-}
 
 /* CSS-only pagination */
 .page-radio {
@@ -1629,96 +1631,96 @@ input[id*='open-page7']:checked ~ .page-content:not(.page-7) {
   outline-offset: -2px;
 }
 
-/* Keep dropdown open when pagination elements are actively being used */
-.clean-tag:has(.dropdown-pagination:focus) .dropdown-overlay,
-.clean-tag:has(.dropdown-pagination:active) .dropdown-overlay,
-.clean-tag:has(.dropdown-pagination:hover) .dropdown-overlay {
-  display: block !important;
+/* Remove old complex dropdown state management - using simple v-show now */
+
+
+/* Highlighted option styling */
+.dropdown-option.highlighted {
+  background-color: rgba(25, 118, 210, 0.15) !important;
+  outline: 2px solid rgba(25, 118, 210, 0.5);
+  outline-offset: -2px;
+  font-weight: 600;
 }
 
-/* Keep dropdown open when radio buttons are being toggled */
-.dropdown-overlay:has(.dropdown-pagination:focus),
-.dropdown-overlay:has(.dropdown-pagination:active),
-.dropdown-overlay:has(.dropdown-pagination:hover) {
-  display: block !important;
+/* Custom input preview styling */
+.custom-input-preview {
+  border-bottom: 1px solid #eee;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
 }
 
-/* Keep dropdown open during radio button state changes */
-.clean-tag:has(input[type='radio']:focus) .dropdown-overlay,
-.clean-tag:has(input[type='radio']:active) .dropdown-overlay {
-  display: block !important;
+.custom-option {
+  font-style: italic;
+  background-color: rgba(76, 175, 80, 0.05) !important;
+  border: 1px dashed rgba(76, 175, 80, 0.3);
+  border-radius: 4px;
+  position: relative;
 }
 
-/* CRITICAL: Keep dropdown open when any non-default page is selected */
-/* This catches the transition moment when pagination elements become hidden */
-.clean-tag:has(input[id*='page2']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='page3']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='page4']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='page5']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='page6']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='page7']:checked) .dropdown-overlay {
-  display: block !important;
+.custom-option:hover,
+.custom-option:focus {
+  background-color: rgba(76, 175, 80, 0.1) !important;
+  border-color: rgba(76, 175, 80, 0.5);
 }
 
-/* Support locked category pagination as well */
-.clean-tag:has(input[id*='locked-page2']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='locked-page3']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='locked-page4']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='locked-page5']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='locked-page6']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='locked-page7']:checked) .dropdown-overlay {
-  display: block !important;
+.custom-label {
+  font-size: 10px;
+  color: #4caf50;
+  font-weight: 600;
+  margin-left: 6px;
+  background: rgba(76, 175, 80, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 
-/* Support open category pagination as well */
-.clean-tag:has(input[id*='open-page2']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='open-page3']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='open-page4']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='open-page5']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='open-page6']:checked) .dropdown-overlay,
-.clean-tag:has(input[id*='open-page7']:checked) .dropdown-overlay {
-  display: block !important;
+/* Enhanced keyboard focus styling */
+.dropdown-overlay:focus {
+  outline: 2px solid rgba(25, 118, 210, 0.3);
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 
-/* Edit mode overlay */
-.edit-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  background: inherit;
-  border: 1px solid;
-  border-color: inherit;
-  border-radius: 16px;
-  z-index: 1001;
-}
-
-.edit-mode-icon {
-  margin-right: 4px;
-  font-size: 14px;
-}
-
-.tag-input {
+/* Inline tag input field styling */
+.tag-input-field {
+  background: none;
   border: none;
   outline: none;
-  background: transparent;
-  font-size: inherit;
+  font-size: 12px;
   color: inherit;
-  font-family: inherit;
-  min-width: 40px;
-  flex: 1;
   padding: 0;
   margin: 0;
+  font-family: inherit;
+  width: auto;
+  min-width: 20px;
+  max-width: 150px;
+  cursor: text;
+  flex: 1;
 }
 
-.tag-input:focus {
-  outline: 2px solid rgba(25, 118, 210, 0.5);
-  outline-offset: 2px;
-  border-radius: 2px;
+/* Remove old header click CSS - no longer needed */
+
+/* Flashing cursor for editing mode */
+.tag-text.cursor-left::before {
+  content: '|';
+  animation: cursor-blink 1s infinite;
+  margin-right: 1px;
+  font-weight: normal;
+}
+
+.tag-text.cursor-right::after {
+  content: '|';
+  animation: cursor-blink 1s infinite;
+  margin-left: 1px;
+  font-weight: normal;
+}
+
+@keyframes cursor-blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
 }
 
 .keyboard-demo-area {
