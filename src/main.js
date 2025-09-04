@@ -7,6 +7,8 @@ import router from './router';
 import vuetify from './plugins/vuetify';
 import { useAuthStore } from './core/stores/auth';
 import { useGlobalAsyncRegistry } from './composables/useAsyncRegistry';
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -14,6 +16,7 @@ const pinia = createPinia();
 app.use(pinia);
 app.use(router);
 app.use(vuetify);
+app.use(ElementPlus);
 
 // Initialize auth store after Pinia is set up
 const authStore = useAuthStore();

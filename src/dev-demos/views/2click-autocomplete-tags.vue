@@ -10,6 +10,60 @@
     <div class="max-w-6xl mx-auto">
 
 
+      <!-- Category Testing -->
+      <v-card class="mb-4">
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-format-list-group" class="me-2" />
+          Category-Specific Autocomplete Testing
+        </v-card-title>
+        <v-card-text>
+          <v-alert color="info" variant="tonal" class="mb-4">
+            Test how autocomplete filters to show only tags within the same category. Each category
+            has different tag options.
+          </v-alert>
+
+          <v-row>
+            <v-col
+              v-for="(category, index) in mockCategories"
+              :key="category.id"
+              cols="12"
+              md="6"
+              lg="4"
+            >
+              <v-card variant="outlined" class="h-100">
+                <v-card-subtitle>
+                  <v-icon :color="getAutomaticTagColor(index)" class="me-2">mdi-folder-tag</v-icon>
+                  {{ category.name }}
+                </v-card-subtitle>
+                <v-card-text>
+                  <div class="text-caption mb-2">Available tags ({{ category.tags.length }}):</div>
+                  <div class="d-flex flex-wrap gap-1">
+                    <v-chip
+                      v-for="tag in category.tags.slice(0, 4)"
+                      :key="tag.id"
+                      :color="getAutomaticTagColor(index)"
+                      variant="outlined"
+                      size="x-small"
+                      @click="demonstrateTagEdit(category.id, tag.tagName)"
+                    >
+                      {{ tag.tagName }}
+                    </v-chip>
+                    <v-chip
+                      v-if="category.tags.length > 4"
+                      variant="outlined"
+                      size="x-small"
+                      color="grey"
+                    >
+                      +{{ category.tags.length - 4 }} more
+                    </v-chip>
+                  </div>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-card-text>
+      </v-card>
+
       <!-- Open vs Locked Category Demo -->
       <v-card class="mb-4">
         <v-card-title class="d-flex align-center">
@@ -219,60 +273,6 @@
         </v-card-text>
       </v-card>
 
-      <!-- Category Testing -->
-      <v-card class="mb-4">
-        <v-card-title class="d-flex align-center">
-          <v-icon icon="mdi-format-list-group" class="me-2" />
-          Category-Specific Autocomplete Testing
-        </v-card-title>
-        <v-card-text>
-          <v-alert color="info" variant="tonal" class="mb-4">
-            Test how autocomplete filters to show only tags within the same category. Each category
-            has different tag options.
-          </v-alert>
-
-          <v-row>
-            <v-col
-              v-for="(category, index) in mockCategories"
-              :key="category.id"
-              cols="12"
-              md="6"
-              lg="4"
-            >
-              <v-card variant="outlined" class="h-100">
-                <v-card-subtitle>
-                  <v-icon :color="getAutomaticTagColor(index)" class="me-2">mdi-folder-tag</v-icon>
-                  {{ category.name }}
-                </v-card-subtitle>
-                <v-card-text>
-                  <div class="text-caption mb-2">Available tags ({{ category.tags.length }}):</div>
-                  <div class="d-flex flex-wrap gap-1">
-                    <v-chip
-                      v-for="tag in category.tags.slice(0, 4)"
-                      :key="tag.id"
-                      :color="getAutomaticTagColor(index)"
-                      variant="outlined"
-                      size="x-small"
-                      @click="demonstrateTagEdit(category.id, tag.tagName)"
-                    >
-                      {{ tag.tagName }}
-                    </v-chip>
-                    <v-chip
-                      v-if="category.tags.length > 4"
-                      variant="outlined"
-                      size="x-small"
-                      color="grey"
-                    >
-                      +{{ category.tags.length - 4 }} more
-                    </v-chip>
-                  </div>
-                </v-card-text>
-              </v-card>
-            </v-col>
-          </v-row>
-        </v-card-text>
-      </v-card>
-
 
       <!-- Performance Benchmarking -->
       <v-card class="mb-4">
@@ -342,6 +342,56 @@
         </v-card-text>
       </v-card>
 
+      <!-- Element Plus Implementation -->
+      <v-card class="mb-4">
+        <v-card-title class="d-flex align-center">
+          <v-icon icon="mdi-view-dashboard-variant" class="me-2" />
+          Element Plus Implementation
+        </v-card-title>
+        <v-card-text>
+          <v-alert color="info" variant="tonal" class="mb-4">
+            <strong>Battle-tested solution:</strong> Uses Element Plus el-select component with built-in z-index management, 
+            teleported dropdowns, and virtual scrolling. Compare this implementation with the custom solutions above.
+          </v-alert>
+
+          <div class="d-flex align-center mb-3">
+            <v-icon icon="mdi-file-document" size="16" class="me-2" />
+            <strong class="text-body-2">quarterly-report-v2.pdf</strong>
+          </div>
+
+          <div class="tags-container mb-3">
+            <!-- Element Plus tags using ElementTag component -->
+            <ElementTag
+              v-for="tag in elementPlusTags"
+              :key="tag.id"
+              :tag="tag"
+              :categoryOptions="getLockedCategoryAlternatives(tag.categoryId)"
+              :allowCustomInput="false"
+              :tagColor="getTagColor(tag)"
+              @tag-updated="handleElementTagUpdate"
+              @tag-selected="handleElementTagSelected"
+              @tag-created="handleElementTagCreated"
+            />
+          </div>
+
+          <v-alert color="success" variant="tonal" density="compact">
+            <v-icon size="14">mdi-information</v-icon>
+            Element Plus handles z-index stacking, positioning, and accessibility automatically
+          </v-alert>
+
+          <div class="mt-3">
+            <strong class="text-subtitle-2">Key Benefits:</strong>
+            <ul class="text-body-2 mt-2">
+              <li>Built-in z-index management eliminates stacking issues</li>
+              <li>Teleported dropdowns escape parent overflow constraints</li>
+              <li>Virtual scrolling for performance with large datasets</li>
+              <li>WCAG accessibility compliance out-of-the-box</li>
+              <li>Consistent cross-browser behavior</li>
+            </ul>
+          </div>
+        </v-card-text>
+      </v-card>
+
       <!-- Error Handling Demo -->
       <v-card>
         <v-card-title class="d-flex align-center">
@@ -405,6 +455,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import DemoContainer from '../components/DemoContainer.vue';
 import EditableTag from '@/components/features/tags/EditableTag.vue';
+import ElementTag from '@/components/features/tags/ElementTag.vue';
 import { getAutomaticTagColor } from '@/features/organizer/utils/automaticTagColors.js';
 
 // Demo state management
@@ -712,6 +763,45 @@ const lockedCategoryTags = ref([
     isHeaderEditing: false,
     hasStartedTyping: false,
     isOpen: false,
+  },
+]);
+
+// Element Plus demo tags (similar to locked category for comparison)
+const elementPlusTags = ref([
+  {
+    id: 'element1',
+    categoryId: 'time-period',
+    tagName: 'April',
+    source: 'element-plus',
+    confidence: 100,
+  },
+  {
+    id: 'element2',
+    categoryId: 'document-type',
+    tagName: 'Receipt',
+    source: 'element-plus',
+    confidence: 100,
+  },
+  {
+    id: 'element3',
+    categoryId: 'priority',
+    tagName: 'Medium',
+    source: 'element-plus',
+    confidence: 100,
+  },
+  {
+    id: 'element4',
+    categoryId: 'status',
+    tagName: 'Approved',
+    source: 'element-plus',
+    confidence: 100,
+  },
+  {
+    id: 'element5',
+    categoryId: 'year',
+    tagName: '2023',
+    source: 'element-plus',
+    confidence: 100,
   },
 ]);
 
@@ -1205,6 +1295,32 @@ const handleLockedTagSelected = ({ oldValue, newValue, tag }) => {
   // Could trigger any additional side effects here
 };
 
+// Event handlers for Element Plus tags
+const handleElementTagUpdate = (updatedTag) => {
+  console.log(`Element Plus tag updated:`, updatedTag);
+};
+
+const handleElementTagSelected = ({ oldValue, newValue, tag }) => {
+  console.log(`Element Plus tag selected: ${oldValue} → ${newValue}`);
+  // The tag object is already updated by the component
+  // Could trigger any additional side effects here
+};
+
+const handleElementTagCreated = ({ tagName, categoryId, tag }) => {
+  console.log(`Element Plus tag created: ${tagName} in category ${categoryId}`);
+  // Add new option to category if it doesn't exist
+  const category = mockCategories.value.find(cat => cat.id === categoryId);
+  if (category && !category.tags.some(option => option.tagName.toLowerCase() === tagName.toLowerCase())) {
+    category.tags.push({
+      id: `custom-element-${Date.now()}`,
+      tagName: tagName,
+      source: 'element-plus-user',
+      description: 'User-created Element Plus tag'
+    });
+    console.log(`✓ Added "${tagName}" to ${category.name} category via Element Plus`);
+  }
+};
+
 // Global click handler to close open dropdowns and reset pagination
 const handleGlobalClick = (event) => {
   // Check if click is outside any smart-tag container
@@ -1265,6 +1381,8 @@ onUnmounted(() => {
   position: relative;
   display: inline-block;
   vertical-align: top;
+  /* Ensure this element creates a new stacking context that can compete with Vuetify cards */
+  z-index: 1000;
 }
 
 /* Tag button - transforms from compact to expanded */
@@ -1276,7 +1394,7 @@ onUnmounted(() => {
   transition: all 0.2s ease-in-out;
   display: inline-block;
   position: relative;
-  z-index: 2001;
+  z-index: 1001; /* Slightly higher than container */
 }
 
 /* Compact state hover */
@@ -1321,7 +1439,7 @@ onUnmounted(() => {
   border-top: 1px solid;
   border-radius: 0 0 12px 12px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  z-index: 2000;
+  z-index: 1002; /* Highest in the tag component hierarchy */
   padding-top: 5px;
 }
 

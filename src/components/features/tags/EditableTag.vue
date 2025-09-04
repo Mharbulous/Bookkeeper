@@ -33,12 +33,13 @@
       </span>
     </button>
     
-    <!-- Teleport the existing dropdown to body to escape stacking context -->
+    <!-- Options appear below expanded button - teleported to body to escape stacking contexts -->
     <Teleport to="body">
       <div 
         class="dropdown-options" 
         v-show="tag.isOpen && filteredOptions.length > 0"
-        :style="dropdownStyle"
+        :style="dropdownPosition"
+        ref="dropdownElement"
       >
         <div class="dropdown-menu">
           <!-- Simple display for categories with 13 or fewer items -->
@@ -112,7 +113,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useTagEditing } from './composables/useTagEditing.js'
 
 // Props
@@ -140,10 +141,7 @@ const emit = defineEmits(['tag-updated', 'tag-selected', 'tag-created'])
 
 // Template refs
 const tagElement = ref(null)
-const tagButton = ref(null)
-
-// Positioning state for teleported dropdown
-const dropdownPosition = ref({ top: 0, left: 0, width: 0 })
+const dropdownElement = ref(null)
 
 // Use composable for tag editing logic
 const {
@@ -154,46 +152,6 @@ const {
   resetPaginationState
 } = useTagEditing(props.tag, props.allowCustomInput, emit)
 
-// Calculate dropdown position based on tag button position
-const updateDropdownPosition = async () => {
-  await nextTick()
-  if (!tagButton.value) return
-  
-  const rect = tagButton.value.getBoundingClientRect()
-  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
-  const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft
-  
-  dropdownPosition.value = {
-    top: rect.bottom + scrollTop - 5, // 5px overlap like original
-    left: rect.left + scrollLeft,
-    width: rect.width
-  }
-}
-
-// Watch for dropdown open/close to update position
-watch(() => props.tag.isOpen, (isOpen) => {
-  if (isOpen) {
-    updateDropdownPosition()
-  }
-})
-
-// Handle window resize and scroll to keep dropdown positioned correctly
-const handlePositionUpdate = () => {
-  if (props.tag.isOpen) {
-    updateDropdownPosition()
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('resize', handlePositionUpdate)
-  window.addEventListener('scroll', handlePositionUpdate)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handlePositionUpdate)
-  window.removeEventListener('scroll', handlePositionUpdate)
-})
-
 // Computed properties
 const filteredOptions = computed(() => {
   if (!props.tag.filterText) return props.categoryOptions
@@ -203,19 +161,90 @@ const filteredOptions = computed(() => {
   )
 })
 
-const dropdownStyle = computed(() => ({
-  position: 'fixed',
-  top: dropdownPosition.value.top + 'px',
-  left: dropdownPosition.value.left + 'px',
-  width: dropdownPosition.value.width + 'px',
-  zIndex: 10000,
-  background: 'white',
-  border: `1px solid ${props.tagColor}`,
-  borderTop: `1px solid ${props.tagColor}`,
-  borderRadius: '0 0 12px 12px',
-  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)',
-  paddingTop: '5px'
-}))
+// Position the teleported dropdown
+const dropdownPosition = ref({})
+
+const updateDropdownPosition = async () => {
+  if (!props.tag.isOpen || !tagElement.value) return
+  
+  await nextTick()
+  
+  const tagRect = tagElement.value.getBoundingClientRect()
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+  
+  // Calculate position relative to viewport
+  let left = tagRect.left
+  let top = tagRect.bottom - 5 // Slightly overlap with tag
+  
+  // Adjust if dropdown would go off screen horizontally
+  const estimatedWidth = Math.max(200, tagRect.width)
+  if (left + estimatedWidth > viewportWidth) {
+    left = viewportWidth - estimatedWidth - 10
+  }
+  
+  // Adjust if dropdown would go off screen vertically
+  const estimatedHeight = Math.min(300, filteredOptions.value.length * 32 + 50)
+  if (top + estimatedHeight > viewportHeight) {
+    top = tagRect.top - estimatedHeight - 5 // Show above instead
+  }
+  
+  dropdownPosition.value = {
+    position: 'fixed',
+    left: `${left}px`,
+    top: `${top}px`,
+    minWidth: `${tagRect.width}px`,
+    zIndex: 9999
+  }
+}
+
+// Update position when dropdown opens or options change
+watch(() => props.tag.isOpen, (isOpen) => {
+  if (isOpen) {
+    updateDropdownPosition()
+  }
+})
+
+watch(() => filteredOptions.value.length, () => {
+  if (props.tag.isOpen) {
+    updateDropdownPosition()
+  }
+})
+
+// Handle clicks outside the teleported dropdown
+const handleGlobalClick = (event) => {
+  if (!props.tag.isOpen) return
+  
+  const isClickOnTag = tagElement.value && tagElement.value.contains(event.target)
+  const isClickOnDropdown = dropdownElement.value && dropdownElement.value.contains(event.target)
+  
+  if (!isClickOnTag && !isClickOnDropdown) {
+    // Close dropdown and reset state
+    props.tag.isOpen = false
+    props.tag.isHeaderEditing = false
+    props.tag.filterText = ''
+    props.tag.hasStartedTyping = false
+  }
+}
+
+// Handle scroll to reposition dropdown
+const handleScroll = () => {
+  if (props.tag.isOpen) {
+    updateDropdownPosition()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleGlobalClick)
+  window.addEventListener('scroll', handleScroll, true) // Use capture phase
+  window.addEventListener('resize', handleScroll)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener('scroll', handleScroll, true)
+  window.removeEventListener('resize', handleScroll)
+})
 </script>
 
 <style scoped>
@@ -224,8 +253,6 @@ const dropdownStyle = computed(() => ({
   position: relative;
   display: inline-block;
   vertical-align: top;
-  /* Ensure this element creates a new stacking context */
-  z-index: 1;
 }
 
 /* Tag button - transforms from compact to expanded */
@@ -237,7 +264,7 @@ const dropdownStyle = computed(() => ({
   transition: all 0.2s ease-in-out;
   display: inline-block;
   position: relative;
-  z-index: 10000;
+  z-index: 1;
 }
 
 /* Compact state hover */
@@ -270,9 +297,15 @@ const dropdownStyle = computed(() => ({
   transform: none;
 }
 
-/* Dropdown options container - now teleported */
+/* Dropdown options container - now teleported to body */
 .dropdown-options {
-  /* All positioning and styling handled by dropdownStyle computed property */
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  padding-top: 5px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 /* Also hide pill header bottom border when no options */
