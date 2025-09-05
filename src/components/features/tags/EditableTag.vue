@@ -85,16 +85,24 @@ const dropdownStyle = computed(() => {
 
   const rect = tagEl.value.getBoundingClientRect();
   const width = Math.max(200, rect.width);
-  const height = Math.min(300, filtered.value.length * 32 + 50);
+  const height = Math.min(300, filtered.value.length * 32 + 60);
 
-  showAbove.value = rect.bottom + height + 16 > window.innerHeight;
+  // Account for speech bubble tail extending outward (12px)
+  showAbove.value = rect.bottom + height + 20 > window.innerHeight;
+
+  const dropdownLeft = Math.min(rect.left, window.innerWidth - width - 10);
+
+  // Calculate tail position to point toward tag center
+  const tagCenterX = rect.left + rect.width / 2;
+  const tailPositionX = Math.max(12, Math.min(width - 12, tagCenterX - dropdownLeft));
 
   return {
     position: 'fixed',
-    left: `${Math.min(rect.left, window.innerWidth - width - 10)}px`,
-    top: `${showAbove.value ? rect.top - height - 8 : rect.bottom + 8}px`,
+    left: `${dropdownLeft}px`,
+    // FIX: Changed the offset from 8px to 12px to match the tail's height
+    top: `${showAbove.value ? rect.top - height - 12 : rect.bottom + 12}px`,
     minWidth: `${rect.width}px`,
-    '--arrow-left': `${Math.max(8, Math.min(width - 16, rect.left + rect.width / 2 - Math.min(rect.left, window.innerWidth - width - 10)))}px`,
+    '--arrow-left': `${tailPositionX}px`,
   };
 });
 
@@ -174,7 +182,6 @@ onMounted(() => {
   background: transparent;
 }
 
-
 .tag-icon {
   font-size: 14px;
 }
@@ -208,79 +215,90 @@ onMounted(() => {
   }
 }
 
-/* Dropdown */
+/* Dropdown - Speech Bubble Style */
 .dropdown-options {
   background: white;
   border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow:
-    0 10px 25px rgba(0, 0, 0, 0.1),
-    0 4px 10px rgba(0, 0, 0, 0.06);
-  padding: 8px 0;
+    0 15px 35px rgba(0, 0, 0, 0.15),
+    0 5px 15px rgba(0, 0, 0, 0.08);
+  padding: 2px 0;
   max-height: 300px;
   overflow-y: auto;
   z-index: 9999;
 }
 
-/* Arrow */
-.dropdown-options::before,
+/* Comic Book Speech Bubble Tail */
+.dropdown-options::before {
+  content: '';
+  position: absolute;
+  left: var(--arrow-left, 50px);
+  top: -12px;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 12px solid #e4e7ed;
+  z-index: 99999;
+  transform: translateX(-12px);
+}
+
 .dropdown-options::after {
   content: '';
   position: absolute;
-  left: var(--arrow-left, 20px);
-  transform: translateX(-8px);
+  left: var(--arrow-left, 50px);
+  top: -11px;
   width: 0;
   height: 0;
-  border: 8px solid transparent;
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-bottom: 11px solid white;
+  z-index: 99999;
+  transform: translateX(-11px);
 }
 
-.dropdown-options::before {
-  top: -8px;
-  border-bottom-color: #e4e7ed;
-}
-
-.dropdown-options::after {
-  top: -7px;
-  border-bottom-color: white;
-}
-
+/* Tail for dropdown above tag */
 .dropdown-options.above::before {
   top: 100%;
-  border-bottom-color: transparent;
-  border-top-color: #e4e7ed;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: none;
+  border-top: 12px solid #e4e7ed;
 }
 
 .dropdown-options.above::after {
-  top: calc(100% + 1px);
-  border-bottom-color: transparent;
-  border-top-color: white;
+  top: calc(100% - 1px);
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-bottom: none;
+  border-top: 11px solid white;
 }
 
 /* Menu items */
 .dropdown-menu {
-  border-top: 1px solid #e4e7ed;
-  margin-top: 4px;
-  padding-top: 8px;
+  padding: 1px;
 }
 
 .dropdown-option {
   display: block;
-  width: calc(100% - 8px);
-  margin: 2px 4px;
-  padding: 6px 12px;
+  width: calc(100% - 16px);
+  margin: 2px 2px;
+  padding: 2px 2px;
   background: none;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
   color: #606266;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
+  transition: all 0.2s ease-in-out;
 }
 
 .dropdown-option:hover {
-  background: rgba(25, 118, 210, 0.1);
+  background: rgba(25, 118, 210, 0.08);
   color: #1976d2;
+  transform: translateX(2px);
 }
 
 /* Scrollbar */
