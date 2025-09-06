@@ -13,7 +13,7 @@
       @keydown="handleTypeToFilter"
       @blur="handleTagBlur"
     >
-      <i class="tag-icon mdi mdi-tag"></i>
+      <i class="tag-icon mdi" :class="iconClass"></i>
       <span class="tag-text" :data-cursor="cursorPosition">
         {{ tag.filterText || tag.tagName }}
       </span>
@@ -80,6 +80,15 @@ const hasOptions = computed(() => filtered.value.length > 0);
 const cursorPosition = computed(() =>
   props.tag.isHeaderEditing ? (props.tag.hasStartedTyping ? 'right' : 'left') : null
 );
+
+const iconClass = computed(() => {
+  // Show different icons when user is typing (isHeaderEditing)
+  if (props.tag.isHeaderEditing) {
+    return props.allowCustomInput ? 'mdi-pencil' : 'mdi-lock';
+  }
+  // Default tag icon when not editing
+  return 'mdi-tag';
+});
 
 const dropdownStyle = computed(() => {
   if (!tagEl.value) return {};
@@ -171,10 +180,7 @@ onMounted(() => {
   font-size: 14px;
 }
 
-/* Edit mode icon change - communicates editability */
-.smart-tag:hover .tag-icon::before {
-  content: '\F064F';
-}
+/* Removed hover effect - icon will change based on typing state instead */
 
 /* Cursor animation - communicates text is being edited */
 .tag-text[data-cursor]::before,
