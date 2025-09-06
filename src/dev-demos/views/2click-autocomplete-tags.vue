@@ -1,15 +1,15 @@
 <template>
   <DemoContainer
     title="Tag System Demonstration"
-    subtitle="Three Tag Implementation Approaches"
-    description="Compare the three different tag implementations: Locked Categories, Open Categories, and Element Plus components."
+    subtitle="Two Tag Implementation Approaches"
+    description="Compare the two different tag implementations: Locked Categories and Open Categories."
     icon="mdi-tag-multiple"
-    :tags="['Tag Demo', 'Vue 3', 'Component Comparison']"
+    :tags="['Tag Demo', 'Vue 3', 'EditableTag Component']"
   >
     <div class="max-w-6xl mx-auto">
       <v-row>
         <!-- Locked Category Example -->
-        <v-col cols="12" md="4">
+        <v-col cols="12" md="6">
           <v-card class="h-100">
             <v-card-title class="d-flex align-center">
               <v-icon color="orange" size="16" class="me-2">mdi-lock</v-icon>
@@ -42,7 +42,7 @@
         </v-col>
 
         <!-- Open Category Example -->
-        <v-col cols="12" md="4">
+        <v-col cols="12" md="6">
           <v-card class="h-100">
             <v-card-title class="d-flex align-center">
               <v-icon color="green" size="16" class="me-2">mdi-lock-open-variant</v-icon>
@@ -74,38 +74,6 @@
           </v-card>
         </v-col>
 
-        <!-- Element Plus Implementation -->
-        <v-col cols="12" md="4">
-          <v-card class="h-100">
-            <v-card-title class="d-flex align-center">
-              <v-icon color="blue" size="16" class="me-2">mdi-view-dashboard-variant</v-icon>
-              Element Plus Tags
-            </v-card-title>
-            <v-card-text>
-              <div class="d-flex align-center mb-3">
-                <v-icon icon="mdi-file-document" size="16" class="me-2" />
-                <strong class="text-body-2">project-docs.pdf</strong>
-              </div>
-
-              <div class="tags-container mb-3">
-                <ElementTag
-                  v-for="tag in elementPlusTags"
-                  :key="tag.id"
-                  :tag="tag"
-                  :categoryOptions="getCategoryOptions(tag.categoryId)"
-                  :isOpenCategory="true"
-                  :tagColor="getTagColor(tag)"
-                  @tag-updated="handleTagUpdate"
-                />
-              </div>
-
-              <v-alert color="info" variant="tonal" density="compact">
-                <v-icon size="14">mdi-information</v-icon>
-                Element Plus with built-in z-index management
-              </v-alert>
-            </v-card-text>
-          </v-card>
-        </v-col>
       </v-row>
     </div>
   </DemoContainer>
@@ -115,7 +83,6 @@
 import { ref } from 'vue';
 import DemoContainer from '../components/DemoContainer.vue';
 import EditableTag from '@/components/features/tags/EditableTag.vue';
-import ElementTag from '@/components/features/tags/ElementTag.vue';
 import { getAutomaticTagColor } from '@/features/organizer/utils/automaticTagColors.js';
 
 // Mock categories with basic data
@@ -227,37 +194,6 @@ const openCategoryTags = ref([
   },
 ]);
 
-// Element Plus demo tags
-const elementPlusTags = ref([
-  {
-    id: 'element1',
-    categoryId: 'document-type',
-    tagName: 'Contract',
-    source: 'element-plus',
-    confidence: 100,
-  },
-  {
-    id: 'element2',
-    categoryId: 'priority',
-    tagName: 'Low',
-    source: 'element-plus',
-    confidence: 100,
-  },
-  {
-    id: 'element3',
-    categoryId: 'status',
-    tagName: 'Review',
-    source: 'element-plus',
-    confidence: 100,
-  },
-  {
-    id: 'element4',
-    categoryId: 'year',
-    tagName: '2022',
-    source: 'element-plus',
-    confidence: 100,
-  },
-]);
 
 // Helper functions
 const getCategoryOptions = (categoryId) => {

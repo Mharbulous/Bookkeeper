@@ -100,10 +100,22 @@ const dropdownStyle = computed(() => {
   const rect = tagEl.value.getBoundingClientRect();
   const dropdownLeft = Math.min(rect.left, window.innerWidth - Math.max(200, rect.width) - 10);
 
+  // Estimate dropdown height based on number of options (approximately 30px per item)
+  // Cap at CSS max-height of 300px
+  const estimatedDropdownHeight = Math.min(300, filtered.value.length * 30);
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const spaceAbove = rect.top;
+
+  // Determine if dropdown should appear above or below the tag
+  const shouldFlipUp = spaceBelow < estimatedDropdownHeight && spaceAbove > spaceBelow;
+
   return {
     position: 'fixed',
     left: `${dropdownLeft}px`,
-    top: `${rect.bottom + 3}px`,
+    // Position above the tag if needed, otherwise below
+    ...(shouldFlipUp
+      ? { bottom: `${window.innerHeight - rect.top + 3}px` }
+      : { top: `${rect.bottom + 3}px` }),
     minWidth: `${rect.width}px`,
   };
 });
