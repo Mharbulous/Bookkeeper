@@ -1,10 +1,10 @@
 <template>
   <div
+    ref="tagEl"
     :data-tag-id="tag.id"
     class="smart-tag"
     :class="{ expanded: tag.isOpen, editing: tag.isHeaderEditing }"
     :style="{ borderColor: tagColor, color: tagColor }"
-    ref="tagEl"
   >
     <button
       class="tag-button"
@@ -13,8 +13,8 @@
       @keydown="handleTypeToFilter"
       @blur="handleTagBlur"
     >
-      <i class="tag-icon mdi" :class="iconClass"></i>
-      <span class="tag-text" :data-cursor="cursorPosition">
+      <i class="tag-icon mdi" :class="iconClass" />
+      <span class="tag-text" :data-cursor="cursorPos">
         {{ tag.filterText || tag.tagName }}
       </span>
     </button>
@@ -22,29 +22,27 @@
     <Teleport to="body">
       <div
         v-show="tag.isOpen && hasOptions"
+        ref="dropdownEl"
         class="dropdown-options"
         :style="dropdownStyle"
-        ref="dropdownEl"
       >
-        <div class="dropdown-menu">
-          <button
-            v-for="opt in filtered"
-            :key="opt.id"
-            class="dropdown-option"
-            :class="{ selected: opt.tagName === tag.tagName }"
-            :style="opt.tagName === tag.tagName ? { color: tagColor, fontWeight: 'bold' } : {}"
-            @click="selectFromDropdown(opt.tagName)"
-          >
-            {{ opt.tagName }}
-          </button>
-        </div>
+        <button
+          v-for="opt in filtered"
+          :key="opt.id"
+          class="dropdown-option"
+          :class="{ selected: opt.tagName === tag.tagName }"
+          :style="opt.tagName === tag.tagName ? { color: tagColor, fontWeight: 'bold' } : {}"
+          @click="selectFromDropdown(opt.tagName)"
+        >
+          {{ opt.tagName }}
+        </button>
       </div>
     </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watchEffect } from 'vue';
 import { useTagEditing } from './composables/useTagEditing.js';
 
 const props = defineProps({
@@ -56,12 +54,10 @@ const props = defineProps({
 
 const emit = defineEmits(['tag-updated', 'tag-selected', 'tag-created']);
 
-// Refs
 const tagEl = ref(null);
 const dropdownEl = ref(null);
-const forceRecalc = ref(0); // Force reactivity on viewport changes
+const dropdownPos = ref({});
 
-// Composable
 const { handleTagClick, handleTagBlur, handleTypeToFilter, selectFromDropdown } = useTagEditing(
   props.tag,
   props.isOpenCategory,
@@ -69,7 +65,6 @@ const { handleTagClick, handleTagBlur, handleTypeToFilter, selectFromDropdown } 
   emit
 );
 
-// Computed
 const filtered = computed(() => {
   if (!props.tag.filterText) return props.categoryOptions;
   const filter = props.tag.filterText.toLowerCase();
@@ -78,49 +73,34 @@ const filtered = computed(() => {
 
 const hasOptions = computed(() => filtered.value.length > 0);
 
-const cursorPosition = computed(() =>
+const cursorPos = computed(() =>
   props.tag.isHeaderEditing ? (props.tag.hasStartedTyping ? 'right' : 'left') : null
 );
 
-const iconClass = computed(() => {
-  // Show different icons when user is typing (isHeaderEditing)
-  if (props.tag.isHeaderEditing) {
-    return props.isOpenCategory ? 'mdi-pencil' : 'mdi-lock';
-  }
-  // Default tag icon when not editing
-  return 'mdi-tag';
-});
+const iconClass = computed(() =>
+  props.tag.isHeaderEditing ? (props.isOpenCategory ? 'mdi-pencil' : 'mdi-lock') : 'mdi-tag'
+);
 
-const dropdownStyle = computed(() => {
-  if (!tagEl.value) return {};
+const dropdownStyle = computed(() => dropdownPos.value);
 
-  // Include forceRecalc in computation to trigger recalculation on viewport changes
-  forceRecalc.value; // eslint-disable-line no-unused-expressions
+const updateDropdownPos = () => {
+  if (!tagEl.value) return;
 
   const rect = tagEl.value.getBoundingClientRect();
-  const dropdownLeft = Math.min(rect.left, window.innerWidth - Math.max(200, rect.width) - 10);
+  const dropHeight = Math.min(300, filtered.value.length * 30);
+  const flipUp =
+    window.innerHeight - rect.bottom < dropHeight && rect.top > window.innerHeight - rect.bottom;
 
-  // Estimate dropdown height based on number of options (approximately 30px per item)
-  // Cap at CSS max-height of 300px
-  const estimatedDropdownHeight = Math.min(300, filtered.value.length * 30);
-  const spaceBelow = window.innerHeight - rect.bottom;
-  const spaceAbove = rect.top;
-
-  // Determine if dropdown should appear above or below the tag
-  const shouldFlipUp = spaceBelow < estimatedDropdownHeight && spaceAbove > spaceBelow;
-
-  return {
+  dropdownPos.value = {
     position: 'fixed',
-    left: `${dropdownLeft}px`,
-    // Position above the tag if needed, otherwise below
-    ...(shouldFlipUp
+    left: `${Math.min(rect.left, window.innerWidth - Math.max(200, rect.width) - 10)}px`,
+    minWidth: `${rect.width}px`,
+    ...(flipUp
       ? { bottom: `${window.innerHeight - rect.top + 3}px` }
       : { top: `${rect.bottom + 3}px` }),
-    minWidth: `${rect.width}px`,
   };
-});
+};
 
-// Methods
 const closeTag = () => {
   Object.assign(props.tag, {
     isOpen: false,
@@ -130,7 +110,6 @@ const closeTag = () => {
   });
 };
 
-// Event handling
 const handleOutside = (e) => {
   if (
     props.tag.isOpen &&
@@ -141,36 +120,24 @@ const handleOutside = (e) => {
   }
 };
 
-// Lifecycle
+watchEffect(() => {
+  if (props.tag.isOpen) updateDropdownPos();
+});
+
 onMounted(() => {
-  const handleResize = () => {
-    forceRecalc.value++; // Trigger dropdown position recalculation
-  };
-
-  const handleScroll = () => {
-    forceRecalc.value++; // Trigger dropdown position recalculation
-  };
-
-  const listeners = [
+  const events = [
     ['click', handleOutside],
-    ['scroll', handleScroll, true],
-    ['resize', handleResize],
+    ['scroll', updateDropdownPos, true],
+    ['resize', updateDropdownPos],
   ];
 
-  listeners.forEach(([event, handler, capture]) =>
-    window.addEventListener(event, handler, capture)
-  );
+  events.forEach(([evt, fn, cap]) => window.addEventListener(evt, fn, cap));
 
-  onUnmounted(() =>
-    listeners.forEach(([event, handler, capture]) =>
-      window.removeEventListener(event, handler, capture)
-    )
-  );
+  onUnmounted(() => events.forEach(([evt, fn, cap]) => window.removeEventListener(evt, fn, cap)));
 });
 </script>
 
 <style scoped>
-/* Core tag */
 .smart-tag {
   display: inline-block;
   margin: 4px;
@@ -188,25 +155,21 @@ onMounted(() => {
   color: inherit;
   font-size: 12px;
   cursor: pointer;
-  outline: none; /* Remove browser focus outline */
+  outline: none;
 }
 
-/* Change cursor to text when tag is in editing mode */
 .smart-tag.editing .tag-button {
   cursor: text;
-}
-
-.tag-button:focus {
-  outline: none; /* Ensure no outline on focus */
 }
 
 .tag-icon {
   font-size: 14px;
 }
 
-/* Removed hover effect - icon will change based on typing state instead */
+.tag-text[data-cursor] {
+  position: relative;
+}
 
-/* Cursor animation - communicates text is being edited */
 .tag-text[data-cursor]::before,
 .tag-text[data-cursor]::after {
   content: '|';
@@ -216,23 +179,16 @@ onMounted(() => {
 }
 
 .tag-text[data-cursor]::before {
-  left: -2px; /* Position cursor to the left of text */
+  left: -2px;
 }
-
 .tag-text[data-cursor]::after {
-  right: -2px; /* Position cursor to the right of text */
+  right: -2px;
 }
-
 .tag-text[data-cursor='left']::after {
   display: none;
 }
 .tag-text[data-cursor='right']::before {
   display: none;
-}
-
-/* Ensure text container can position cursor absolutely */
-.tag-text[data-cursor] {
-  position: relative;
 }
 
 @keyframes blink {
@@ -246,40 +202,33 @@ onMounted(() => {
   }
 }
 
-/* Dropdown */
 .dropdown-options {
   background: white;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  padding: 0;
   max-height: 300px;
   overflow-y: auto;
   z-index: 9999;
 }
 
-/* Menu items */
 .dropdown-option {
   display: block;
   width: 100%;
   padding: 6px 12px;
   background: none;
   border: none;
-  border-radius: 0;
   text-align: left;
   font-size: 13px;
   color: #606266;
   cursor: pointer;
 }
 
-/* Hover state - communicates selection */
 .dropdown-option:hover {
   background: rgba(25, 118, 210, 0.1);
   color: #1976d2;
-  border-radius: 0;
 }
 
-/* Basic scrollbar for overflow content */
 .dropdown-options::-webkit-scrollbar {
   width: 6px;
 }
