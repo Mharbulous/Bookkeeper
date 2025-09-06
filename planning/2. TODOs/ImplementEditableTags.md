@@ -1,190 +1,228 @@
-# Implementation Plan: EditableTag Integration
+# EditableTag Integration - Simplified Plan
 
-## Overview
+## Goal
 
-This document outlines the plan to integrate the open category tags from `EditableTag.vue` (currently demonstrated at `/dev/clickable-tags`) into the main document organizer page (`/organizer`).
+Replace the current dropdown-based tag system with the EditableTag component.
 
-## Current State Analysis
+## Current Setup
 
-### Current Organizer Page Tags (`/organizer`)
-
-The organizer uses a **complex multi-component tag system**:
 - **TagSelector.vue** - Main coordinator component
-- **CategoryTagSelector.vue** - Category/tag selection dropdowns  
-- **TagDisplaySection.vue** - Shows existing tags as colored chips
-- **TagManagementService.vue** - Handles data loading and AI operations
-- **TagOperationsHandler.vue** - Handles CRUD operations
-- **Multi-layered architecture** with separate services for different concerns
-- **Category-first workflow**: Select category → select/create tag
-- **Structured data storage** using Firestore subcollections
-- **AI integration** for automatic tag suggestions
-- **Complex state management** across multiple components
+- **CategoryTagSelector.vue** - Dropdown component to be replaced
+- Tags stored in Firestore subcollections: `documents/{docId}/tags`
 
-### Open Category Tags (`/dev/clickable-tags`)
+## Implementation Steps
 
-Uses **EditableTag.vue** component with:
-- **Single-component solution** for tag editing
-- **Inline editing** with type-to-filter functionality
-- **Direct tag editing**: Click tag → type to filter/create → select/create
-- **Open category support** (`isOpenCategory: true`) allows custom tag creation
-- **Smart dropdown positioning** with automatic flip-up/down
-- **Visual editing states** with cursor indicators and icons
-- **Simpler architecture** - one component handles everything
-- **Real-time filtering** of existing options while typing
+### Step 1: Create Adapter Component (Day 1)
 
-## Key Differences
+Create `EditableTagWrapper.vue` to bridge between existing system and EditableTag:
 
-1. **Complexity**: Current system has 5+ components vs 1 component for EditableTag
-2. **Workflow**: Current requires category selection first, EditableTag allows direct tag editing
-3. **User Experience**: EditableTag provides immediate inline editing, current system uses separate dropdowns
-4. **Customization**: Current system is category-constrained, EditableTag allows free-form input when `isOpenCategory: true`
-5. **Data Integration**: Current system deeply integrated with Firestore subcollections and AI services
+```vue
+<!-- src/features/organizer/components/EditableTagWrapper.vue -->
+<template>
+  <EditableTag
+    :tag="adaptedTag"
+    :categoryOptions="categoryOptions"
+    :isOpenCategory="category.allowCustom"
+    :tagColor="tagColor"
+    @tag-updated="handleTagUpdate"
+    @tag-removed="handleTagRemove"
+  />
+</template>
 
-## Implementation Plan
+<script setup>
+import EditableTag from '@/components/features/tags/EditableTag.vue';
 
-### Phase 1: Component Integration
-**Goal**: Replace dropdown-based tag selection with inline EditableTag components
+const props = defineProps({
+  category: Object,
+  existingTag: Object,
+  documentId: String,
+});
 
-**Tasks**:
-- [ ] Replace `CategoryTagSelector.vue` with `EditableTag.vue` instances in `TagSelector.vue`
-- [ ] Create individual EditableTag for each category assigned to a document
-- [ ] Configure each EditableTag with:
-  - `isOpenCategory: true` for custom tag creation
-  - Appropriate `categoryOptions` from existing category data
-  - Proper `tagColor` using existing `automaticTagColors.js`
-- [ ] Update component imports and dependencies
+// Transform existing tag to EditableTag format
+const adaptedTag = computed(() => ({
+  id: props.existingTag?.id,
+  tagName: props.existingTag?.tagName || '',
+  categoryId: props.category.id,
+}));
 
-**Files to Modify**:
-- `src/features/organizer/components/TagSelector.vue`
-- `src/features/organizer/components/CategoryTagSelector.vue` (potentially remove/refactor)
+// Load category options from Firestore or local config
+const categoryOptions = ref([]);
 
-### Phase 2: Data Adapter Layer
-**Goal**: Bridge data format differences between systems
+const handleTagUpdate = async (updatedTag) => {
+  // Save to Firestore
+  await updateTagInFirestore(props.documentId, updatedTag);
+  emit('tag-updated', updatedTag);
+};
 
-**Tasks**:
-- [ ] Create adapter functions to convert Firestore subcollection data to EditableTag format
-- [ ] Map category tags to EditableTag's `categoryOptions` prop structure
-- [ ] Create reverse mapping functions for saving EditableTag data back to Firestore
-- [ ] Ensure tag metadata (source, confidence, etc.) is preserved during conversion
-
-**New Files to Create**:
-- `src/features/organizer/adapters/editableTagAdapter.js`
-
-**Data Format Mapping**:
-```javascript
-// Current format (Firestore subcollection)
-{
-  id: 'tag123',
-  categoryId: 'document-type',
-  tagName: 'Invoice',
-  source: 'ai',
-  confidence: 95
-}
-
-// EditableTag expected format
-{
-  id: 'tag123',
-  tagName: 'Invoice',
-  // Plus category options array for dropdown
-}
+const handleTagRemove = async () => {
+  // Delete from Firestore
+  await deleteTagFromFirestore(props.documentId, props.existingTag.id);
+  emit('tag-removed', props.existingTag.id);
+};
+</script>
 ```
 
-### Phase 3: Event Handling Integration
-**Goal**: Connect EditableTag events to existing backend services
+### Step 2: Update TagSelector.vue (Day 2)
 
-**Tasks**:
-- [ ] Map EditableTag's `@tag-updated` events to existing tag management services
-- [ ] Ensure AI tag processing continues to work with new component
-- [ ] Maintain tag approval/rejection workflows for AI-suggested tags
-- [ ] Preserve existing tag CRUD operations through `TagOperationsHandler.vue`
-- [ ] Handle tag creation events and save to Firestore subcollections
+Replace CategoryTagSelector with EditableTagWrapper:
 
-**Integration Points**:
-- `TagManagementService.vue` - AI operations
-- `TagOperationsHandler.vue` - CRUD operations
-- Existing tag approval/rejection system
+```vue
+<!-- In TagSelector.vue -->
+<template>
+  <div v-for="category in activeCategories" :key="category.id">
+    <EditableTagWrapper
+      :category="category"
+      :existing-tag="getTagForCategory(category.id)"
+      :document-id="evidence.id"
+      @tag-updated="refreshTags"
+      @tag-removed="refreshTags"
+    />
+  </div>
+</template>
+```
 
-### Phase 4: UI/UX Refinements
-**Goal**: Ensure consistent user experience and performance
+### Step 3: Connect to Firestore Operations (Day 3-4)
 
-**Tasks**:
-- [ ] Implement proper tag color coordination using existing color system
-- [ ] Add loading states for EditableTag components during data operations
-- [ ] Integrate with existing error handling and notification system
-- [ ] Ensure progressive loading performance optimizations are maintained
-- [ ] Update styles to match existing organizer page design patterns
-- [ ] Add proper accessibility attributes and keyboard navigation
+Update the wrapper to handle CRUD operations:
 
-**Design Considerations**:
-- Maintain existing color scheme and visual hierarchy
-- Preserve loading indicators and progress states
-- Keep consistent spacing and layout with current design
+```javascript
+// In EditableTagWrapper.vue
+import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 
-## Technical Challenges
+const updateTagInFirestore = async (documentId, tag) => {
+  const tagRef = doc(db, 'documents', documentId, 'tags', tag.id || crypto.randomUUID());
 
-### 1. Architecture Mismatch
-- **Current**: Multi-service architecture with separation of concerns
-- **EditableTag**: Single-component solution
-- **Solution**: Create adapter layer that maintains service separation while using EditableTag for UI
+  await setDoc(
+    tagRef,
+    {
+      categoryId: props.category.id,
+      categoryName: props.category.name,
+      tagName: tag.tagName,
+      source: 'human',
+      confidence: 100,
+      status: 'approved',
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+};
 
-### 2. Data Format Differences
-- **Current**: Complex Firestore subcollection structure with metadata
-- **EditableTag**: Simple tag name and options array
-- **Solution**: Bidirectional data transformation functions
+const deleteTagFromFirestore = async (documentId, tagId) => {
+  if (!tagId) return;
+  const tagRef = doc(db, 'documents', documentId, 'tags', tagId);
+  await deleteDoc(tagRef);
+};
+```
 
-### 3. AI Integration Complexity
-- **Current**: Sophisticated AI tag suggestion and approval system
-- **EditableTag**: Simple tag selection/creation
-- **Solution**: Extend EditableTag to support AI tag states (pending, approved, rejected)
+### Step 4: Handle Tag Colors (Day 5)
 
-### 4. State Management
-- **Current**: Complex state spread across multiple components
-- **EditableTag**: Self-contained state management
-- **Solution**: Careful event handling to sync states between systems
+Connect the existing color system:
 
-## Success Criteria
+```javascript
+// In EditableTagWrapper.vue
+import { useTagColor } from '@/composables/useTagColor';
 
-1. **Functionality**: All existing tag operations continue to work
-2. **User Experience**: Improved inline editing replaces dropdown workflow
-3. **Performance**: No regression in loading times or responsiveness
-4. **AI Integration**: AI tag suggestions and approval workflows preserved
-5. **Data Integrity**: No loss of existing tag data or metadata
+const { getColorForTag } = useTagColor();
 
-## Risk Assessment
+const tagColor = computed(() => getColorForTag(props.category.id, props.existingTag?.tagName));
+```
 
-**Medium-High Risk Factors**:
-- Complex data transformation requirements
-- Potential state management conflicts
-- Integration with existing AI processing system
-- Maintaining backward compatibility with existing data
+### Step 5: Handle AI Tags (Day 6)
 
-**Mitigation Strategies**:
-- Implement comprehensive testing for data transformation
-- Create feature flags for gradual rollout
-- Maintain existing components as fallback during development
-- Add extensive logging for debugging integration issues
+Add support for AI-suggested tags if needed:
 
-## Estimated Effort
+```vue
+<!-- Add to EditableTag or EditableTagWrapper -->
+<template v-if="existingTag?.source === 'ai'">
+  <v-chip size="x-small" class="ml-2"> AI {{ existingTag.confidence }}% </v-chip>
+</template>
+```
 
-**Total Effort**: 2-3 weeks for complete implementation
+### Step 6: Load Category Options (Day 7)
 
-**Breakdown**:
-- Phase 1: 3-4 days
-- Phase 2: 4-5 days  
-- Phase 3: 3-4 days
-- Phase 4: 2-3 days
-- Testing & Refinement: 2-3 days
+Populate dropdown options for each category:
 
-## Next Steps
+```javascript
+// In EditableTagWrapper.vue
+onMounted(async () => {
+  if (props.category.predefinedTags) {
+    // Use local predefined tags
+    categoryOptions.value = props.category.predefinedTags;
+  } else {
+    // Load from Firestore if stored there
+    const snapshot = await getDocs(collection(db, 'tagOptions', props.category.id));
+    categoryOptions.value = snapshot.docs.map((doc) => doc.data().name);
+  }
+});
+```
 
-1. **Start with Phase 1**: Begin component integration in isolated environment
-2. **Create data transformation layer**: Build and test adapter functions
-3. **Incremental integration**: Connect one piece at a time to avoid breaking existing functionality
-4. **Comprehensive testing**: Test all existing workflows with new components
-5. **User feedback**: Gather feedback on improved UX before full deployment
+### Step 7: Testing & Cleanup (Day 8-9)
+
+1. Test with real documents:
+
+   - Create new tags
+   - Edit existing tags
+   - Delete tags
+   - Test with multiple categories
+
+2. Remove old components:
+   - Delete CategoryTagSelector.vue
+   - Remove unused dropdown code
+   - Clean up any old tag selection logic
+
+### Step 8: Final Integration (Day 10)
+
+1. Ensure all category types work:
+
+   - Closed categories (fixed options only)
+   - Open categories (allow custom values)
+   - AI-suggested categories
+
+2. Verify data persistence:
+   - Tags save correctly to Firestore
+   - Tags load on page refresh
+   - Multi-user editing works
+
+## Key Files to Modify
+
+1. **Create New:**
+
+   - `EditableTagWrapper.vue` - Adapter component
+
+2. **Modify:**
+
+   - `TagSelector.vue` - Replace dropdown with EditableTag
+   - Tag-related Firestore operations (if centralized)
+
+3. **Delete (after testing):**
+   - `CategoryTagSelector.vue`
+   - Any unused dropdown components
+
+## Simplified Data Flow
+
+```
+User edits tag → EditableTag emits event → EditableTagWrapper → Firestore
+                                                ↓
+                                          TagSelector refreshes
+```
+
+## Success Checklist
+
+- [ ] Users can edit tags inline without dropdowns
+- [ ] Changes save to Firestore immediately
+- [ ] All existing tags display correctly
+- [ ] New tags can be created
+- [ ] Tags can be deleted
+- [ ] AI tags (if any) still work
+
+## Potential Issues & Quick Fixes
+
+1. **Tag not saving**: Check Firestore rules allow writes to tags subcollection
+2. **Options not loading**: Verify category configuration has either `predefinedTags` or Firestore collection
+3. **Colors not working**: Ensure `useTagColor` composable is imported correctly
+4. **Missing tags**: Check if `getTagForCategory()` returns the right structure
 
 ---
 
-*Document created: 2025-09-06*  
-*Status: Planning Phase*  
-*Priority: Medium*
+_Estimated Time: 8-10 days of casual development_  
+_Approach: Direct replacement, test with real data, fix issues as they arise_
