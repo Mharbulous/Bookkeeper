@@ -10,7 +10,7 @@
       </div>
     </div>
 
-    <!-- File display with 3 view modes -->
+    <!-- File display with 2 view modes -->
     <div class="file-display">
       <!-- List view -->
       <div v-if="currentViewMode === 'list'" class="file-list">
@@ -34,19 +34,9 @@
             :tagUpdateLoading="props.getTagUpdateLoading(evidence.id)"
             :aiProcessing="props.getAIProcessing(evidence.id)"
             :get-evidence-tags="props.getEvidenceTags"
-            @rename="$emit('rename', $event)"
-            @view-details="$emit('viewDetails', $event)"
             @process-with-ai="$emit('process-with-ai', $event)"
           />
         </template>
-      </div>
-
-      <!-- Grid view placeholder -->
-      <div v-else-if="currentViewMode === 'grid'" class="file-grid">
-        <p class="text-body-2 text-center text-medium-emphasis pa-8">
-          <v-icon size="48" class="mb-2 d-block">mdi-view-grid</v-icon>
-          Folder Grid coming in future updates
-        </p>
       </div>
 
       <!-- Tree view placeholder -->
@@ -114,8 +104,6 @@ let dataLoadTime = null; // eslint-disable-line no-unused-vars
 const emit = defineEmits([
   'update:viewMode',
   'process-with-ai',
-  'rename',
-  'viewDetails',
 ]);
 
 // Handle view mode changes from ViewModeToggle
@@ -225,7 +213,6 @@ onUnmounted(() => {
   min-height: 0;
 }
 
-.file-grid,
 .file-tree {
   min-height: 200px;
   display: flex;

@@ -34,9 +34,6 @@
             :show-actions="showActions"
             :action-loading="actionLoading"
             :ai-processing="aiProcessing"
-            @rename="handleRename"
-            @view-details="handleViewDetails"
-            @delete="handleDelete"
             @process-with-ai="handleProcessWithAI"
           />
         </div>
@@ -150,9 +147,6 @@ const props = defineProps({
 // Emits
 const emit = defineEmits([
   'click',
-  'rename',
-  'view-details',
-  'delete',
   'selection-change',
   'process-with-ai',
 ]);
@@ -212,17 +206,6 @@ const handleClick = () => {
 };
 
 
-const handleRename = () => {
-  emit('rename', props.evidence);
-};
-
-const handleViewDetails = () => {
-  emit('view-details', props.evidence);
-};
-
-const handleDelete = () => {
-  emit('delete', props.evidence);
-};
 
 const handleSelectionChange = (selected) => {
   emit('selection-change', props.evidence.id, selected);

@@ -29,8 +29,6 @@
       :getEvidenceTags="getEvidenceTags"
       :getTagUpdateLoading="getTagUpdateLoading"
       :getAIProcessing="getAIProcessing"
-      @rename="renameFile"
-      @view-details="viewDetails"
       @process-with-ai="processWithAI"
     />
 
@@ -135,13 +133,6 @@ const getAIProcessing = (evidenceId) => {
 };
 
 
-const renameFile = () => {
-  showNotification('Rename functionality coming soon', 'info');
-};
-
-const viewDetails = () => {
-  showNotification('Details view coming soon', 'info');
-};
 
 const processWithAI = async (evidence) => {
   console.log('DEBUG: processWithAI called with evidence:', evidence.id);

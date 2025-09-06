@@ -13,43 +13,11 @@
       <span v-if="aiProcessing" class="processing-spinner">⟳</span>
     </button>
     
-    <!-- Simplified dropdown menu -->
-    <div class="action-dropdown">
-      <button
-        class="action-btn dropdown-toggle"
-        :class="{ disabled: actionLoading, open: dropdownOpen }"
-        :disabled="actionLoading"
-        :title="'More actions'"
-        @click.stop="toggleDropdown"
-      >
-        <span class="action-icon">⋮</span>
-      </button>
-      
-      <div v-if="dropdownOpen" class="dropdown-menu" @click.stop>
-        <div class="dropdown-item" @click="handleRename">
-          <span class="dropdown-icon">✏️</span>
-          Rename
-        </div>
-        <div class="dropdown-item" @click="handleViewDetails">
-          <span class="dropdown-icon">ℹ️</span>
-          Details
-        </div>
-        <div v-if="!readonly" class="dropdown-separator"></div>
-        <div 
-          v-if="!readonly"
-          class="dropdown-item dropdown-item--danger" 
-          @click="handleDelete"
-        >
-          <span class="dropdown-icon">🗑️</span>
-          Delete
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onBeforeMount, ref, onUnmounted } from 'vue';
+import { computed } from 'vue';
 
 // Debug logging helper
 const debugLog = (message, data = null) => {
@@ -93,9 +61,6 @@ const props = defineProps({
 
 // Emits
 const emit = defineEmits([
-  'rename',
-  'view-details',
-  'delete',
   'process-with-ai',
 ]);
 
@@ -104,31 +69,6 @@ const isAIEnabled = computed(() => {
   return import.meta.env.VITE_ENABLE_AI_FEATURES === 'true';
 });
 
-// Dropdown state management
-const dropdownOpen = ref(false);
-
-const toggleDropdown = () => {
-  dropdownOpen.value = !dropdownOpen.value;
-};
-
-const closeDropdown = () => {
-  dropdownOpen.value = false;
-};
-
-// Close dropdown when clicking outside
-const handleClickOutside = (event) => {
-  if (dropdownOpen.value && !event.target.closest('.action-dropdown')) {
-    closeDropdown();
-  }
-};
-
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
-});
 
 // Event handlers
 const handleProcessWithAI = () => {
@@ -136,33 +76,10 @@ const handleProcessWithAI = () => {
 };
 
 
-const handleRename = () => {
-  closeDropdown();
-  emit('rename', props.evidence);
-};
-
-const handleViewDetails = () => {
-  closeDropdown();
-  emit('view-details', props.evidence);
-};
-
-const handleDelete = () => {
-  closeDropdown();
-  emit('delete', props.evidence);
-};
 
 // Performance tracking - mark setup completion
 setupComplete = performance.now();
 
-// Lifecycle performance tracking (disabled - optimization complete)
-onBeforeMount(() => {
-  beforeMountTime = performance.now();
-  // Performance tracking disabled - optimization complete
-});
-
-onMounted(() => {
-  // Performance tracking disabled - optimization complete
-});
 </script>
 
 <style scoped>
@@ -221,71 +138,12 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* Dropdown styles - much lighter than v-menu */
-.action-dropdown {
-  position: relative;
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  min-width: 140px;
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgba(var(--v-theme-outline), 0.2);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  padding: 4px 0;
-  margin-top: 4px;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1.2;
-  color: rgba(var(--v-theme-on-surface), 0.87);
-  transition: background-color 0.15s ease;
-}
-
-.dropdown-item:hover {
-  background: rgba(var(--v-theme-on-surface), 0.08);
-}
-
-.dropdown-item--danger {
-  color: rgb(var(--v-theme-error));
-}
-
-.dropdown-item--danger:hover {
-  background: rgba(var(--v-theme-error), 0.08);
-}
-
-.dropdown-icon {
-  font-size: 14px;
-  margin-right: 8px;
-  width: 16px;
-  text-align: center;
-}
-
-.dropdown-separator {
-  height: 1px;
-  background: rgba(var(--v-theme-outline), 0.2);
-  margin: 4px 0;
-}
 
 /* Responsive design */
 @media (max-width: 768px) {
   .file-actions {
     align-self: stretch;
     justify-content: flex-end;
-  }
-  
-  .dropdown-menu {
-    right: 0;
-    left: auto;
   }
 }
 </style>
