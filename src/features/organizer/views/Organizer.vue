@@ -29,7 +29,6 @@
       :getEvidenceTags="getEvidenceTags"
       :getTagUpdateLoading="getTagUpdateLoading"
       :getAIProcessing="getAIProcessing"
-      @download="downloadFile"
       @rename="renameFile"
       @view-details="viewDetails"
       @process-with-ai="processWithAI"
@@ -135,9 +134,6 @@ const getAIProcessing = (evidenceId) => {
   return aiProcessing.value.has(evidenceId);
 };
 
-const downloadFile = () => {
-  showNotification('Download functionality coming soon', 'info');
-};
 
 const renameFile = () => {
   showNotification('Rename functionality coming soon', 'info');

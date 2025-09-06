@@ -13,16 +13,6 @@
       <span v-if="aiProcessing" class="processing-spinner">⟳</span>
     </button>
     
-    <button
-      class="action-btn"
-      :class="{ disabled: actionLoading }"
-      :disabled="actionLoading"
-      :title="'Download'"
-      @click.stop="handleDownload"
-    >
-      <span class="action-icon">⬇️</span>
-    </button>
-    
     <!-- Simplified dropdown menu -->
     <div class="action-dropdown">
       <button
@@ -103,7 +93,6 @@ const props = defineProps({
 
 // Emits
 const emit = defineEmits([
-  'download',
   'rename',
   'view-details',
   'delete',
@@ -146,9 +135,6 @@ const handleProcessWithAI = () => {
   emit('process-with-ai', props.evidence);
 };
 
-const handleDownload = () => {
-  emit('download', props.evidence);
-};
 
 const handleRename = () => {
   closeDropdown();

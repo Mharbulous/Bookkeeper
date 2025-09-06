@@ -34,7 +34,6 @@
             :tagUpdateLoading="props.getTagUpdateLoading(evidence.id)"
             :aiProcessing="props.getAIProcessing(evidence.id)"
             :get-evidence-tags="props.getEvidenceTags"
-            @download="$emit('download', $event)"
             @rename="$emit('rename', $event)"
             @view-details="$emit('viewDetails', $event)"
             @process-with-ai="$emit('process-with-ai', $event)"
@@ -115,7 +114,6 @@ let dataLoadTime = null; // eslint-disable-line no-unused-vars
 const emit = defineEmits([
   'update:viewMode',
   'process-with-ai',
-  'download',
   'rename',
   'viewDetails',
 ]);

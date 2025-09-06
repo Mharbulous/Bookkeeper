@@ -34,7 +34,6 @@
             :show-actions="showActions"
             :action-loading="actionLoading"
             :ai-processing="aiProcessing"
-            @download="handleDownload"
             @rename="handleRename"
             @view-details="handleViewDetails"
             @delete="handleDelete"
@@ -151,7 +150,6 @@ const props = defineProps({
 // Emits
 const emit = defineEmits([
   'click',
-  'download',
   'rename',
   'view-details',
   'delete',
@@ -213,9 +211,6 @@ const handleClick = () => {
   emit('click', props.evidence);
 };
 
-const handleDownload = () => {
-  emit('download', props.evidence);
-};
 
 const handleRename = () => {
   emit('rename', props.evidence);
