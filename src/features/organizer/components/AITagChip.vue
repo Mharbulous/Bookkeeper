@@ -7,22 +7,17 @@
     :class="{
       'ai-tag-chip--suggested': getTagStatus() === 'suggested',
       'ai-tag-chip--approved': getTagStatus() === 'approved',
-      'ai-tag-chip--rejected': getTagStatus() === 'rejected'
+      'ai-tag-chip--rejected': getTagStatus() === 'rejected',
     }"
   >
     <!-- AI indicator icon -->
-    <v-icon
-      v-if="showAIIcon"
-      size="14"
-      class="ai-icon"
-      :class="{ 'mr-1': true }"
-    >
+    <v-icon v-if="showAIIcon" size="14" class="ai-icon" :class="{ 'mr-1': true }">
       {{ aiIcon }}
     </v-icon>
-    
+
     <!-- Tag name -->
     {{ tag.tagName }}
-    
+
     <!-- Status indicator for suggested tags -->
     <v-icon
       v-if="getTagStatus() === 'suggested' && showStatusActions"
@@ -31,14 +26,9 @@
     >
       mdi-clock-outline
     </v-icon>
-    
+
     <!-- Approval indicator for approved tags -->
-    <v-icon
-      v-if="getTagStatus() === 'approved'"
-      size="14"
-      class="ml-1 status-icon"
-      color="success"
-    >
+    <v-icon v-if="getTagStatus() === 'approved'" size="14" class="ml-1 status-icon" color="success">
       mdi-check-circle
     </v-icon>
 
@@ -55,15 +45,11 @@
             <strong>Confidence:</strong> {{ getConfidence() }}%
             <span v-if="isAutoApproved()" class="auto-approved-badge">(Auto-approved)</span>
           </div>
-          <div v-if="tag.reasoning">
-            <strong>Reasoning:</strong> {{ tag.reasoning }}
-          </div>
+          <div v-if="tag.reasoning"><strong>Reasoning:</strong> {{ tag.reasoning }}</div>
           <div v-if="getCreatedAt()">
             <strong>Suggested:</strong> {{ formatDate(getCreatedAt()) }}
           </div>
-          <div class="tooltip-status">
-            <strong>Status:</strong> {{ statusText }}
-          </div>
+          <div class="tooltip-status"><strong>Status:</strong> {{ statusText }}</div>
         </div>
       </div>
     </v-tooltip>
@@ -80,23 +66,22 @@ const props = defineProps({
     type: Object,
     required: true,
     validator: (tag) => {
-      return tag.tagName && 
-             tag.categoryName;
-    }
+      return tag.tagName && tag.categoryName;
+    },
   },
   showAIIcon: {
     type: Boolean,
-    default: true
+    default: true,
   },
   showStatusActions: {
     type: Boolean,
-    default: true
+    default: true,
   },
   variant: {
     type: String,
     default: 'tonal', // tonal, outlined, flat
-    validator: (value) => ['tonal', 'outlined', 'flat'].includes(value)
-  }
+    validator: (value) => ['tonal', 'outlined', 'flat'].includes(value),
+  },
 });
 
 // Use tag color composable for centralized color resolution
@@ -106,7 +91,7 @@ const { getTagColor } = useTagColor();
 const displayColor = computed(() => {
   const status = getTagStatus();
   const confidence = getConfidence();
-  
+
   switch (status) {
     case 'suggested':
       // Color intensity based on confidence level
@@ -134,22 +119,8 @@ const chipVariant = computed(() => {
 });
 
 const aiIcon = computed(() => {
-  const status = getTagStatus();
-  const confidence = getConfidence();
-  
-  switch (status) {
-    case 'suggested':
-      // Different icons based on confidence
-      if (confidence >= 85) return 'mdi-robot-excited';
-      if (confidence >= 70) return 'mdi-robot-outline';
-      return 'mdi-robot-confused';
-    case 'approved':
-      return isAutoApproved() ? 'mdi-robot-industrial' : 'mdi-robot-happy';
-    case 'rejected':
-      return 'mdi-robot-off';
-    default:
-      return 'mdi-robot';
-  }
+  // Simplified to always use the android head icon
+  return 'mdi-robot';
 });
 
 const statusText = computed(() => {
@@ -177,22 +148,22 @@ const getTagStatus = () => {
     // Map 'pending' to 'suggested' for UI compatibility
     return props.tag.status === 'pending' ? 'suggested' : props.tag.status;
   }
-  
+
   // Legacy embedded format - metadata.status
   if (props.tag.metadata?.status) {
     return props.tag.metadata.status;
   }
-  
+
   // Check if it's a human tag that was approved from AI (legacy)
   if (props.tag.source === 'human' && props.tag.metadata?.originallyFromAI) {
     return 'approved';
   }
-  
+
   // Default for AI tags without explicit status
   if (props.tag.source === 'ai') {
     return 'suggested';
   }
-  
+
   return 'unknown';
 };
 
@@ -204,12 +175,12 @@ const getConfidence = () => {
   if (typeof props.tag.confidence === 'number') {
     return Math.round(props.tag.confidence);
   }
-  
+
   // Legacy format with decimal confidence
   if (props.tag.confidence && props.tag.confidence <= 1) {
     return Math.round(props.tag.confidence * 100);
   }
-  
+
   return null;
 };
 
@@ -223,16 +194,14 @@ const isAutoApproved = () => {
 // Helper functions
 const formatDate = (date) => {
   if (!date) return '';
-  
-  const dateObj = date instanceof Date ? date : 
-                  date.toDate ? date.toDate() : 
-                  new Date(date);
-  
+
+  const dateObj = date instanceof Date ? date : date.toDate ? date.toDate() : new Date(date);
+
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
-    minute: '2-digit'
+    minute: '2-digit',
   }).format(dateObj);
 };
 
@@ -244,12 +213,12 @@ const getCreatedAt = () => {
   if (props.tag.createdAt) {
     return props.tag.createdAt;
   }
-  
+
   // Check embedded format (suggestedAt)
   if (props.tag.suggestedAt) {
     return props.tag.suggestedAt;
   }
-  
+
   return null;
 };
 </script>
@@ -315,14 +284,14 @@ const getCreatedAt = () => {
 
 /* Visual distinction animations */
 @keyframes pulse-ai {
-  0% { 
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); 
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4);
   }
-  70% { 
-    box-shadow: 0 0 0 4px rgba(255, 152, 0, 0); 
+  70% {
+    box-shadow: 0 0 0 4px rgba(255, 152, 0, 0);
   }
-  100% { 
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); 
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
   }
 }
 
@@ -342,13 +311,13 @@ const getCreatedAt = () => {
   .ai-tag-chip {
     font-size: 0.75rem;
   }
-  
+
   .ai-icon,
   .status-icon {
     width: 12px !important;
     height: 12px !important;
   }
-  
+
   .ai-tag-tooltip {
     max-width: 240px;
     font-size: 0.8rem;

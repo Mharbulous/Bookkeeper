@@ -8,38 +8,22 @@
     <v-card-text class="pa-4">
       <div class="file-item-content">
         <!-- File info section -->
-        <FileListItemContent
-          :evidence="evidence"
-          :show-processing-stage="showProcessingStage"
-        />
+        <FileListItemContent :evidence="evidence" :show-processing-stage="showProcessingStage" />
 
-        <!-- Tags section - conditionally lazy loaded -->
-        <div 
+        <!-- Simplified Tags section - conditionally lazy loaded -->
+        <div
           v-if="!enableProgressiveLoading || tagsVisible"
           :key="`tags-${evidence.id}`"
           :class="enableProgressiveLoading ? 'tags-section' : ''"
         >
-          <FileListItemTags
-            :evidence="evidence"
-            :readonly="readonly"
-            :tag-update-loading="tagUpdateLoading"
-            :tag-input-placeholder="tagInputPlaceholder"
-            :allow-manual-editing="allowManualEditing"
-            @tags-updated="handleTagsUpdated"
-            @migrate-legacy="handleMigrateLegacy"
-            @tag-error="handleTagError"
-          />
+          <SimplifiedTagDisplay :evidence="evidence" :get-evidence-tags="getEvidenceTags" />
         </div>
-        <div 
-          v-else-if="enableProgressiveLoading"
-          class="tags-placeholder"
-          @click.stop="loadTags"
-        >
+        <div v-else-if="enableProgressiveLoading" class="tags-placeholder" @click.stop="loadTags">
           <span class="placeholder-text">Tags loading...</span>
         </div>
 
         <!-- Actions section - conditionally lazy loaded on hover -->
-        <div 
+        <div
           v-if="!enableProgressiveLoading || actionsVisible"
           :key="`actions-${evidence.id}`"
           :class="enableProgressiveLoading ? 'actions-section' : ''"
@@ -57,7 +41,7 @@
             @process-with-ai="handleProcessWithAI"
           />
         </div>
-        <div 
+        <div
           v-else-if="enableProgressiveLoading"
           class="actions-placeholder"
           @mouseenter="loadActions"
@@ -81,19 +65,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, nextTick } from 'vue';
+import { onMounted, ref, nextTick } from 'vue';
 import FileListItemContent from './FileListItemContent.vue';
-import FileListItemTags from './FileListItemTags.vue';
+import SimplifiedTagDisplay from './SimplifiedTagDisplay.vue';
 import FileListItemActions from './FileListItemActions.vue';
 
-// Debug logging helper
-const debugLog = (message, data = null) => {
-  const timestamp = new Date().toISOString().substring(11, 23);
-  console.log(`[${timestamp}] [FileListItem] ${message}`, data || '');
-};
+// Debug logging helper - disabled for production
+// const debugLog = (message, data = null) => {
+//   const timestamp = new Date().toISOString().substring(11, 23);
+//   console.log(`[${timestamp}] [FileListItem] ${message}`, data || '');
+// };
 
 // Track render timing
-const renderStart = performance.now();
+const renderStart = performance.now(); // eslint-disable-line no-unused-vars
 
 // Props
 const props = defineProps({
@@ -102,7 +86,7 @@ const props = defineProps({
     type: Object,
     required: true,
   },
-  
+
   // Display options
   readonly: {
     type: Boolean,
@@ -124,7 +108,7 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  
+
   // Loading states
   tagUpdateLoading: {
     type: Boolean,
@@ -138,31 +122,34 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  
+
   // Customization
   tagInputPlaceholder: {
     type: String,
     default: 'Add tags...',
   },
-  
+
   // Control manual editing capabilities
   allowManualEditing: {
     type: Boolean,
     default: true,
   },
-  
+
   // Performance optimization flags
   enableProgressiveLoading: {
     type: Boolean,
     default: true,
   },
+
+  // Function to get tags from evidence
+  getEvidenceTags: {
+    type: Function,
+    default: null,
+  },
 });
 
 // Emits
 const emit = defineEmits([
-  'tags-updated',
-  'tag-error',
-  'migrate-legacy',
   'click',
   'download',
   'rename',
@@ -180,20 +167,20 @@ const loadingPhase = ref(1); // 1: content only, 2: + tags, 3: + actions
 // Progressive loading methods
 const loadTags = async () => {
   if (tagsVisible.value) return;
-  
+
   tagsVisible.value = true;
   loadingPhase.value = 2;
-  
+
   await nextTick();
   // Performance tracking disabled - optimization complete
 };
 
 const loadActions = async () => {
   if (actionsVisible.value) return;
-  
+
   actionsVisible.value = true;
   loadingPhase.value = 3;
-  
+
   await nextTick();
   // Individual item logging disabled - using loop-level timing instead
 };
@@ -201,7 +188,7 @@ const loadActions = async () => {
 // Auto-load tags after a short delay for better UX
 const autoLoadTags = () => {
   if (!props.enableProgressiveLoading) return;
-  
+
   setTimeout(() => {
     if (!tagsVisible.value) {
       loadTags();
@@ -212,7 +199,7 @@ const autoLoadTags = () => {
 // Auto-load everything after longer delay as fallback
 const autoLoadAll = () => {
   if (!props.enableProgressiveLoading) return;
-  
+
   setTimeout(() => {
     if (!tagsVisible.value) loadTags();
     if (!actionsVisible.value) loadActions();
@@ -224,18 +211,6 @@ const autoLoadAll = () => {
 // Event handlers
 const handleClick = () => {
   emit('click', props.evidence);
-};
-
-const handleTagsUpdated = () => {
-  emit('tags-updated');
-};
-
-const handleMigrateLegacy = (evidenceId) => {
-  emit('migrate-legacy', evidenceId);
-};
-
-const handleTagError = (error) => {
-  emit('tag-error', error);
 };
 
 const handleDownload = () => {
@@ -266,7 +241,7 @@ const handleProcessWithAI = () => {
 // Track component mount performance
 onMounted(() => {
   // Performance tracking disabled - optimization complete
-  
+
   // Start progressive loading after content is mounted
   autoLoadTags();
   autoLoadAll();

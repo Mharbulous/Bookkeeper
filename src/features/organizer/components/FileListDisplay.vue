@@ -33,7 +33,7 @@
             :allow-manual-editing="false"
             :tagUpdateLoading="props.getTagUpdateLoading(evidence.id)"
             :aiProcessing="props.getAIProcessing(evidence.id)"
-            @tags-updated="$emit('tagsUpdated')"
+            :get-evidence-tags="props.getEvidenceTags"
             @download="$emit('download', $event)"
             @rename="$emit('rename', $event)"
             @view-details="$emit('viewDetails', $event)"
@@ -109,12 +109,11 @@ const { isItemLoaded, loadItem, preloadInitialItems } = useLazyDocuments(
 // Intersection Observer for lazy loading
 let observer = null;
 let renderStartTime = null;
-let dataLoadTime = null;
+let dataLoadTime = null; // eslint-disable-line no-unused-vars
 
 // Emits
 const emit = defineEmits([
   'update:viewMode',
-  'tagsUpdated',
   'process-with-ai',
   'download',
   'rename',
@@ -129,32 +128,43 @@ const handleViewModeChange = (event) => {
 };
 
 // Debug: Watch filteredEvidence changes to track data loading timing
-watch(() => props.filteredEvidence, (newEvidence, oldEvidence) => {
-  dataLoadTime = performance.now();
-  // Data loading log removed - focusing on loop-level timing only
-}, { immediate: true, deep: false });
+watch(
+  () => props.filteredEvidence,
+  () => {
+    dataLoadTime = performance.now();
+    // Data loading log removed - focusing on loop-level timing only
+  },
+  { immediate: true, deep: false }
+);
 
 // Debug: Track FileListItem loop start/completion
-watch(currentViewMode, (newMode) => {
-  if (newMode === 'list') {
-    renderStartTime = performance.now();
-    
-    // Log when FileListItem loop starts
-    debugLog(`🚀 Starting FileListItem loop processing...`);
-    
-    // Track render performance  
-    nextTick(() => {
-      const loadedCount = props.filteredEvidence?.reduce((count, _, index) => {
-        return isItemLoaded(index) ? count + 1 : count;
-      }, 0) || 0;
-      
-      const renderTime = performance.now() - renderStartTime;
-      
-      // Log when FileListItem loop completes
-      debugLog(`✅ FileListItem loop completed - rendered ${loadedCount}/${props.filteredEvidence?.length || 0} items in ${renderTime.toFixed(1)}ms`);
-    });
-  }
-}, { immediate: true });
+watch(
+  currentViewMode,
+  (newMode) => {
+    if (newMode === 'list') {
+      renderStartTime = performance.now();
+
+      // Log when FileListItem loop starts
+      debugLog(`🚀 Starting FileListItem loop processing...`);
+
+      // Track render performance
+      nextTick(() => {
+        const loadedCount =
+          props.filteredEvidence?.reduce((count, _, index) => {
+            return isItemLoaded(index) ? count + 1 : count;
+          }, 0) || 0;
+
+        const renderTime = performance.now() - renderStartTime;
+
+        // Log when FileListItem loop completes
+        debugLog(
+          `✅ FileListItem loop completed - rendered ${loadedCount}/${props.filteredEvidence?.length || 0} items in ${renderTime.toFixed(1)}ms`
+        );
+      });
+    }
+  },
+  { immediate: true }
+);
 
 // Setup lazy loading on mount
 onMounted(async () => {
@@ -167,7 +177,7 @@ onMounted(async () => {
   // Setup Intersection Observer for remaining items
   observer = new IntersectionObserver(
     (entries) => {
-      const loadedItems = entries.filter(entry => entry.isIntersecting).length;
+      const loadedItems = entries.filter((entry) => entry.isIntersecting).length;
       if (loadedItems > 0) {
         debugLog(`👁️ Loading ${loadedItems} more items`);
       }

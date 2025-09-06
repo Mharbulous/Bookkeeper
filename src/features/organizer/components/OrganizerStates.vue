@@ -75,20 +75,9 @@ defineEmits([
   'clearSearch',
 ]);
 
-// Computed state conditions
+// Computed state conditions  
 const showLoading = computed(() => {
-  const shouldShow = props.loading && !props.isInitialized;
-  
-  // DEBUG: Log when loading spinner appears/disappears
-  if (shouldShow && !showLoading._wasShowing) {
-    console.log(`[DEBUG ORGANIZER LOADING] Loading spinner APPEARED at: ${new Date().toISOString()} (${Date.now()})`);
-    showLoading._wasShowing = true;
-  } else if (!shouldShow && showLoading._wasShowing) {
-    console.log(`[DEBUG ORGANIZER LOADING] Loading spinner DISAPPEARED at: ${new Date().toISOString()} (${Date.now()})`);
-    showLoading._wasShowing = false;
-  }
-  
-  return shouldShow;
+  return props.loading && !props.isInitialized;
 });
 const showError = computed(() => props.error && !props.loading);
 const showEmptyState = computed(() => 

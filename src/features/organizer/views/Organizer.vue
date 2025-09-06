@@ -29,7 +29,6 @@
       :getEvidenceTags="getEvidenceTags"
       :getTagUpdateLoading="getTagUpdateLoading"
       :getAIProcessing="getAIProcessing"
-      @tags-updated="handleTagsUpdated"
       @download="downloadFile"
       @rename="renameFile"
       @view-details="viewDetails"
@@ -37,27 +36,16 @@
     />
 
     <!-- Loading overlay for updates -->
-    <v-overlay
-      v-model="showUpdateOverlay"
-      class="d-flex align-center justify-center"
-      contained
-    >
+    <v-overlay v-model="showUpdateOverlay" class="d-flex align-center justify-center" contained>
       <v-progress-circular indeterminate size="48" />
       <p class="ml-4">Updating tags...</p>
     </v-overlay>
 
-
     <!-- Snackbar for notifications -->
-    <v-snackbar
-      v-model="snackbar.show"
-      :color="snackbar.color"
-      :timeout="snackbar.timeout"
-    >
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="snackbar.timeout">
       {{ snackbar.message }}
       <template #actions>
-        <v-btn variant="text" @click="snackbar.show = false">
-          Close
-        </v-btn>
+        <v-btn variant="text" @click="snackbar.show = false"> Close </v-btn>
       </template>
     </v-snackbar>
   </div>
@@ -73,6 +61,11 @@ import OrganizerHeader from '../components/OrganizerHeader.vue';
 import OrganizerStates from '../components/OrganizerStates.vue';
 import FileListDisplay from '../components/FileListDisplay.vue';
 
+// Define component name to satisfy Vue linting rules
+defineOptions({
+  name: 'OrganizerView',
+});
+
 // Store and router
 const organizerStore = useOrganizerStore();
 const router = useRouter();
@@ -86,7 +79,6 @@ const aiProcessing = ref(new Set()); // Track AI processing by evidence ID
 const refreshKey = ref(0); // Force component refresh after AI processing
 const unsubscribe = ref(null);
 
-
 // AI Service instance
 const aiTagService = new AITagService();
 
@@ -94,22 +86,22 @@ const snackbar = ref({
   show: false,
   message: '',
   color: 'success',
-  timeout: 4000
+  timeout: 4000,
 });
 
 // Computed - use storeToRefs for reactive properties
-const {
-  filteredEvidence,
-  loading,
-  error,
-  evidenceCount,
-  filteredCount,
-  isInitialized
-} = storeToRefs(organizerStore);
+const { filteredEvidence, loading, error, evidenceCount, filteredCount, isInitialized } =
+  storeToRefs(organizerStore);
 
 // Computed for conditional display
 const showFileList = computed(() => {
-  return !loading.value && !error.value && evidenceCount.value > 0 && filteredCount.value > 0 && isInitialized.value;
+  return (
+    !loading.value &&
+    !error.value &&
+    evidenceCount.value > 0 &&
+    filteredCount.value > 0 &&
+    isInitialized.value
+  );
 });
 
 // Methods
@@ -143,12 +135,6 @@ const getAIProcessing = (evidenceId) => {
   return aiProcessing.value.has(evidenceId);
 };
 
-const handleTagsUpdated = async () => {
-  // Tags are now handled by the TagSelector component using TagSubcollectionService
-  // This is just a notification that tags were updated
-  showNotification('Tags updated successfully', 'success');
-};
-
 const downloadFile = () => {
   showNotification('Download functionality coming soon', 'info');
 };
@@ -164,7 +150,7 @@ const viewDetails = () => {
 const processWithAI = async (evidence) => {
   console.log('DEBUG: processWithAI called with evidence:', evidence.id);
   console.log('DEBUG: aiTagService.isAIEnabled():', aiTagService.isAIEnabled());
-  
+
   if (!aiTagService.isAIEnabled()) {
     console.log('DEBUG: AI features not enabled');
     showNotification('AI features are not enabled', 'warning');
@@ -176,17 +162,17 @@ const processWithAI = async (evidence) => {
     showNotification('Processing document with AI...', 'info', 2000);
 
     const result = await aiTagService.processSingleDocument(evidence.id);
-    
+
     if (result.success) {
       if (result.suggestedTags.length > 0) {
         showNotification(
-          `AI processing complete! ${result.suggestedTags.length} tags applied.`, 
+          `AI processing complete! ${result.suggestedTags.length} tags applied.`,
           'success'
         );
       } else {
         showNotification('AI processing complete, but no tags were suggested.', 'info');
       }
-      
+
       // Force a reactivity update by updating a key or triggering a refresh
       // We'll increment a refresh counter that child components can watch
       refreshKey.value++;
@@ -195,7 +181,7 @@ const processWithAI = async (evidence) => {
     }
   } catch (error) {
     console.error('AI processing failed:', error);
-    
+
     // User-friendly error messages
     let errorMessage = 'AI processing failed';
     if (error.message.includes('File size')) {
@@ -205,7 +191,7 @@ const processWithAI = async (evidence) => {
     } else if (error.message.includes('not found')) {
       errorMessage = 'Document not found';
     }
-    
+
     showNotification(errorMessage, 'error');
   } finally {
     aiProcessing.value.delete(evidence.id);
@@ -217,10 +203,9 @@ const showNotification = (message, color = 'success', timeout = 4000) => {
     show: true,
     message,
     color,
-    timeout
+    timeout,
   };
 };
-
 
 // Lifecycle
 onMounted(async () => {
