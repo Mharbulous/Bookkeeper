@@ -27,7 +27,7 @@
                   :key="tag.id"
                   :tag="tag"
                   :categoryOptions="getCategoryOptions(tag.categoryId)"
-                  :allowCustomInput="false"
+                  :isOpenCategory="false"
                   :tagColor="getTagColor(tag)"
                   @tag-updated="handleTagUpdate"
                 />
@@ -60,7 +60,7 @@
                   :key="tag.id"
                   :tag="tag"
                   :categoryOptions="getCategoryOptions(tag.categoryId)"
-                  :allowCustomInput="true"
+                  :isOpenCategory="true"
                   :tagColor="getTagColor(tag)"
                   @tag-updated="handleTagUpdate"
                 />
@@ -93,7 +93,7 @@
                   :key="tag.id"
                   :tag="tag"
                   :categoryOptions="getCategoryOptions(tag.categoryId)"
-                  :allowCustomInput="true"
+                  :isOpenCategory="true"
                   :tagColor="getTagColor(tag)"
                   @tag-updated="handleTagUpdate"
                 />

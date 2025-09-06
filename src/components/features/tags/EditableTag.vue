@@ -49,7 +49,7 @@ import { useTagEditing } from './composables/useTagEditing.js';
 const props = defineProps({
   tag: { type: Object, required: true },
   categoryOptions: { type: Array, default: () => [] },
-  allowCustomInput: { type: Boolean, default: true },
+  isOpenCategory: { type: Boolean, default: true },
   tagColor: { type: String, default: '#1976d2' },
 });
 
@@ -63,7 +63,7 @@ const showAbove = ref(false);
 // Composable
 const { handleTagClick, handleTagBlur, handleTypeToFilter, selectFromDropdown } = useTagEditing(
   props.tag,
-  props.allowCustomInput,
+  props.isOpenCategory,
   props.categoryOptions,
   emit
 );
@@ -84,7 +84,7 @@ const cursorPosition = computed(() =>
 const iconClass = computed(() => {
   // Show different icons when user is typing (isHeaderEditing)
   if (props.tag.isHeaderEditing) {
-    return props.allowCustomInput ? 'mdi-pencil' : 'mdi-lock';
+    return props.isOpenCategory ? 'mdi-pencil' : 'mdi-lock';
   }
   // Default tag icon when not editing
   return 'mdi-tag';

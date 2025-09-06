@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
+export function useTagEditing(tag, isOpenCategory, categoryOptions, emit) {
   // Track current focused tag for pagination management
   const currentFocusedTag = ref(null)
 
@@ -11,7 +11,7 @@ export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
   }
 
   const isValidPrefix = (prefix) => {
-    if (!prefix || allowCustomInput) return true
+    if (!prefix || isOpenCategory) return true
     const lowerPrefix = prefix.toLowerCase()
     return categoryOptions.some(option => 
       option.tagName.toLowerCase().startsWith(lowerPrefix)
@@ -92,7 +92,7 @@ export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
 
   const handleTypeToFilter = (event) => {
     // Only handle typing when header is in edit mode (for open categories)
-    if (allowCustomInput && !tag.isHeaderEditing) {
+    if (isOpenCategory && !tag.isHeaderEditing) {
       return
     }
     
@@ -136,7 +136,7 @@ export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
       const tentativeText = newFilterText + event.key
       
       // For Locked tags, only accept keystrokes that could form a valid prefix
-      if (!allowCustomInput && !isValidPrefix(tentativeText)) {
+      if (!isOpenCategory && !isValidPrefix(tentativeText)) {
         console.log(`Rejected keystroke "${event.key}" - "${tentativeText}" is not a valid prefix`)
         return // Don't process this keystroke
       }
@@ -160,7 +160,7 @@ export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
       console.log(`Reset hasStartedTyping=false - user deleted all content`)
     }
     
-    if (allowCustomInput) {
+    if (isOpenCategory) {
       tag.customInputValue = capitalizedText
       tag.highlightedIndex = -1 // No auto-highlight for open categories
     } else {
@@ -183,7 +183,7 @@ export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
   }
 
   const handleEnterKey = () => {
-    if (allowCustomInput) {
+    if (isOpenCategory) {
       // For open categories, use filter text or current tag name
       const newValue = tag.filterText || tag.tagName
       if (newValue && newValue !== tag.tagName) {
@@ -240,7 +240,7 @@ export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
   }
 
   const handleArrowNavigation = (event) => {
-    if (allowCustomInput) return // No arrow navigation for open categories
+    if (isOpenCategory) return // No arrow navigation for open categories
     
     event.preventDefault()
     // Arrow navigation would be handled by parent component with access to filtered options

@@ -4,8 +4,8 @@
     <el-select
       :model-value="tag.tagName"
       @update:model-value="handleSelectionChange"
-      :filterable="allowCustomInput"
-      :allow-create="allowCustomInput"
+      :filterable="isOpenCategory"
+      :allow-create="isOpenCategory"
       :placeholder="`${tag.tagName}`"
       :popper-class="`element-tag-dropdown ${popperClass}`"
       teleported
@@ -39,7 +39,7 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  allowCustomInput: {
+  isOpenCategory: {
     type: Boolean,
     default: true
   },
@@ -101,7 +101,7 @@ const handleSelectionChange = (newValue) => {
   // Check if it's a new tag that doesn't exist in options
   const existingOption = props.categoryOptions.find(opt => opt.tagName === newValue)
   
-  if (!existingOption && props.allowCustomInput) {
+  if (!existingOption && props.isOpenCategory) {
     // Create new tag
     emit('tag-created', {
       tagName: newValue,
