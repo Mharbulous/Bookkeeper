@@ -23,7 +23,6 @@
       <div
         v-show="tag.isOpen && hasOptions"
         class="dropdown-options"
-        :class="{ above: showAbove }"
         :style="dropdownStyle"
         ref="dropdownEl"
       >
@@ -32,6 +31,8 @@
             v-for="opt in filtered"
             :key="opt.id"
             class="dropdown-option"
+            :class="{ selected: opt.tagName === tag.tagName }"
+            :style="opt.tagName === tag.tagName ? { color: tagColor, fontWeight: 'bold' } : {}"
             @click="selectFromDropdown(opt.tagName)"
           >
             {{ opt.tagName }}
@@ -58,7 +59,7 @@ const emit = defineEmits(['tag-updated', 'tag-selected', 'tag-created']);
 // Refs
 const tagEl = ref(null);
 const dropdownEl = ref(null);
-const showAbove = ref(false);
+const forceRecalc = ref(0); // Force reactivity on viewport changes
 
 // Composable
 const { handleTagClick, handleTagBlur, handleTypeToFilter, selectFromDropdown } = useTagEditing(
@@ -93,18 +94,16 @@ const iconClass = computed(() => {
 const dropdownStyle = computed(() => {
   if (!tagEl.value) return {};
 
+  // Include forceRecalc in computation to trigger recalculation on viewport changes
+  forceRecalc.value; // eslint-disable-line no-unused-expressions
+
   const rect = tagEl.value.getBoundingClientRect();
-  const width = Math.max(200, rect.width);
-  const height = Math.min(300, filtered.value.length * 32 + 60);
-
-  showAbove.value = rect.bottom + height + 20 > window.innerHeight;
-
-  const dropdownLeft = Math.min(rect.left, window.innerWidth - width - 10);
+  const dropdownLeft = Math.min(rect.left, window.innerWidth - Math.max(200, rect.width) - 10);
 
   return {
     position: 'fixed',
     left: `${dropdownLeft}px`,
-    top: `${showAbove.value ? rect.top - height - 8 : rect.bottom + 8}px`,
+    top: `${rect.bottom + 3}px`,
     minWidth: `${rect.width}px`,
   };
 });
@@ -132,10 +131,18 @@ const handleOutside = (e) => {
 
 // Lifecycle
 onMounted(() => {
+  const handleResize = () => {
+    forceRecalc.value++; // Trigger dropdown position recalculation
+  };
+
+  const handleScroll = () => {
+    forceRecalc.value++; // Trigger dropdown position recalculation
+  };
+
   const listeners = [
     ['click', handleOutside],
-    ['scroll', () => dropdownStyle.value, true],
-    ['resize', () => dropdownStyle.value],
+    ['scroll', handleScroll, true],
+    ['resize', handleResize],
   ];
 
   listeners.forEach(([event, handler, capture]) =>
