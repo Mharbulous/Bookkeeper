@@ -25,11 +25,11 @@
       :structured-tags="structuredTags"
       :disabled="disabled"
       :loading="loading || loadingTags"
-      @remove-tag="removeStructuredTag"
     />
 
-    <!-- Category-based tag assignment -->
+    <!-- Category-based tag assignment (only if manual editing is allowed) -->
     <CategoryTagSelector
+      v-if="allowManualEditing"
       ref="categoryTagSelector"
       :categories="categories"
       :disabled="disabled"
@@ -62,6 +62,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  allowManualEditing: {
+    type: Boolean,
+    default: true
   }
 });
 
@@ -112,15 +116,12 @@ const onTagChange = (tagId) => {
 };
 
 const addSelectedTag = async (selection) => {
+  if (!props.allowManualEditing) return;
   await tagOperationsHandler.value?.addSelectedTag(selection);
   // Reset selections in child component
   if (categoryTagSelector.value) {
     categoryTagSelector.value.clearSelections();
   }
-};
-
-const removeStructuredTag = async (tagToRemove) => {
-  await tagOperationsHandler.value?.removeStructuredTag(tagToRemove);
 };
 
 // Handle tags loaded from management service

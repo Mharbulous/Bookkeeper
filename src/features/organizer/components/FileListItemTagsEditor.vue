@@ -3,6 +3,7 @@
     <TagSelector
       :evidence="evidence"
       :loading="loading"
+      :allow-manual-editing="allowManualEditing"
       class="tag-selector"
       @tags-updated="handleTagsUpdated"
       @migrate-legacy="handleMigrateLegacy"
@@ -43,6 +44,12 @@ const props = defineProps({
   tagInputPlaceholder: {
     type: String,
     default: 'Add tags...',
+  },
+  
+  // Control manual editing capabilities
+  allowManualEditing: {
+    type: Boolean,
+    default: true,
   },
 });
 

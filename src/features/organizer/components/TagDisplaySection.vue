@@ -4,11 +4,9 @@
       v-for="tag in structuredTags"
       :key="`${tag.categoryId}-${tag.tagId}`"
       size="small"
-      closable
       variant="outlined"
       :color="getTagColor(tag)"
       class="ma-1"
-      @click:close="handleRemoveTag(tag)"
     >
       <v-icon start size="14" :color="getTagColor(tag)">mdi-tag</v-icon>
       {{ tag.tagName }}
@@ -35,19 +33,14 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['remove-tag']);
+// Note: remove-tag emit removed since manual deletion is disabled
+const emit = defineEmits([]);
 
 // Use tag color composable for centralized color resolution
 const { getTagColor } = useTagColor();
 
 // Computed properties
 const hasStructuredTags = computed(() => props.structuredTags.length > 0);
-
-// Methods
-const handleRemoveTag = (tag) => {
-  if (props.disabled || props.loading) return;
-  emit('remove-tag', tag);
-};
 </script>
 
 <style scoped>

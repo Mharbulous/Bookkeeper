@@ -30,6 +30,7 @@
           <FileListItem
             v-else
             :evidence="evidence"
+            :allow-manual-editing="false"
             :tagUpdateLoading="props.getTagUpdateLoading(evidence.id)"
             :aiProcessing="props.getAIProcessing(evidence.id)"
             @tags-updated="$emit('tagsUpdated')"

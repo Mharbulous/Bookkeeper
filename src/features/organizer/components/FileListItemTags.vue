@@ -6,6 +6,7 @@
       :evidence="evidence"
       :loading="tagUpdateLoading"
       :tag-input-placeholder="tagInputPlaceholder"
+      :allow-manual-editing="allowManualEditing"
       @tags-updated="handleTagsUpdated"
       @migrate-legacy="handleMigrateLegacy"
       @tag-error="handleTagError"
@@ -65,6 +66,12 @@ const props = defineProps({
   tagInputPlaceholder: {
     type: String,
     default: 'Add tags...',
+  },
+  
+  // Control manual editing capabilities
+  allowManualEditing: {
+    type: Boolean,
+    default: true,
   },
 });
 
