@@ -186,7 +186,17 @@ onMounted(() => {
 .tag-text[data-cursor]::before,
 .tag-text[data-cursor]::after {
   content: '|';
+  position: absolute;
   animation: blink 1s infinite;
+  top: 0;
+}
+
+.tag-text[data-cursor]::before {
+  left: -2px; /* Position cursor to the left of text */
+}
+
+.tag-text[data-cursor]::after {
+  right: -2px; /* Position cursor to the right of text */
 }
 
 .tag-text[data-cursor='left']::after {
@@ -194,6 +204,11 @@ onMounted(() => {
 }
 .tag-text[data-cursor='right']::before {
   display: none;
+}
+
+/* Ensure text container can position cursor absolutely */
+.tag-text[data-cursor] {
+  position: relative;
 }
 
 @keyframes blink {
