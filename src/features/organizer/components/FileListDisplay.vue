@@ -6,6 +6,15 @@
         <h3 class="text-h6">Documents</h3>
       </div>
       <div class="list-controls">
+        <v-btn
+          color="primary"
+          variant="outlined"
+          size="small"
+          @click="$emit('manage-categories')"
+        >
+          <v-icon start>mdi-cog</v-icon>
+          Manage Categories
+        </v-btn>
         <ViewModeToggle :loading="false" @view-mode-changed="handleViewModeChange" />
       </div>
     </div>
@@ -104,6 +113,7 @@ let dataLoadTime = null; // eslint-disable-line no-unused-vars
 const emit = defineEmits([
   'update:viewMode',
   'process-with-ai',
+  'manage-categories',
 ]);
 
 // Handle view mode changes from ViewModeToggle
@@ -207,6 +217,12 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+}
+
+.list-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .file-display {

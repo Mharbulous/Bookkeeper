@@ -6,7 +6,6 @@
       :evidence-count="evidenceCount"
       :filtered-count="filteredCount"
       @search="handleSearch"
-      @manage-categories="navigateToCategories"
     />
 
     <!-- States (loading, error, empty) -->
@@ -30,6 +29,7 @@
       :getTagUpdateLoading="getTagUpdateLoading"
       :getAIProcessing="getAIProcessing"
       @process-with-ai="processWithAI"
+      @manage-categories="navigateToCategories"
     />
 
     <!-- Loading overlay for updates -->
