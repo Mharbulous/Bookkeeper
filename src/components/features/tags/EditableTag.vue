@@ -233,7 +233,7 @@ onMounted(() => {
   border: 1px solid #e4e7ed;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  padding: 4px;
+  padding: 0;
   max-height: 300px;
   overflow-y: auto;
   z-index: 9999;
@@ -246,7 +246,7 @@ onMounted(() => {
   padding: 6px 12px;
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: 0;
   text-align: left;
   font-size: 13px;
   color: #606266;
@@ -257,6 +257,7 @@ onMounted(() => {
 .dropdown-option:hover {
   background: rgba(25, 118, 210, 0.1);
   color: #1976d2;
+  border-radius: 0;
 }
 
 /* Basic scrollbar for overflow content */
