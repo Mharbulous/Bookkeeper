@@ -172,6 +172,11 @@ onMounted(() => {
   outline: none; /* Remove browser focus outline */
 }
 
+/* Change cursor to text when tag is in editing mode */
+.smart-tag.editing .tag-button {
+  cursor: text;
+}
+
 .tag-button:focus {
   outline: none; /* Ensure no outline on focus */
 }
