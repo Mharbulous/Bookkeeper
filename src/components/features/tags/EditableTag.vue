@@ -64,6 +64,7 @@ const showAbove = ref(false);
 const { handleTagClick, handleTagBlur, handleTypeToFilter, selectFromDropdown } = useTagEditing(
   props.tag,
   props.allowCustomInput,
+  props.categoryOptions,
   emit
 );
 
@@ -87,22 +88,15 @@ const dropdownStyle = computed(() => {
   const width = Math.max(200, rect.width);
   const height = Math.min(300, filtered.value.length * 32 + 60);
 
-  // Account for speech bubble tail extending outward (12px)
   showAbove.value = rect.bottom + height + 20 > window.innerHeight;
 
   const dropdownLeft = Math.min(rect.left, window.innerWidth - width - 10);
 
-  // Calculate tail position to point toward tag center
-  const tagCenterX = rect.left + rect.width / 2;
-  const tailPositionX = Math.max(12, Math.min(width - 12, tagCenterX - dropdownLeft));
-
   return {
     position: 'fixed',
     left: `${dropdownLeft}px`,
-    // FIX: Changed the offset from 8px to 12px to match the tail's height
-    top: `${showAbove.value ? rect.top - height - 12 : rect.bottom + 12}px`,
+    top: `${showAbove.value ? rect.top - height - 8 : rect.bottom + 8}px`,
     minWidth: `${rect.width}px`,
-    '--arrow-left': `${tailPositionX}px`,
   };
 });
 
@@ -150,7 +144,6 @@ onMounted(() => {
 <style scoped>
 /* Core tag */
 .smart-tag {
-  position: relative;
   display: inline-block;
   margin: 4px;
 }
@@ -167,30 +160,23 @@ onMounted(() => {
   color: inherit;
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
-  outline: none;
+  outline: none; /* Remove browser focus outline */
 }
 
-.smart-tag:not(.expanded) .tag-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.smart-tag.expanded .tag-button {
-  border-radius: 12px;
-  padding: 4px 8px;
-  background: transparent;
+.tag-button:focus {
+  outline: none; /* Ensure no outline on focus */
 }
 
 .tag-icon {
   font-size: 14px;
 }
 
+/* Edit mode icon change - communicates editability */
 .smart-tag:hover .tag-icon::before {
   content: '\F064F';
 }
 
-/* Cursor animation */
+/* Cursor animation - communicates text is being edited */
 .tag-text[data-cursor]::before,
 .tag-text[data-cursor]::after {
   content: '|';
@@ -215,108 +201,45 @@ onMounted(() => {
   }
 }
 
-/* Dropdown - Speech Bubble Style */
+/* Dropdown */
 .dropdown-options {
   background: white;
   border: 1px solid #e4e7ed;
-  border-radius: 12px;
-  box-shadow:
-    0 15px 35px rgba(0, 0, 0, 0.15),
-    0 5px 15px rgba(0, 0, 0, 0.08);
-  padding: 2px 0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  padding: 4px;
   max-height: 300px;
   overflow-y: auto;
   z-index: 9999;
 }
 
-/* Comic Book Speech Bubble Tail */
-.dropdown-options::before {
-  content: '';
-  position: absolute;
-  left: var(--arrow-left, 50px);
-  top: -12px;
-  width: 0;
-  height: 0;
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-bottom: 12px solid #e4e7ed;
-  z-index: 99999;
-  transform: translateX(-12px);
-}
-
-.dropdown-options::after {
-  content: '';
-  position: absolute;
-  left: var(--arrow-left, 50px);
-  top: -11px;
-  width: 0;
-  height: 0;
-  border-left: 11px solid transparent;
-  border-right: 11px solid transparent;
-  border-bottom: 11px solid white;
-  z-index: 99999;
-  transform: translateX(-11px);
-}
-
-/* Tail for dropdown above tag */
-.dropdown-options.above::before {
-  top: 100%;
-  border-left: 12px solid transparent;
-  border-right: 12px solid transparent;
-  border-bottom: none;
-  border-top: 12px solid #e4e7ed;
-}
-
-.dropdown-options.above::after {
-  top: calc(100% - 1px);
-  border-left: 11px solid transparent;
-  border-right: 11px solid transparent;
-  border-bottom: none;
-  border-top: 11px solid white;
-}
-
 /* Menu items */
-.dropdown-menu {
-  padding: 1px;
-}
-
 .dropdown-option {
   display: block;
-  width: calc(100% - 16px);
-  margin: 2px 2px;
-  padding: 2px 2px;
+  width: 100%;
+  padding: 6px 12px;
   background: none;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   text-align: left;
   font-size: 13px;
   color: #606266;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
 }
 
+/* Hover state - communicates selection */
 .dropdown-option:hover {
-  background: rgba(25, 118, 210, 0.08);
+  background: rgba(25, 118, 210, 0.1);
   color: #1976d2;
-  transform: translateX(2px);
 }
 
-/* Scrollbar */
+/* Basic scrollbar for overflow content */
 .dropdown-options::-webkit-scrollbar {
   width: 6px;
-}
-
-.dropdown-options::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
 }
 
 .dropdown-options::-webkit-scrollbar-thumb {
   background: #c1c1c1;
   border-radius: 3px;
-}
-
-.dropdown-options::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
 }
 </style>

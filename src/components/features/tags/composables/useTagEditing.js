@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export function useTagEditing(tag, allowCustomInput, emit) {
+export function useTagEditing(tag, allowCustomInput, categoryOptions, emit) {
   // Track current focused tag for pagination management
   const currentFocusedTag = ref(null)
 
@@ -8,6 +8,14 @@ export function useTagEditing(tag, allowCustomInput, emit) {
   const capitalizeFirstLetter = (str) => {
     if (!str) return str
     return str.charAt(0).toUpperCase() + str.slice(1)
+  }
+
+  const isValidPrefix = (prefix) => {
+    if (!prefix || allowCustomInput) return true
+    const lowerPrefix = prefix.toLowerCase()
+    return categoryOptions.some(option => 
+      option.tagName.toLowerCase().startsWith(lowerPrefix)
+    )
   }
 
   const resetFilterState = () => {
@@ -125,7 +133,15 @@ export function useTagEditing(tag, allowCustomInput, emit) {
     if (event.key === 'Backspace') {
       newFilterText = newFilterText.slice(0, -1)
     } else if (event.key.length === 1) {
-      newFilterText += event.key
+      const tentativeText = newFilterText + event.key
+      
+      // For Locked tags, only accept keystrokes that could form a valid prefix
+      if (!allowCustomInput && !isValidPrefix(tentativeText)) {
+        console.log(`Rejected keystroke "${event.key}" - "${tentativeText}" is not a valid prefix`)
+        return // Don't process this keystroke
+      }
+      
+      newFilterText = tentativeText
     }
     
     // Update filter state with capitalization
@@ -134,11 +150,11 @@ export function useTagEditing(tag, allowCustomInput, emit) {
     tag.filterTextRaw = newFilterText  // Store original for filtering
     tag.isFiltering = capitalizedText.length > 0
     
-    // Mark that user has started typing (for cursor positioning)
-    if (allowCustomInput && capitalizedText.length > 0) {
+    // Mark that user has started typing (for cursor positioning) - applies to both locked and open tags
+    if (capitalizedText.length > 0) {
       tag.hasStartedTyping = true
       console.log(`Set hasStartedTyping=true for text: "${capitalizedText}" (length: ${capitalizedText.length})`)
-    } else if (allowCustomInput && capitalizedText.length === 0) {
+    } else if (capitalizedText.length === 0) {
       // Reset to left cursor when user has deleted all content
       tag.hasStartedTyping = false
       console.log(`Reset hasStartedTyping=false - user deleted all content`)
@@ -158,20 +174,66 @@ export function useTagEditing(tag, allowCustomInput, emit) {
     emit('filter-changed', { filterText: capitalizedText, rawText: newFilterText })
   }
 
+  const getTopFilteredOption = () => {
+    if (!tag.filterText) return categoryOptions[0]
+    const filter = tag.filterText.toLowerCase()
+    return categoryOptions.find(option => 
+      option.tagName.toLowerCase().startsWith(filter)
+    ) || categoryOptions[0]
+  }
+
   const handleEnterKey = () => {
     if (allowCustomInput) {
       // For open categories, use filter text or current tag name
       const newValue = tag.filterText || tag.tagName
       if (newValue && newValue !== tag.tagName) {
-        // Emit events for adding new option and updating tag
-        emit('tag-created', { tagName: newValue, categoryId: tag.categoryId })
-        emit('tag-updated', { ...tag, tagName: newValue })
-        tag.tagName = newValue
-        console.log(`Tag updated to: ${newValue}`)
+        const hasTrailingSpace = newValue.endsWith(' ')
+        const trimmedValue = newValue.trim()
+        
+        // Check if there are options that start with this prefix (ignoring exact matches if trailing space)
+        const matchingOptions = categoryOptions.filter(option => 
+          option.tagName.toLowerCase().startsWith(trimmedValue.toLowerCase())
+        )
+        
+        // If there's a trailing space, force creation of new tag
+        // If no matching options exist, create new tag
+        // If there's an exact match and no trailing space, select the match
+        // If there are partial matches but no exact match, create new tag
+        if (hasTrailingSpace) {
+          emit('tag-created', { tagName: trimmedValue, categoryId: tag.categoryId })
+          emit('tag-updated', { ...tag, tagName: trimmedValue })
+          tag.tagName = trimmedValue
+          console.log(`Created new tag (trailing space): ${trimmedValue}`)
+        } else if (matchingOptions.length === 0) {
+          emit('tag-created', { tagName: trimmedValue, categoryId: tag.categoryId })
+          emit('tag-updated', { ...tag, tagName: trimmedValue })
+          tag.tagName = trimmedValue
+          console.log(`Created new tag (no matches): ${trimmedValue}`)
+        } else {
+          // Check if there's an exact match
+          const exactMatch = matchingOptions.find(option => 
+            option.tagName.toLowerCase() === trimmedValue.toLowerCase()
+          )
+          if (exactMatch) {
+            emit('tag-updated', { ...tag, tagName: exactMatch.tagName })
+            tag.tagName = exactMatch.tagName
+            console.log(`Selected exact match: ${exactMatch.tagName}`)
+          } else {
+            // Select the first partial match (top of dropdown)
+            emit('tag-updated', { ...tag, tagName: matchingOptions[0].tagName })
+            tag.tagName = matchingOptions[0].tagName
+            console.log(`Selected first partial match: ${matchingOptions[0].tagName}`)
+          }
+        }
       }
     } else {
-      // For locked categories, would use highlighted option
-      // This would be handled by the parent component with highlighted index
+      // For locked categories, select the top filtered option
+      const topOption = getTopFilteredOption()
+      if (topOption && topOption.tagName !== tag.tagName) {
+        emit('tag-updated', { ...tag, tagName: topOption.tagName })
+        tag.tagName = topOption.tagName
+        console.log(`Locked tag selected top option: ${topOption.tagName}`)
+      }
     }
     
     resetFilterState()
