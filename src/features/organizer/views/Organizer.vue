@@ -160,9 +160,8 @@ const processWithAI = async (evidence) => {
         showNotification('AI processing complete, but no tags were suggested.', 'info');
       }
 
-      // Force a reactivity update by updating a key or triggering a refresh
-      // We'll increment a refresh counter that child components can watch
-      refreshKey.value++;
+      // Refresh tags for this evidence document to get fresh data from Firestore
+      await organizerStore.refreshEvidenceTags(evidence.id);
     } else {
       throw new Error(result.error || 'AI processing failed');
     }

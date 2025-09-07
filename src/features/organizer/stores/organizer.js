@@ -100,6 +100,7 @@ export const useOrganizerStore = defineStore('organizer', () => {
     reset,
     getDisplayInfo: coreStore.getDisplayInfo,
     getAllTags,
+    refreshEvidenceTags: coreStore.refreshEvidenceTags,
 
     // === NEW v1.1 FEATURES ===
     // Store access

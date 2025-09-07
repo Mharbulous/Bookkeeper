@@ -364,6 +364,39 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   };
 
   /**
+   * Refresh tags for a specific evidence document after external changes
+   * Called when tags are modified externally (e.g., after AI processing)
+   */
+  const refreshEvidenceTags = async (evidenceId) => {
+    try {
+      const teamId = authStore.currentTeam;
+      if (!teamId || !evidenceId) return;
+
+      // Find the evidence in current list
+      const evidenceIndex = evidenceList.value.findIndex(e => e.id === evidenceId);
+      if (evidenceIndex === -1) {
+        console.warn(`[OrganizerCore] Evidence ${evidenceId} not found for tag refresh`);
+        return;
+      }
+
+      // Re-load tags for this evidence document
+      const tagData = await loadTagsForEvidence(evidenceId, teamId);
+      
+      // Update the evidence with fresh tag data
+      evidenceList.value[evidenceIndex] = {
+        ...evidenceList.value[evidenceIndex],
+        subcollectionTags: tagData.subcollectionTags,
+        tags: tagData.tags,
+      };
+      
+      notifyDataChange();
+      console.log(`[OrganizerCore] Refreshed tags for evidence ${evidenceId}`);
+    } catch (err) {
+      console.error('[OrganizerCore] Failed to refresh evidence tags:', err);
+    }
+  };
+
+  /**
    * Clear display info cache
    */
   const clearDisplayCache = () => {
@@ -407,6 +440,7 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
     getDisplayInfo,
     getEvidenceById,
     refreshEvidence,
+    refreshEvidenceTags,
     
     // Cache management
     clearDisplayCache,
