@@ -9,13 +9,14 @@ Last Updated: 2025-08-30
 This eliminates confusion about where files belong and simplifies security rules. Teams that need general storage simply create a "General" matter for non-client documents.
 
 **Key Principles:**
+
 - One storage pattern to rule them all: `/teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{ext}`
 - Every upload attempt is logged (successful or duplicate)
 - Simple, consistent security rules
 - Clear audit trail for compliance
 - Handles multi-client matters and pre-matter intake documents
 
-**Note**: For complete data structure specifications, see [data-structures.md](./data-structures.md) as the authoritative source.
+**Note**: For complete data structure specifications, see [data-structures.md](./architecture.md) as the authoritative source.
 
 ## File Extension Standardization Policy
 
@@ -30,7 +31,8 @@ This eliminates confusion about where files belong and simplifies security rules
 
 ### Original Case Preservation Exception
 
-**File extension case preservation is documented in [data-structures/FileMetadata.md](./data-structures/FileMetadata.md).**
+**File extension case preservation is documented in [data-structures/FileMetadata.md](./architecture/FileMetadata.md).**
+
 - This preserves the historical record of how files were originally named
 - Example: If user uploads `Report.PDF`, the originalName field stores `Report.PDF` exactly
 
@@ -41,7 +43,7 @@ This eliminates confusion about where files belong and simplifies security rules
 const fileExtension = filename.split('.').pop().toLowerCase();
 return `${fileSize} • ${fileExtension} • ${date}`;
 
-// ✅ Correct - Storage uses lowercase  
+// ✅ Correct - Storage uses lowercase
 const extension = file.name.split('.').pop().toLowerCase();
 const storagePath = `teams/${teamId}/uploads/${fileHash}.${extension}`;
 
@@ -65,8 +67,9 @@ return `${fileSize} • ${fileExtension.toUpperCase()} • ${date}`;
 ## Naming Conventions
 
 To keep things organized and queryable:
+
 - **Team general**: `matter-general`
-- **Client intake**: `matter-client-{clientId}-general`  
+- **Client intake**: `matter-client-{clientId}-general`
 - **Regular matters**: `matter-{clientId}-{sequentialNumber}` or custom IDs
 - **Multi-client matters**: Use primary client or descriptive ID like `matter-smith-estate-001`
 
@@ -79,27 +82,30 @@ Firebase Storage Root
 
 That's it. One pattern. Every file follows this structure.
 
-**Note**: Complete storage structure documentation is maintained in [data-structures.md - Firebase Storage Structure](./data-structures.md#firebase-storage-structure).
+**Note**: Complete storage structure documentation is maintained in [data-structures.md - Firebase Storage Structure](./architecture.md#firebase-storage-structure).
 
 ### Special System Matters
 
 Each team automatically gets these special matters:
+
 - `matter-general` - Team resources, templates, non-client documents
 - `matter-archive` - Archived/inactive documents
 
 ### Client Intake Matters
 
 Each client gets a special intake matter for pre-matter documents:
+
 - `matter-client-{clientId}-general` - Documents before matter is opened, or spanning multiple matters
 
 Example: Client ABC Corp would have:
+
 - `matter-client-abc-general` - Initial consultations, general corporate docs
 - `matter-abc-001` - Specific matter #1 (contract review)
 - `matter-abc-002` - Specific matter #2 (litigation)
 
 ### Multi-Client Matters
 
-Matters can have multiple clients. For complete matter data structure, see [data-structures.md - Matters Collection](./data-structures.md#matters-collection-teamsteamidmattersmatterid).
+Matters can have multiple clients. For complete matter data structure, see [data-structures.md - Matters Collection](./architecture.md#matters-collection-teamsteamidmattersmatterid).
 
 ## File Storage Implementation
 
@@ -109,11 +115,11 @@ Matters can have multiple clients. For complete matter data structure, see [data
 class StorageService {
   async uploadFile(file, teamId, matterId, metadata = {}) {
     // 1. Calculate hash
-    const fileHash = await this.calculateSHA256(file)
-    const extension = file.name.split('.').pop().toLowerCase() // Standardize to lowercase
-    const fileName = `${fileHash}.${extension}`
-    const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${fileName}`
-    
+    const fileHash = await this.calculateSHA256(file);
+    const extension = file.name.split('.').pop().toLowerCase(); // Standardize to lowercase
+    const fileName = `${fileHash}.${extension}`;
+    const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${fileName}`;
+
     // 2. Create upload event record (ALWAYS, even for duplicates)
     const eventId = await this.logUploadEvent({
       eventType: 'upload_success',
@@ -122,69 +128,70 @@ class StorageService {
       fileHash,
       metadataHash: await this.calculateMetadataHash(file),
       teamId,
-      userId: auth.currentUser.uid
-    })
-    
+      userId: auth.currentUser.uid,
+    });
+
     // 3. Check if file exists
-    const fileRef = storage.ref(storagePath)
-    const exists = await this.checkFileExists(fileRef)
-    
+    const fileRef = storage.ref(storagePath);
+    const exists = await this.checkFileExists(fileRef);
+
     if (exists) {
       // 4a. File exists - create evidence record
       const evidenceId = await this.createEvidenceRecord({
         ...metadata,
         fileHash,
         isDuplicate: true,
-        uploadEventId: eventId
-      })
-      
-      return { 
-        success: true, 
+        uploadEventId: eventId,
+      });
+
+      return {
+        success: true,
         isDuplicate: true,
         storagePath,
         evidenceId,
-        eventId
-      }
+        eventId,
+      };
     }
-    
+
     // 4b. New file - upload it
-    await fileRef.put(file)
-    
+    await fileRef.put(file);
+
     // 5. Create evidence record
     const evidenceId = await this.createEvidenceRecord({
       ...metadata,
       fileHash,
       isDuplicate: false,
-      uploadEventId: eventId
-    })
-    
-    return { 
-      success: true, 
+      uploadEventId: eventId,
+    });
+
+    return {
+      success: true,
       isDuplicate: false,
       storagePath,
       evidenceId,
-      eventId
-    }
+      eventId,
+    };
   }
-  
+
   async calculateSHA256(file) {
-    const buffer = await file.arrayBuffer()
-    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 }
 ```
 
 ### 2. Data Storage Implementation
 
-**Important**: All file metadata data structures are definitively documented in **[data-structures/FileMetadata.md](./data-structures/FileMetadata.md)**, which provides comprehensive coverage of file metadata collections, deduplication architecture, and the critical distinction between original desktop file metadata versus Firebase storage file metadata.
+**Important**: All file metadata data structures are definitively documented in **[data-structures/FileMetadata.md](./architecture/FileMetadata.md)**, which provides comprehensive coverage of file metadata collections, deduplication architecture, and the critical distinction between original desktop file metadata versus Firebase storage file metadata.
 
 ## Security Rules
 
-**Security rules are maintained in [data-structures.md - Security Rules](./data-structures.md#security-rules) as the authoritative source.**
+**Security rules are maintained in [data-structures.md - Security Rules](./architecture.md#security-rules) as the authoritative source.**
 
 Key security principles:
+
 - Team members can only access their own team's files
 - Matter-based file organization provides natural access boundaries
 - Evidence records and upload events are immutable once created
@@ -193,44 +200,51 @@ Key security principles:
 ## Client Isolation Strategy
 
 ### Matter-Based Isolation
+
 Since ALL files go through matters, client isolation is automatic:
+
 - Client A intake → `matter-client-A-general`
 - Client B intake → `matter-client-B-general`
 - Joint clients → `matter-smith-estate-001` (both clients listed)
 - Team files → `matter-general`
 
 ### Multi-Client Considerations
+
 When matters have multiple clients (e.g., husband & wife):
+
 1. **Documents are associated with the matter**, not individual clients
 2. **All clients of a matter can access that matter's documents**
 3. **Client intake folders remain separate** until formally combined in a matter
 
 Example workflow:
+
 ```javascript
 // John Smith uploads documents during initial consultation
-uploadFile(file, teamId, 'matter-client-john-general')
+uploadFile(file, teamId, 'matter-client-john-general');
 
-// Jane Smith uploads documents during her consultation  
-uploadFile(file, teamId, 'matter-client-jane-general')
+// Jane Smith uploads documents during her consultation
+uploadFile(file, teamId, 'matter-client-jane-general');
 
 // Lawyer opens joint matter for estate planning
 createMatter('matter-smith-estate-001', {
-  clients: ['client-john-smith', 'client-jane-smith']
-})
+  clients: ['client-john-smith', 'client-jane-smith'],
+});
 
 // New documents go to the joint matter
-uploadFile(file, teamId, 'matter-smith-estate-001')
+uploadFile(file, teamId, 'matter-smith-estate-001');
 
 // Optional: Associate intake documents with new matter
-associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-estate-001')
+associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-estate-001');
 ```
 
 ### Security Benefits
+
 1. **Pre-matter isolation**: Intake documents are isolated until matter is formalized
 2. **Clear boundaries**: Each matter is a clear security boundary
 3. **No accidents**: Can't accidentally mix different clients' matters
 4. **Audit trail**: Document associations are tracked
-```
+
+````
 
 ## Tracking & Audit Trail
 
@@ -269,7 +283,7 @@ associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-e
   wasSuccessful: false,
   error: 'Network timeout'
 }
-```
+````
 
 ### Useful Query Patterns
 
@@ -281,6 +295,7 @@ associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-e
 ## Implementation Phases
 
 ### Phase 1: Core Upload (Week 1)
+
 - [ ] SHA-256 calculation
 - [ ] Basic upload to matter folders
 - [ ] Document reference creation
@@ -288,12 +303,14 @@ associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-e
 - [ ] Create system matters (general, client-general)
 
 ### Phase 2: Search & Retrieval (Week 2)
+
 - [ ] Document search by name/tags
 - [ ] Client document aggregation across matters
 - [ ] Download functionality
 - [ ] Upload history viewing
 
 ### Phase 3: Nice-to-haves (If needed)
+
 - [ ] Bulk upload
 - [ ] File preview
 - [ ] Document association between matters
@@ -302,53 +319,55 @@ associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-e
 ## Practical Workflows
 
 ### New Client Consultation Flow
+
 ```javascript
 // 1. Client calls for consultation
 const clientId = await createClient({
   name: 'John Smith',
-  email: 'john@example.com'
-})
+  email: 'john@example.com',
+});
 
 // 2. System auto-creates intake matter
-const intakeMatterId = `matter-client-${clientId}-general`
+const intakeMatterId = `matter-client-${clientId}-general`;
 
 // 3. Upload consultation documents
-await uploadFile(consulationNotes, teamId, intakeMatterId)
-await uploadFile(clientProvidedDocs, teamId, intakeMatterId)
+await uploadFile(consulationNotes, teamId, intakeMatterId);
+await uploadFile(clientProvidedDocs, teamId, intakeMatterId);
 
 // 4. If client engages firm, create formal matter
 const formalMatterId = await createMatter({
   id: 'matter-smith-divorce-001',
   clients: [clientId],
-  type: 'divorce'
-})
+  type: 'divorce',
+});
 
 // 5. New documents go to formal matter
-await uploadFile(retainerAgreement, teamId, formalMatterId)
+await uploadFile(retainerAgreement, teamId, formalMatterId);
 
 // 6. Optionally associate intake docs with formal matter
 // (creates references, doesn't move files)
 ```
 
 ### Joint Client Matter Flow
+
 ```javascript
 // 1. Create both clients
-const husbandId = await createClient({ name: 'John Smith' })
-const wifeId = await createClient({ name: 'Jane Smith' })
+const husbandId = await createClient({ name: 'John Smith' });
+const wifeId = await createClient({ name: 'Jane Smith' });
 
 // 2. Each may have individual intake documents
-await uploadFile(husbandTaxReturn, teamId, `matter-client-${husbandId}-general`)
-await uploadFile(wifeFinancials, teamId, `matter-client-${wifeId}-general`)
+await uploadFile(husbandTaxReturn, teamId, `matter-client-${husbandId}-general`);
+await uploadFile(wifeFinancials, teamId, `matter-client-${wifeId}-general`);
 
 // 3. Create joint matter
 const jointMatterId = await createMatter({
   id: 'matter-smith-estate-001',
   clients: [husbandId, wifeId],
-  type: 'estate-planning'
-})
+  type: 'estate-planning',
+});
 
 // 4. Joint documents go to joint matter
-await uploadFile(jointAssets, teamId, jointMatterId)
+await uploadFile(jointAssets, teamId, jointMatterId);
 ```
 
 ## Benefits of This Simplified Approach
@@ -366,50 +385,46 @@ await uploadFile(jointAssets, teamId, jointMatterId)
 ```javascript
 // Upload initial consultation documents
 await storageService.uploadFile(
-  file, 
-  teamId, 
-  'matter-client-abc-general',  // Client's general intake folder
-  { 
-    displayName: 'Initial Tax Returns',
-    tags: ['intake', 'tax'],
-    folderPath: '/intake/2025'
-  }
-)
-
-// Upload to a formal matter
-await storageService.uploadFile(
   file,
   teamId,
-  'matter-smith-estate-001',
+  'matter-client-abc-general', // Client's general intake folder
   {
-    displayName: 'Joint Asset Declaration',
-    tags: ['estate', 'assets'],
-    folderPath: '/estate-planning'
+    displayName: 'Initial Tax Returns',
+    tags: ['intake', 'tax'],
+    folderPath: '/intake/2025',
   }
-)
+);
+
+// Upload to a formal matter
+await storageService.uploadFile(file, teamId, 'matter-smith-estate-001', {
+  displayName: 'Joint Asset Declaration',
+  tags: ['estate', 'assets'],
+  folderPath: '/estate-planning',
+});
 
 // Upload a team resource
 await storageService.uploadFile(
   file,
   teamId,
-  'general',  // Team's general matter
+  'general', // Team's general matter
   {
     displayName: 'Team Handbook 2024',
     tags: ['handbook', 'policy'],
-    folderPath: '/team-resources'
+    folderPath: '/team-resources',
   }
-)
+);
 
 // File metadata record creation patterns documented in FileMetadata.md
 ```
 
-**Note**: These examples show the implementation pattern. Complete method signatures and error handling should follow the data structures defined in [data-structures.md](./data-structures.md).
+**Note**: These examples show the implementation pattern. Complete method signatures and error handling should follow the data structures defined in [data-structures.md](./architecture.md).
 
 ## Required Indexes
 
-**Firestore indexes are documented in [data-structures.md - Required Firestore Indexes](./data-structures.md#required-firestore-indexes) as the authoritative source.**
+**Firestore indexes are documented in [data-structures.md - Required Firestore Indexes](./architecture.md#required-firestore-indexes) as the authoritative source.**
 
 Key indexes needed:
+
 - Evidence collection queries by file hash and timestamps
 - Upload events by matter and timestamp
 - Original metadata by hash lookups

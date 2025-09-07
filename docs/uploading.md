@@ -17,11 +17,11 @@ The Bookkeeper application features a sophisticated file upload system designed 
 
 ## File Storage and Data Paths
 
-For complete documentation of all file storage paths and Firestore data structures, please refer to the single source of truth: **[docs/data-structures.md](./data-structures.md)**
+For complete documentation of all file storage paths and Firestore data structures, please refer to the single source of truth: **[docs/architecture.md](./architecture.md)**
 
 ### Quick Reference
 
-All file metadata collections, storage paths, and data structures are comprehensively documented in **[data-structures/FileMetadata.md](./data-structures/FileMetadata.md)**.
+All file metadata collections, storage paths, and data structures are comprehensively documented in **[data-structures/FileMetadata.md](./architecture/FileMetadata.md)**.
 
 ## Upload Process Flow
 
@@ -39,13 +39,14 @@ User drops files/folder → Folder analysis → Time estimation → Queue initia
 
 The system supports uploading entire folder structures using the HTML5 `webkitdirectory` API with an intelligent metadata capturing algorithm that preserves and enhances folder path information across multiple uploads.
 
-**For folder path data structure schema and field definitions, see:** **[docs/data-structures.md - Folder Path System](./data-structures.md#folder-path-system)**
+**For folder path data structure schema and field definitions, see:** **[docs/architecture.md - Folder Path System](./architecture.md#folder-path-system)**
 
 ##### Smart Metadata Capturing Algorithm
 
 When processing files during upload, the system implements a sophisticated pattern recognition algorithm to intelligently manage folder path information:
 
 **Algorithm Overview**:
+
 1. **Path Extraction**: Extract folder path from `webkitRelativePath`
 2. **Existing Data Retrieval**: Check for existing metadata records with same file hash
 3. **Pattern Recognition**: Analyze relationship between new path and existing paths
@@ -56,9 +57,10 @@ When processing files during upload, the system implements a sophisticated patte
 The algorithm identifies four distinct patterns when comparing folder paths:
 
 **Pattern 1: Extension (Information Enhancement)**
+
 ```javascript
 // Scenario: New upload provides more specific context
-// Existing: "/2025"  
+// Existing: "/2025"
 // New: "/General Account/2025"
 // Decision: Update existing path with more detailed information
 // Result: folderPaths = "/General Account/2025"
@@ -66,7 +68,8 @@ The algorithm identifies four distinct patterns when comparing folder paths:
 // Detection Logic: newPath.endsWith(existingPath) && newPath.length > existingPath.length
 ```
 
-**Pattern 2: Reduction (Information Preservation)**  
+**Pattern 2: Reduction (Information Preservation)**
+
 ```javascript
 // Scenario: New upload has less specific context
 // Existing: "/General Account/2025"
@@ -78,10 +81,11 @@ The algorithm identifies four distinct patterns when comparing folder paths:
 ```
 
 **Pattern 3: Different Paths (Multi-Context Support)**
+
 ```javascript
 // Scenario: File appears in completely different organizational contexts
 // Existing: "/2025"
-// New: "/Bank Statements" 
+// New: "/Bank Statements"
 // Decision: Store both contexts using pipe delimiter
 // Result: folderPaths = "/2025|/Bank Statements"
 
@@ -89,6 +93,7 @@ The algorithm identifies four distinct patterns when comparing folder paths:
 ```
 
 **Pattern 4: Exact Match (No Action)**
+
 ```javascript
 // Scenario: Identical folder context in repeat upload
 // Existing: "/2025"
@@ -106,34 +111,34 @@ The algorithm identifies four distinct patterns when comparing folder paths:
 async function processFileMetadata(file, existingMetadata) {
   // 1. Extract current folder path
   const currentPath = extractFolderPath(file.webkitRelativePath);
-  
+
   // 2. Get existing folder paths for this file hash
   const existingPaths = parseExistingPaths(existingMetadata.folderPaths);
-  
+
   // 3. Run pattern recognition
   const pattern = identifyFolderPathPattern(currentPath, existingPaths);
-  
+
   // 4. Apply appropriate update strategy
   switch (pattern.type) {
     case 'EXTENSION':
       // Replace existing path with extended version
       updatedPaths[pattern.targetIndex] = pattern.newValue;
       break;
-      
-    case 'REDUCTION':  
+
+    case 'REDUCTION':
       // Keep existing path, ignore new one
       break;
-      
+
     case 'DIFFERENT_PATH':
       // Append new path to collection
       updatedPaths.push(pattern.newValue);
       break;
-      
+
     case 'EXACT_MATCH':
       // No change needed
       break;
   }
-  
+
   // 5. Save updated metadata
   return { folderPaths: serializePaths(updatedPaths) };
 }
@@ -154,11 +159,12 @@ async function processFileMetadata(file, existingMetadata) {
 ##### Real-World Scenarios
 
 **Scenario A: Progressive Enhancement**
+
 ```
 Upload 1: User uploads from "Documents/invoice.pdf"
 → folderPaths: "Documents"
 
-Upload 2: Same file uploaded from "Client Files/ABC Corp/Documents/invoice.pdf"  
+Upload 2: Same file uploaded from "Client Files/ABC Corp/Documents/invoice.pdf"
 → folderPaths: "Client Files/ABC Corp/Documents" (enhanced context)
 
 Upload 3: Same file uploaded from root level "invoice.pdf"
@@ -166,6 +172,7 @@ Upload 3: Same file uploaded from root level "invoice.pdf"
 ```
 
 **Scenario B: Multiple Organizational Systems**
+
 ```
 Upload 1: "2024 Files/Q1/report.pdf"
 → folderPaths: "2024 Files/Q1"
@@ -215,7 +222,7 @@ for (const file of duplicateCandidates) {
 The system logs only essential upload events with minimal information:
 
 - **upload_interrupted**: Upload started
-- **upload_success**: Upload completed successfully  
+- **upload_success**: Upload completed successfully
 - **upload_failed**: Upload failed
 - **upload_skipped_metadata_recorded**: File skipped but metadata recorded
 
@@ -241,7 +248,7 @@ for (const file of uploadableFiles) {
   } catch (error) {
     await logUploadEvent({ eventType: 'upload_failed', ... });
   }
-  
+
   await createMetadataRecord(file);
 }
 ```
@@ -270,15 +277,15 @@ Large batches (>100 files):
 
 ### Visual Status System (Color Dots)
 
-| Dot | Status/Property        | Meaning                   | Tooltip                   |
-| --- | ---------------------- | ------------------------- | ------------------------- |
-| 🔵  | `ready`                | Ready for upload          | "Ready for upload"        |
-| 🟡  | `uploading`            | Currently uploading       | "Uploading..."            |
-| 🟢  | `completed`            | Successfully uploaded     | "Successfully uploaded"   |
-| 🟠  | `skipped`              | Skipped, metadata uploaded | "Skipped" |
-| 🔴  | `error`                | Upload failed             | "Failed upload"           |
-| ⚪  | `uploadMetadataOnly`   | Upload metadata only      | "Upload metadata only"    |
-| ⚫  | `unknown`              | Unknown status (fallback) | "Unknown status"          |
+| Dot | Status/Property      | Meaning                    | Tooltip                 |
+| --- | -------------------- | -------------------------- | ----------------------- |
+| 🔵  | `ready`              | Ready for upload           | "Ready for upload"      |
+| 🟡  | `uploading`          | Currently uploading        | "Uploading..."          |
+| 🟢  | `completed`          | Successfully uploaded      | "Successfully uploaded" |
+| 🟠  | `skipped`            | Skipped, metadata uploaded | "Skipped"               |
+| 🔴  | `error`              | Upload failed              | "Failed upload"         |
+| ⚪  | `uploadMetadataOnly` | Upload metadata only       | "Upload metadata only"  |
+| ⚫  | `unknown`            | Unknown status (fallback)  | "Unknown status"        |
 
 ### Real-Time Updates
 
@@ -288,7 +295,7 @@ Large batches (>100 files):
 
 ## Metadata Hash Constraint-Based Deduplication
 
-For complete documentation of metadata hash generation, constraint-based deduplication logic, and use case examples, please refer to the single source of truth: **[docs/data-structures.md](./data-structures.md#file-metadata-records)**
+For complete documentation of metadata hash generation, constraint-based deduplication logic, and use case examples, please refer to the single source of truth: **[docs/architecture.md](./architecture.md#file-metadata-records)**
 
 ### Key Concepts
 
@@ -389,7 +396,7 @@ while (retryCount < maxRetries) {
 
 ## API Reference
 
-For complete data structure schemas and field definitions used by these APIs, please refer to: **[docs/data-structures.md](./data-structures.md)**
+For complete data structure schemas and field definitions used by these APIs, please refer to: **[docs/architecture.md](./architecture.md)**
 
 ### Core Functions
 
@@ -505,7 +512,7 @@ console.log(`[UPLOAD] ${action}: ${fileName} (${status})`, {
 - **Path truncation**: Check folder path extraction logic in metadata creation
 - **Pattern recognition failures**: Check `src/utils/folderPathUtils.js` pattern detection logic
 - **Multi-context issues**: Verify pipe-delimited path parsing and storage
-- **Data format issues**: Check field schema requirements in **[docs/data-structures.md - Folder Path System](./data-structures.md#folder-path-system)**
+- **Data format issues**: Check field schema requirements in **[docs/architecture.md - Folder Path System](./architecture.md#folder-path-system)**
 
 ### Debug Commands
 
@@ -523,11 +530,14 @@ console.log('Queue:', uploadQueue.value);
 console.log('Workers:', workerManager.getStatus());
 
 // Debug folder path extraction
-console.log('File paths:', files.map(f => ({ 
-  name: f.name, 
-  webkitRelativePath: f.webkitRelativePath,
-  extractedFolder: f.webkitRelativePath?.split('/').slice(0, -1).join('/') || '(root)'
-})));
+console.log(
+  'File paths:',
+  files.map((f) => ({
+    name: f.name,
+    webkitRelativePath: f.webkitRelativePath,
+    extractedFolder: f.webkitRelativePath?.split('/').slice(0, -1).join('/') || '(root)',
+  }))
+);
 ```
 
 ## Future Enhancements

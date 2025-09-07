@@ -23,7 +23,7 @@ Implement a subcollection-based tag system with built-in confidence-based auto-a
 ### **Optimal Subcollection Structure with Built-in Auto-Approval**
 
 ```javascript
-// Evidence document (matches docs/data-structures.md format)
+// Evidence document (matches docs/architecture.md format)
 teams/{teamId}/evidence/{docId}
 ├── storageRef: {
 │   storage: 'uploads',
@@ -261,7 +261,7 @@ With all data deleted, we can implement the optimal structure directly:
 ```javascript
 // teams/team-abc-123/evidence/evidence-doc-789
 {
-  // File reference (matches docs/data-structures.md)
+  // File reference (matches docs/architecture.md)
   storageRef: {
     storage: 'uploads',
     fileHash: 'a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890'
@@ -276,7 +276,7 @@ With all data deleted, we can implement the optimal structure directly:
   // File properties
   fileSize: 2048576,
 
-  // Processing status (from docs/data-structures.md)
+  // Processing status (from docs/architecture.md)
   isProcessed: true,
   hasAllPages: true,
   processingStage: 'complete',
@@ -390,7 +390,7 @@ With all data deleted, we can implement the optimal structure directly:
 }
 ```
 
-**Supporting Data Records (per docs/data-structures.md):**
+**Supporting Data Records (per docs/architecture.md):**
 
 ```javascript
 // Original Metadata Record
@@ -416,7 +416,7 @@ With all data deleted, we can implement the optimal structure directly:
 }
 ```
 
-**Firebase Storage Examples (per docs/data-structures.md):**
+**Firebase Storage Examples (per docs/architecture.md):**
 
 ```javascript
 // Actual file storage paths using content-based addressing

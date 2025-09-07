@@ -1,51 +1,149 @@
-# Evidence Document Structure v1.1 - Subcollection-Based Tags with Confidence Workflow
+# Categories and Tags System
+
+Last Updated: 2025-09-07
 
 ## Overview
 
-This document defines the Evidence document structure for Organizer v1.1, featuring subcollection-based tagging with confidence-based auto-approval. Since we are starting with a clean slate (all data and documents have been deleted), this version implements the optimal subcollection architecture from the start.
+This document defines the Categories and Tags system used for organizing and classifying documents within our multi-tenant team-based architecture. Categories provide the primary organizational structure, while tags offer granular classification within each category.
 
-## Database Location
+## Categories Collection
 
-```
-/teams/{teamId}/evidence/{evidenceId}
-```
+**Database Location**: `/teams/{teamId}/categories/{categoryId}`
 
-## Evidence Document Structure
+**Purpose**: Store categorization system for organizing and tagging evidence documents using soft-delete pattern
 
 ```javascript
 {
-  // === FILE REFERENCES ===
-  storageRef: {
-    storage: 'uploads',
-    fileHash: string,  // SHA-256 hash of file content
-    fileTypes: string  // File extension/type (e.g., '.pdf')
-  },
+  // Category information
+  name: 'Document Type',
+  color: '#1976d2',                      // Primary category color for UI display
 
-  displayCopy: string,  // Metadata hash - reference to originalMetadata document
+  // Soft-delete pattern with backward compatibility
+  isActive: true,                        // Controls visibility (false = soft deleted, undefined = treated as true)
+  deletedAt: Timestamp,                  // Set when isActive becomes false (optional field)
 
-  // === FILE PROPERTIES ===
-  fileSize: number,
+  // Available tags for this category
+  tags: [
+    {
+      id: 'tag-uuid-1',
+      name: 'Invoice',
+      color: '#1976d2'                   // Inherits or varies from category color
+    },
+    {
+      id: 'tag-uuid-2', 
+      name: 'Statement',
+      color: '#1565c0'                   // Darker shade of category color
+    }
+  ],
 
-  // === PROCESSING STATUS ===
-  isProcessed: boolean,
-  hasAllPages: boolean | null,
-  processingStage: 'uploaded' | 'splitting' | 'merging' | 'complete',
-
-  // === TAG SUBCOLLECTION COUNTERS ===
-  tagCount: number,                // Total tags across all categories
-  autoApprovedCount: number,       // AI tags auto-approved (confidence >= 85%)
-  reviewRequiredCount: number,     // AI tags needing human review (confidence < 85%)
-
-  // === TIMESTAMPS ===
-  updatedAt: timestamp
+  // Metadata
+  createdAt: Timestamp,
+  updatedAt: Timestamp
 }
 ```
 
-## Tag Subcollection Structure
+## Key Design Features
 
+- **Soft Delete Pattern**: Uses `isActive: false` instead of hard deletion to preserve data integrity
+- **Graceful Degradation**: Queries attempt `isActive` filtering but fall back to unfiltered queries if indexes don't exist
+- **Background Migration**: Categories missing the `isActive` field are automatically migrated to `isActive: true`
+- **Backward Compatibility**: Treats undefined `isActive` field as `true` (active) for legacy data
+- **Query Filtering**: Queries prefer `where('isActive', '==', true)` but handle fallback scenarios
+- **Tag Nesting**: Tags are embedded within categories for atomic operations
+- **Color Inheritance**: Tags can inherit or vary from category colors for consistent theming
+
+## Common Operations
+
+```javascript
+// Get all active categories (robust implementation with fallback)
+const categoriesRef = db.collection('teams').doc(teamId).collection('categories');
+let categoriesQuery, snapshot;
+
+try {
+  // Try querying with isActive filter first
+  categoriesQuery = query(
+    categoriesRef,
+    where('isActive', '==', true),
+    orderBy('createdAt', 'asc')
+  );
+  snapshot = await getDocs(categoriesQuery);
+} catch (queryError) {
+  console.log('isActive query failed, using fallback query:', queryError.message);
+  // Fallback: Query without isActive filter
+  categoriesQuery = query(categoriesRef, orderBy('createdAt', 'asc'));
+  snapshot = await getDocs(categoriesQuery);
+}
+
+// Process results with migration handling
+const loadedCategories = [];
+const categoriesToMigrate = [];
+
+snapshot.docs.forEach(doc => {
+  const data = doc.data();
+  
+  // Handle missing isActive field
+  if (data.isActive === undefined) {
+    // Mark for migration and include as active
+    categoriesToMigrate.push({ id: doc.id, data });
+    loadedCategories.push({ id: doc.id, ...data, isActive: true });
+  } else if (data.isActive === true) {
+    // Include active categories
+    loadedCategories.push({ id: doc.id, ...data });
+  }
+  // Skip categories where isActive === false
+});
+
+// Background migration for categories missing isActive field
+if (categoriesToMigrate.length > 0) {
+  console.log(`Migrating ${categoriesToMigrate.length} categories to add isActive field`);
+  // Migrate in background without blocking main operation
+  migrationPromises = categoriesToMigrate.map(async ({ id }) => {
+    const categoryRef = doc(db, 'teams', teamId, 'categories', id);
+    return updateDoc(categoryRef, {
+      isActive: true,
+      updatedAt: serverTimestamp()
+    });
+  });
+  Promise.all(migrationPromises).catch(err => console.error('Migration failed:', err));
+}
+
+// Soft delete category
+await updateDoc(categoryRef, {
+  isActive: false,
+  deletedAt: serverTimestamp(),
+  updatedAt: serverTimestamp()
+});
 ```
-/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}
+
+## Implementation Notes
+
+The `isActive` field implementation demonstrates the difference between **ideal state documentation** and **production-ready robustness**:
+
+- **Ideal State**: All categories have `isActive: true/false`, all queries use `where('isActive', '==', true)`, required Firestore index exists
+- **Real-World Robustness**: Code handles missing fields, missing indexes, and legacy data gracefully
+- **Migration Strategy**: Background migrations occur transparently without blocking user operations
+- **Fallback Behavior**: If `isActive` queries fail (missing index), falls back to unfiltered queries with client-side filtering
+- **Default Assumption**: Missing `isActive` fields are treated as `true` to maintain backward compatibility
+
+This robust approach ensures the application works in all deployment scenarios while gradually migrating toward the ideal state.
+
+## Required Firestore Index for Categories
+
+```javascript
+{
+  collection: 'teams/{teamId}/categories',
+  fields: [
+    { field: 'isActive', order: 'ASCENDING' },
+    { field: 'createdAt', order: 'ASCENDING' },
+  ],
+}
 ```
+
+## Tags Subcollection System
+
+### Tags Subcollection Structure: `/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}`
+
+**Purpose**: Store individual tag assignments for evidence documents using subcollection architecture for scalability and atomic operations.
 
 ```javascript
 {
@@ -94,14 +192,18 @@ This document defines the Evidence document structure for Organizer v1.1, featur
 }
 ```
 
-## Implementation Notes
+### Evidence Document Tag Counters
 
-Since we are starting with a clean database:
+Evidence documents maintain counters for efficient tag management:
 
-1. **All new evidence documents** will use the subcollection architecture from the start
-2. **No migration required** - this is the optimal implementation
-3. **Tag counters** will be maintained in evidence documents for quick access
-4. **Clean, scalable data structure** across all documents
+```javascript
+{
+  // === TAG SUBCOLLECTION COUNTERS ===
+  tagCount: number,                // Total tags across all categories
+  autoApprovedCount: number,       // AI tags auto-approved (confidence >= 85%)
+  reviewRequiredCount: number,     // AI tags needing human review (confidence < 85%)
+}
+```
 
 ### AI Alternatives Architecture
 
@@ -188,9 +290,16 @@ The `aiAlternatives` field implements a no-cap approach that balances UX simplic
 
 ## Firestore Security Rules
 
-### Security Rules for v1.1
+### Security Rules for Categories and Tags
 
 ```javascript
+// Categories collection access
+match /teams/{teamId}/categories/{categoryId} {
+  allow read, write: if
+    request.auth != null &&
+    request.auth.token.teamId == teamId;
+}
+
 // Evidence document access
 match /teams/{teamId}/evidence/{evidenceId} {
   allow read, write: if
@@ -348,6 +457,8 @@ const getTagCounts = (evidence) => {
 - [ ] Confidence-based auto-approval logic
 - [ ] Tag counter increment/decrement
 - [ ] Review workflow state transitions
+- [ ] Category soft-delete functionality
+- [ ] Category migration handling
 
 ### Integration Tests
 
@@ -356,6 +467,8 @@ const getTagCounts = (evidence) => {
 - [ ] Auto-approval workflow end-to-end
 - [ ] Human review process
 - [ ] Tag deletion and counter updates
+- [ ] Category-tag relationship integrity
+- [ ] Cross-system category and tag queries
 
 ### Performance Tests
 
@@ -364,3 +477,21 @@ const getTagCounts = (evidence) => {
 - [ ] Auto-approval processing <200ms
 - [ ] Review interface loading <300ms
 - [ ] Memory usage with large tag subcollections
+- [ ] Category loading with large tag collections
+
+## Architecture Integration
+
+### Categories ↔ Tags Relationship
+
+- **Categories define available options**: Each category document contains the available tags array
+- **Tags reference categories**: Each tag subcollection document references its categoryId and categoryName
+- **Atomic operations**: Categories and tags can be updated independently while maintaining referential integrity
+- **Color inheritance**: Tags inherit or vary from category colors using the triadic pattern
+- **Validation dependencies**: Tag creation requires active category existence
+
+### Data Flow Patterns
+
+1. **Category Management**: Categories → Available Tags → UI Options
+2. **Tag Assignment**: Evidence Document → Tag Subcollection → Category Reference
+3. **AI Processing**: Content Analysis → Category Selection → Tag Assignment → Confidence Evaluation → Auto-Approval/Review
+4. **User Review**: Review Queue → Tag Modification → Counter Updates → Evidence Document Sync
