@@ -275,9 +275,9 @@ const filtered = docs.docs.filter((doc) => {
   name: 'Document Type',
   color: '#1976d2',                      // Primary category color for UI display
 
-  // Soft-delete pattern
-  isActive: true,                        // Controls visibility (false = soft deleted)
-  deletedAt: Timestamp,                  // Set when isActive becomes false
+  // Soft-delete pattern with backward compatibility
+  isActive: true,                        // Controls visibility (false = soft deleted, undefined = treated as true)
+  deletedAt: Timestamp,                  // Set when isActive becomes false (optional field)
 
   // Available tags for this category
   tags: [
@@ -302,20 +302,67 @@ const filtered = docs.docs.filter((doc) => {
 **Key Design Features:**
 
 - **Soft Delete Pattern**: Uses `isActive: false` instead of hard deletion to preserve data integrity
-- **Query Filtering**: All queries include `where('isActive', '==', true)` to exclude deleted categories
+- **Graceful Degradation**: Queries attempt `isActive` filtering but fall back to unfiltered queries if indexes don't exist
+- **Background Migration**: Categories missing the `isActive` field are automatically migrated to `isActive: true`
+- **Backward Compatibility**: Treats undefined `isActive` field as `true` (active) for legacy data
+- **Query Filtering**: Queries prefer `where('isActive', '==', true)` but handle fallback scenarios
 - **Tag Nesting**: Tags are embedded within categories for atomic operations
 - **Color Inheritance**: Tags can inherit or vary from category colors for consistent theming
 
 **Common Operations:**
 
 ```javascript
-// Get all active categories
-const categories = await db
-  .collection('teams').doc(teamId)
-  .collection('categories')
-  .where('isActive', '==', true)
-  .orderBy('createdAt', 'asc')
-  .get()
+// Get all active categories (robust implementation with fallback)
+const categoriesRef = db.collection('teams').doc(teamId).collection('categories');
+let categoriesQuery, snapshot;
+
+try {
+  // Try querying with isActive filter first
+  categoriesQuery = query(
+    categoriesRef,
+    where('isActive', '==', true),
+    orderBy('createdAt', 'asc')
+  );
+  snapshot = await getDocs(categoriesQuery);
+} catch (queryError) {
+  console.log('isActive query failed, using fallback query:', queryError.message);
+  // Fallback: Query without isActive filter
+  categoriesQuery = query(categoriesRef, orderBy('createdAt', 'asc'));
+  snapshot = await getDocs(categoriesQuery);
+}
+
+// Process results with migration handling
+const loadedCategories = [];
+const categoriesToMigrate = [];
+
+snapshot.docs.forEach(doc => {
+  const data = doc.data();
+  
+  // Handle missing isActive field
+  if (data.isActive === undefined) {
+    // Mark for migration and include as active
+    categoriesToMigrate.push({ id: doc.id, data });
+    loadedCategories.push({ id: doc.id, ...data, isActive: true });
+  } else if (data.isActive === true) {
+    // Include active categories
+    loadedCategories.push({ id: doc.id, ...data });
+  }
+  // Skip categories where isActive === false
+});
+
+// Background migration for categories missing isActive field
+if (categoriesToMigrate.length > 0) {
+  console.log(`Migrating ${categoriesToMigrate.length} categories to add isActive field`);
+  // Migrate in background without blocking main operation
+  migrationPromises = categoriesToMigrate.map(async ({ id }) => {
+    const categoryRef = doc(db, 'teams', teamId, 'categories', id);
+    return updateDoc(categoryRef, {
+      isActive: true,
+      updatedAt: serverTimestamp()
+    });
+  });
+  Promise.all(migrationPromises).catch(err => console.error('Migration failed:', err));
+}
 
 // Soft delete category
 await updateDoc(categoryRef, {
@@ -324,6 +371,18 @@ await updateDoc(categoryRef, {
   updatedAt: serverTimestamp()
 });
 ```
+
+**Implementation Notes:**
+
+The `isActive` field implementation demonstrates the difference between **ideal state documentation** and **production-ready robustness**:
+
+- **Ideal State**: All categories have `isActive: true/false`, all queries use `where('isActive', '==', true)`, required Firestore index exists
+- **Real-World Robustness**: Code handles missing fields, missing indexes, and legacy data gracefully
+- **Migration Strategy**: Background migrations occur transparently without blocking user operations
+- **Fallback Behavior**: If `isActive` queries fail (missing index), falls back to unfiltered queries with client-side filtering
+- **Default Assumption**: Missing `isActive` fields are treated as `true` to maintain backward compatibility
+
+This robust approach ensures the application works in all deployment scenarios while gradually migrating toward the ideal state.
 
 ### Evidence Collection: `/teams/{teamId}/evidence/{evidenceId}`
 
