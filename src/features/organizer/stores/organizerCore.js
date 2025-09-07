@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { collection, query, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
 import { useCategoryStore } from './categoryStore.js';
+import { FileProcessingService } from '../services/fileProcessingService.js';
 
 export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   // State
@@ -22,6 +23,9 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   
   // Tag service instance (use imported singleton)
   const tagService = tagSubcollectionService;
+  
+  // File processing service for file size fallback
+  const fileProcessingService = new FileProcessingService();
 
   // Computed
   const evidenceCount = computed(() => evidenceList.value.length);
@@ -91,8 +95,19 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
       
       if (metadataDoc.exists()) {
         const data = metadataDoc.data();
+        
+        // Normalize display name to use lowercase extension for consistency
+        let displayName = data.originalName || 'Unknown File';
+        if (displayName !== 'Unknown File') {
+          const parts = displayName.split('.');
+          if (parts.length > 1) {
+            parts[parts.length - 1] = parts[parts.length - 1].toLowerCase();
+            displayName = parts.join('.');
+          }
+        }
+        
         const displayInfo = {
-          displayName: data.originalName || 'Unknown File',
+          displayName: displayName,
           createdAt: data.lastModified || null
         };
         
@@ -154,14 +169,34 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
           
           // Process each evidence document
           let processedCount = 0;
-          for (const doc of snapshot.docs) {
-            const evidenceData = doc.data();
+          for (const docSnapshot of snapshot.docs) {
+            const evidenceData = docSnapshot.data();
             
             // Fetch display information from referenced metadata
             const displayInfo = await getDisplayInfo(evidenceData.displayCopy?.metadataHash, teamId);
             
             // Load tags for this evidence document
-            const tagData = await loadTagsForEvidence(doc.id, teamId);
+            const tagData = await loadTagsForEvidence(docSnapshot.id, teamId);
+            
+            // File size fallback and auto-migration
+            let finalFileSize = evidenceData.fileSize || 0;
+            if (!finalFileSize && evidenceData.storageRef?.fileHash) {
+              try {
+                const storageFileSize = await fileProcessingService.getFileSize(evidenceData, teamId);
+                if (storageFileSize > 0) {
+                  finalFileSize = storageFileSize;
+                  
+                  // Auto-migrate: Update Evidence document with correct file size
+                  const evidenceDocRef = doc(db, 'teams', teamId, 'evidence', docSnapshot.id);
+                  await updateDoc(evidenceDocRef, {
+                    fileSize: storageFileSize
+                  });
+                  console.log(`[OrganizerCore] Auto-migrated file size for evidence ${docSnapshot.id}: ${storageFileSize} bytes`);
+                }
+              } catch (error) {
+                console.warn(`[OrganizerCore] Failed to get file size fallback for evidence ${docSnapshot.id}:`, error);
+              }
+            }
             
             processedCount++;
             if (processedCount % 10 === 0 || processedCount === snapshot.docs.length) {
@@ -169,11 +204,12 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
             }
             
             evidence.push({
-              id: doc.id,
+              id: docSnapshot.id,
               ...evidenceData,
               // Add computed display fields
               displayName: displayInfo.displayName,
               createdAt: displayInfo.createdAt,
+              fileSize: finalFileSize,
               // Add tag data for both store compatibility
               subcollectionTags: tagData.subcollectionTags,
               tags: tagData.tags,

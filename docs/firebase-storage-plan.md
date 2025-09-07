@@ -17,6 +17,53 @@ This eliminates confusion about where files belong and simplifies security rules
 
 **Note**: For complete data structure specifications, see [data-structures.md](./data-structures.md) as the authoritative source.
 
+## File Extension Standardization Policy
+
+**All file extensions MUST use lowercase format throughout the system**, with one specific exception:
+
+### Standardization Rules
+
+- **Display**: All file extensions shown to users use lowercase (`.pdf`, `.docx`, `.jpg`)
+- **Storage Paths**: Firebase Storage paths use lowercase extensions (`{fileHash}.pdf`)
+- **Processing**: All file extension handling in code uses lowercase
+- **Comparisons**: File type checks and mappings use lowercase extensions
+
+### Original Case Preservation Exception
+
+**The `originalMetadata` collection is the ONLY place where original file extension case is preserved.**
+
+- `originalMetadata.originalName` stores the exact filename as it appeared in the original source file
+- This preserves the historical record of how files were originally named
+- Example: If user uploads `Report.PDF`, the originalName field stores `Report.PDF` exactly
+
+### Implementation Examples
+
+```javascript
+// ✅ Correct - Display uses lowercase
+const fileExtension = filename.split('.').pop().toLowerCase();
+return `${fileSize} • ${fileExtension} • ${date}`;
+
+// ✅ Correct - Storage uses lowercase  
+const extension = file.name.split('.').pop().toLowerCase();
+const storagePath = `teams/${teamId}/uploads/${fileHash}.${extension}`;
+
+// ✅ Correct - Original metadata preserves case
+const metadataRecord = {
+  originalName: file.name, // Preserves original case: "Report.PDF"
+  // ... other fields
+};
+
+// ❌ Incorrect - Don't use toUpperCase() for display
+return `${fileSize} • ${fileExtension.toUpperCase()} • ${date}`;
+```
+
+### Rationale
+
+- **Consistency**: Lowercase provides uniform display and prevents case-sensitivity issues
+- **Compatibility**: Most file systems and web standards expect lowercase extensions
+- **Historical Accuracy**: Original filenames preserved for audit and compliance purposes
+- **User Experience**: Consistent lowercase display regardless of how files were originally named
+
 ## Naming Conventions
 
 To keep things organized and queryable:
@@ -65,7 +112,7 @@ class StorageService {
   async uploadFile(file, teamId, matterId, metadata = {}) {
     // 1. Calculate hash
     const fileHash = await this.calculateSHA256(file)
-    const extension = file.name.split('.').pop().toLowerCase()
+    const extension = file.name.split('.').pop().toLowerCase() // Standardize to lowercase
     const fileName = `${fileHash}.${extension}`
     const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${fileName}`
     

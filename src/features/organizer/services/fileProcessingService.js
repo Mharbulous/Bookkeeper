@@ -1,4 +1,4 @@
-import { ref, getDownloadURL, getBytes } from 'firebase/storage';
+import { ref, getDownloadURL, getBytes, getMetadata } from 'firebase/storage';
 import { storage } from '../../../services/firebase.js';
 
 /**
@@ -22,18 +22,13 @@ export class FileProcessingService {
         throw new Error('No file hash found in evidence document');
       }
 
-      // Get file extension from displayName
+      // Get file extension from displayName (preserve original case to match storage)
       const displayName = evidence.displayName || '';
-      const extension = displayName.split('.').pop()?.toLowerCase() || 'pdf';
+      const extension = displayName.split('.').pop() || 'pdf';
 
-      // Get file from actual storage path: teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{ext}
-      
-      // For now, assume files are in the 'general' matter
-      // TODO: Extract actual matter ID from evidence if available
-      const matterId = 'general';
-      
-      // Use the actual storage path format with extension
-      const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${evidence.storageRef.fileHash}.${extension}`;
+      // Use the EXACT same path format as UploadService.generateStoragePath()
+      // UploadService hardcodes 'general' matter and converts extension to lowercase
+      const storagePath = `teams/${teamId}/matters/general/uploads/${evidence.storageRef.fileHash}.${extension.toLowerCase()}`;
       const fileRef = ref(storage, storagePath);
       
       // Get file bytes directly from Firebase Storage
@@ -77,10 +72,10 @@ export class FileProcessingService {
       }
 
       const displayName = evidence.displayName || '';
-      const extension = displayName.split('.').pop()?.toLowerCase() || 'pdf';
-      const matterId = 'general';
+      const extension = displayName.split('.').pop() || 'pdf';
       
-      const storagePath = `teams/${teamId}/matters/${matterId}/uploads/${evidence.storageRef.fileHash}.${extension}`;
+      // Use the EXACT same path format as UploadService.generateStoragePath()
+      const storagePath = `teams/${teamId}/matters/general/uploads/${evidence.storageRef.fileHash}.${extension.toLowerCase()}`;
       const fileRef = ref(storage, storagePath);
       
       const downloadURL = await getDownloadURL(fileRef);
@@ -128,6 +123,73 @@ export class FileProcessingService {
     } catch (error) {
       console.warn(`[FileProcessingService] File does not exist: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Get file size from Firebase Storage metadata
+   * Fallback method when evidence.fileSize is 0 or missing
+   * @param {Object} evidence - Evidence document
+   * @param {string} teamId - Team ID
+   * @returns {Promise<number>} - File size in bytes, or 0 if unable to retrieve
+   */
+  async getFileSize(evidence, teamId) {
+    try {
+      if (!evidence.storageRef?.fileHash) {
+        console.warn('[FileProcessingService] No file hash found in evidence document');
+        return 0;
+      }
+
+      // Get file extension from displayName
+      const displayName = evidence.displayName || '';
+      const originalExtension = displayName.split('.').pop() || 'pdf';
+
+      // Use lowercase extension (UploadService standard)
+      // Note: All files now use lowercase extensions after re-upload standardization
+      const extensionVariations = [
+        originalExtension.toLowerCase(), // UploadService standard
+        originalExtension,               // Original case fallback (if display name has different case)
+      ];
+
+      // Remove duplicates while preserving order
+      const uniqueExtensions = [...new Set(extensionVariations)];
+      
+      // Try each extension variation until one works
+      console.log(`[FileProcessingService] Attempting to find file for ${evidence.displayName} with extensions:`, uniqueExtensions);
+      
+      for (let i = 0; i < uniqueExtensions.length; i++) {
+        const extension = uniqueExtensions[i];
+        // Use the EXACT same path format as UploadService.generateStoragePath()
+        const storagePath = `teams/${teamId}/matters/general/uploads/${evidence.storageRef.fileHash}.${extension}`;
+        const fileRef = ref(storage, storagePath);
+        
+        console.log(`[FileProcessingService] Trying path ${i + 1}/${uniqueExtensions.length}: ${storagePath}`);
+        
+        try {
+          // Get file metadata from Firebase Storage
+          const metadata = await getMetadata(fileRef);
+          
+          if (i > 0) {
+            console.log(`[FileProcessingService] ✅ Found file using case variation ${i + 1}: ${storagePath}`);
+          } else {
+            console.log(`[FileProcessingService] ✅ Found file on first try: ${storagePath}`);
+          }
+          console.log(`[FileProcessingService] Retrieved file size from storage: ${metadata.size} bytes`);
+          return metadata.size || 0;
+        } catch (extensionError) {
+          console.log(`[FileProcessingService] ❌ Failed path ${i + 1}: ${extensionError.message}`);
+          // This extension variation didn't work, try the next one
+          if (i === uniqueExtensions.length - 1) {
+            // This was the last attempt, log the error
+            throw extensionError;
+          }
+        }
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('[FileProcessingService] Failed to get file size from Firebase Storage:', error);
+      return 0;
     }
   }
 
