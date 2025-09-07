@@ -1,26 +1,12 @@
 <template>
   <div class="organizer-header">
     <div class="header-content">
-      <div class="title-section">
-        <h1 class="text-h4 font-weight-medium text-primary">
-          Document Organizer
-        </h1>
-        <p class="text-body-2 text-medium-emphasis mb-0">
-          Organize and tag your uploaded documents for easy discovery
-        </p>
-      </div>
-      
-      <div class="header-actions">
-        <v-btn
-          color="primary"
-          variant="outlined"
-          size="small"
-          @click="$emit('manage-categories')"
-        >
-          <v-icon start>mdi-cog</v-icon>
-          Manage Categories
-        </v-btn>
-      </div>
+      <h1 class="text-h4 font-weight-medium text-primary">
+        Document Organizer
+      </h1>
+      <p class="text-body-2 text-medium-emphasis mb-0">
+        Organize and tag your uploaded documents for easy discovery
+      </p>
     </div>
     
     <!-- Search and filter controls -->
@@ -80,7 +66,6 @@ defineProps({
 defineEmits([
   'update:searchText',
   'search',
-  'manage-categories',
 ]);
 </script>
 
@@ -94,17 +79,6 @@ defineEmits([
 
 .header-content {
   margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.title-section {
-  flex: 1;
-}
-
-.header-actions {
-  margin-left: 16px;
 }
 
 .search-controls {

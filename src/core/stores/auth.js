@@ -59,11 +59,9 @@ export const useAuthStore = defineStore('auth', {
     // Initialize the auth system
     async initialize() {
       if (this._initialized) {
-        console.log('Auth already initialized');
         return;
       }
 
-      console.log('Auth store initializing...');
       this._initialized = true;
       this.authState = 'initializing';
       this.error = null;
@@ -71,7 +69,6 @@ export const useAuthStore = defineStore('auth', {
       // Enable cross-domain persistence for SSO
       try {
         await setPersistence(auth, browserLocalPersistence);
-        console.log('Cross-domain persistence enabled for SSO');
       } catch (error) {
         console.error('Failed to set auth persistence:', error);
       }
@@ -83,8 +80,6 @@ export const useAuthStore = defineStore('auth', {
     _initializeFirebase() {
       this._unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         try {
-          console.log('Firebase auth state changed:', firebaseUser ? 'User logged in' : 'No user');
-
           if (firebaseUser) {
             await this._handleUserAuthenticated(firebaseUser);
           } else {
@@ -126,8 +121,6 @@ export const useAuthStore = defineStore('auth', {
         // 3. Update state
         this.authState = 'authenticated';
         this.error = null;
-
-        console.log('User authenticated:', firebaseUser.email);
       } catch (error) {
         console.error('Error handling authenticated user:', error);
         // Still authenticate even if team setup fails
@@ -144,8 +137,6 @@ export const useAuthStore = defineStore('auth', {
       this.teamId = null;
       this.authState = 'unauthenticated';
       this.error = null;
-
-      console.log('Auth state transitioned: -> unauthenticated');
     },
 
     // Simple check for existing team
@@ -230,7 +221,6 @@ export const useAuthStore = defineStore('auth', {
         });
 
         await batch.commit();
-        console.log('Solo team created for user:', firebaseUser.email);
       } catch (error) {
         console.error('Error creating solo team:', error);
         throw error;
@@ -314,7 +304,6 @@ export const useAuthStore = defineStore('auth', {
       }
       this._initialized = false;
       this.authState = 'uninitialized';
-      console.log('Auth store cleaned up');
     },
   },
 });

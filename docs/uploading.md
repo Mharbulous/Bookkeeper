@@ -21,11 +21,7 @@ For complete documentation of all file storage paths and Firestore data structur
 
 ### Quick Reference
 
-- **File Storage**: `/teams/{teamId}/matters/{matterId}/uploads/{fileHash}.{extension}`
-- **Upload Events**: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}` (includes both individual file events and session summaries)
-- **File Metadata Records**: `/teams/{teamId}/matters/{matterId}/originalMetadata/{metadataHash}`
-
-**Note**: All data structure schemas, field definitions, and storage strategies are maintained in `data-structures.md` to ensure consistency across the system.
+All file metadata collections, storage paths, and data structures are comprehensively documented in **[data-structures/FileMetadata.md](./data-structures/FileMetadata.md)**.
 
 ## Upload Process Flow
 

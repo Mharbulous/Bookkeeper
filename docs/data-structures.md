@@ -84,8 +84,7 @@ User and team management processes:
 /teams/{teamId}                                    // Team info with embedded members
 /teams/{teamId}/clients/{clientId}                 // Client records
 /teams/{teamId}/matters/{matterId}                 // Matter/case records
-/teams/{teamId}/evidence/{evidenceId}              // File organization
-/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}  // AI/human tags
+// File metadata collections are documented in data-structures/FileMetadata.md
 ```
 
 ### Storage Paths

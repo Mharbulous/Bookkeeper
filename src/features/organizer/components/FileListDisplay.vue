@@ -6,11 +6,20 @@
         <h3 class="text-h6">Documents</h3>
       </div>
       <div class="list-controls">
+        <v-btn
+          color="primary"
+          variant="outlined"
+          size="small"
+          @click="$emit('manage-categories')"
+        >
+          <v-icon start>mdi-cog</v-icon>
+          Manage Categories
+        </v-btn>
         <ViewModeToggle :loading="false" @view-mode-changed="handleViewModeChange" />
       </div>
     </div>
 
-    <!-- File display with 3 view modes -->
+    <!-- File display with 2 view modes -->
     <div class="file-display">
       <!-- List view -->
       <div v-if="currentViewMode === 'list'" class="file-list">
@@ -30,23 +39,13 @@
           <FileListItem
             v-else
             :evidence="evidence"
+            :allow-manual-editing="false"
             :tagUpdateLoading="props.getTagUpdateLoading(evidence.id)"
             :aiProcessing="props.getAIProcessing(evidence.id)"
-            @tags-updated="$emit('tagsUpdated')"
-            @download="$emit('download', $event)"
-            @rename="$emit('rename', $event)"
-            @view-details="$emit('viewDetails', $event)"
+            :get-evidence-tags="props.getEvidenceTags"
             @process-with-ai="$emit('process-with-ai', $event)"
           />
         </template>
-      </div>
-
-      <!-- Grid view placeholder -->
-      <div v-else-if="currentViewMode === 'grid'" class="file-grid">
-        <p class="text-body-2 text-center text-medium-emphasis pa-8">
-          <v-icon size="48" class="mb-2 d-block">mdi-view-grid</v-icon>
-          Folder Grid coming in future updates
-        </p>
       </div>
 
       <!-- Tree view placeholder -->
@@ -108,16 +107,13 @@ const { isItemLoaded, loadItem, preloadInitialItems } = useLazyDocuments(
 // Intersection Observer for lazy loading
 let observer = null;
 let renderStartTime = null;
-let dataLoadTime = null;
+let dataLoadTime = null; // eslint-disable-line no-unused-vars
 
 // Emits
 const emit = defineEmits([
   'update:viewMode',
-  'tagsUpdated',
   'process-with-ai',
-  'download',
-  'rename',
-  'viewDetails',
+  'manage-categories',
 ]);
 
 // Handle view mode changes from ViewModeToggle
@@ -128,32 +124,43 @@ const handleViewModeChange = (event) => {
 };
 
 // Debug: Watch filteredEvidence changes to track data loading timing
-watch(() => props.filteredEvidence, (newEvidence, oldEvidence) => {
-  dataLoadTime = performance.now();
-  // Data loading log removed - focusing on loop-level timing only
-}, { immediate: true, deep: false });
+watch(
+  () => props.filteredEvidence,
+  () => {
+    dataLoadTime = performance.now();
+    // Data loading log removed - focusing on loop-level timing only
+  },
+  { immediate: true, deep: false }
+);
 
 // Debug: Track FileListItem loop start/completion
-watch(currentViewMode, (newMode) => {
-  if (newMode === 'list') {
-    renderStartTime = performance.now();
-    
-    // Log when FileListItem loop starts
-    debugLog(`🚀 Starting FileListItem loop processing...`);
-    
-    // Track render performance  
-    nextTick(() => {
-      const loadedCount = props.filteredEvidence?.reduce((count, _, index) => {
-        return isItemLoaded(index) ? count + 1 : count;
-      }, 0) || 0;
-      
-      const renderTime = performance.now() - renderStartTime;
-      
-      // Log when FileListItem loop completes
-      debugLog(`✅ FileListItem loop completed - rendered ${loadedCount}/${props.filteredEvidence?.length || 0} items in ${renderTime.toFixed(1)}ms`);
-    });
-  }
-}, { immediate: true });
+watch(
+  currentViewMode,
+  (newMode) => {
+    if (newMode === 'list') {
+      renderStartTime = performance.now();
+
+      // Log when FileListItem loop starts
+      debugLog(`🚀 Starting FileListItem loop processing...`);
+
+      // Track render performance
+      nextTick(() => {
+        const loadedCount =
+          props.filteredEvidence?.reduce((count, _, index) => {
+            return isItemLoaded(index) ? count + 1 : count;
+          }, 0) || 0;
+
+        const renderTime = performance.now() - renderStartTime;
+
+        // Log when FileListItem loop completes
+        debugLog(
+          `✅ FileListItem loop completed - rendered ${loadedCount}/${props.filteredEvidence?.length || 0} items in ${renderTime.toFixed(1)}ms`
+        );
+      });
+    }
+  },
+  { immediate: true }
+);
 
 // Setup lazy loading on mount
 onMounted(async () => {
@@ -166,7 +173,7 @@ onMounted(async () => {
   // Setup Intersection Observer for remaining items
   observer = new IntersectionObserver(
     (entries) => {
-      const loadedItems = entries.filter(entry => entry.isIntersecting).length;
+      const loadedItems = entries.filter((entry) => entry.isIntersecting).length;
       if (loadedItems > 0) {
         debugLog(`👁️ Loading ${loadedItems} more items`);
       }
@@ -212,11 +219,16 @@ onUnmounted(() => {
   margin-bottom: 16px;
 }
 
+.list-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .file-display {
   min-height: 0;
 }
 
-.file-grid,
 .file-tree {
   min-height: 200px;
   display: flex;

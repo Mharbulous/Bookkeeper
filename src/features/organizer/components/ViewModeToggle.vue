@@ -1,15 +1,10 @@
 <template>
   <div class="view-mode-toggle">
-    <!-- Enhanced 3-mode toggle: Flat List, Folder Grid, Folder Tree -->
+    <!-- Simplified 2-mode toggle: Flat List, Folder Tree -->
     <v-btn-toggle v-model="viewMode" mandatory variant="outlined" divided class="enhanced-toggle">
       <v-btn value="list" size="small" class="toggle-btn" :disabled="loading">
         <v-icon size="16">mdi-view-list</v-icon>
         <v-tooltip activator="parent" location="bottom"> Flat List </v-tooltip>
-      </v-btn>
-
-      <v-btn value="grid" size="small" class="toggle-btn" :disabled="loading">
-        <v-icon size="16">mdi-view-grid</v-icon>
-        <v-tooltip activator="parent" location="bottom"> Folder Grid </v-tooltip>
       </v-btn>
 
       <v-btn value="tree" size="small" class="toggle-btn" :disabled="loading">
@@ -41,8 +36,8 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['view-mode-changed']);
 
-// Local reactive state for the enhanced 3-mode toggle
-const viewMode = ref('list'); // 'list', 'grid', or 'tree'
+// Local reactive state for the simplified 2-mode toggle
+const viewMode = ref('list'); // 'list' or 'tree'
 
 // Handle view mode changes
 watch(viewMode, (newMode, oldMode) => {
@@ -60,7 +55,12 @@ watch(viewMode, (newMode, oldMode) => {
 // Initialize component using onMounted lifecycle hook
 onMounted(() => {
   const savedViewMode = localStorage.getItem('organizer-view-mode');
-  viewMode.value = savedViewMode || 'list';
+  // If saved mode was 'grid' (removed), default to 'list'
+  if (savedViewMode === 'grid') {
+    viewMode.value = 'list';
+  } else {
+    viewMode.value = savedViewMode || 'list';
+  }
 });
 </script>
 

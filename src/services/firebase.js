@@ -41,7 +41,6 @@ let firebaseAI = null;
 if (import.meta.env.VITE_ENABLE_AI_FEATURES === 'true') {
   try {
     firebaseAI = getAI(app);
-    console.log('[Firebase] Firebase AI Logic initialized successfully');
   } catch (error) {
     console.warn('[Firebase] Failed to initialize Firebase AI Logic:', error);
   }

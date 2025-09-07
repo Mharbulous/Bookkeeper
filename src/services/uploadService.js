@@ -288,7 +288,7 @@ export class UploadService {
    * Generates storage path for a file based on team, matter, and hash
    */
   generateStoragePath(fileHash, originalFileName) {
-    const extension = originalFileName.split('.').pop();
+    const extension = originalFileName.split('.').pop().toLowerCase();
     return `teams/${this.teamId}/matters/general/uploads/${fileHash}.${extension}`;
   }
 

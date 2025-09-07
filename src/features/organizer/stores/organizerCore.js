@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { collection, query, orderBy, limit, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../services/firebase.js';
 import { useAuthStore } from '../../../core/stores/auth.js';
 import tagSubcollectionService from '../services/tagSubcollectionService.js';
 import { useCategoryStore } from './categoryStore.js';
+import { FileProcessingService } from '../services/fileProcessingService.js';
 
 export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   // State
@@ -22,25 +23,72 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   
   // Tag service instance (use imported singleton)
   const tagService = tagSubcollectionService;
+  
+  // File processing service for file size fallback
+  const fileProcessingService = new FileProcessingService();
 
   // Computed
   const evidenceCount = computed(() => evidenceList.value.length);
 
   /**
    * Load tags for an evidence document and structure them for both query and virtual folder stores
+   * Includes category validation and orphaned tag cleanup
    */
   const loadTagsForEvidence = async (evidenceId, teamId) => {
     try {
       const tags = await tagService.getTags(evidenceId, {}, teamId);
       
+      // If no tags exist, return early
+      if (!tags || tags.length === 0) {
+        return {
+          subcollectionTags: [],
+          tags: {}
+        };
+      }
+      
+      // Ensure category store is initialized before validation
+      if (!categoryStore.isInitialized) {
+        console.warn(`[OrganizerCore] Category store not initialized, skipping tag validation for evidence ${evidenceId}`);
+        // Return tags without validation if category store isn't ready
+        return {
+          subcollectionTags: tags.map(tag => ({
+            categoryId: tag.id,
+            categoryName: tag.id,
+            tagName: tag.tagName,
+            name: tag.tagName,
+            confidence: tag.confidence,
+            status: tag.status,
+            autoApproved: tag.autoApproved
+          })),
+          tags: {}
+        };
+      }
+      
       // Create both data structures for compatibility
       const subcollectionTags = []; // For organizerQueryStore (flat array)
       const groupedTags = {}; // For virtualFolderStore (category-grouped)
+      const tagsToDelete = []; // Track orphaned tags for cleanup
       
-      tags.forEach(tag => {
+      for (const tag of tags) {
         const categoryId = tag.id; // The document ID is the categoryId
         const category = categoryStore.getCategoryById(categoryId);
-        const categoryName = category?.name || categoryId;
+        
+        // Check category validation
+        if (!category) {
+          // Category doesn't exist - delete the orphaned tag
+          console.warn(`[OrganizerCore] Found orphaned tag for deleted category ${categoryId}, marking for deletion`);
+          tagsToDelete.push(categoryId);
+          continue;
+        }
+        
+        if (category.isActive === false) {
+          // Category exists but is inactive - skip display but don't delete tag
+          console.log(`[OrganizerCore] Skipping tag for inactive category ${categoryId} (${category.name})`);
+          continue;
+        }
+        
+        // Category is valid and active - include the tag
+        const categoryName = category.name || categoryId;
         
         const tagData = {
           categoryId,
@@ -60,7 +108,14 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
           groupedTags[categoryId] = [];
         }
         groupedTags[categoryId].push(tagData);
-      });
+      }
+      
+      // Clean up orphaned tags in background
+      if (tagsToDelete.length > 0) {
+        cleanupOrphanedTags(evidenceId, teamId, tagsToDelete).catch(error => {
+          console.error(`[OrganizerCore] Failed to cleanup orphaned tags for evidence ${evidenceId}:`, error);
+        });
+      }
       
       return {
         subcollectionTags,
@@ -72,6 +127,25 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
         subcollectionTags: [],
         tags: {}
       };
+    }
+  };
+
+  /**
+   * Clean up orphaned tags (tags belonging to deleted categories)
+   */
+  const cleanupOrphanedTags = async (evidenceId, teamId, categoryIdsToDelete) => {
+    try {
+      console.log(`[OrganizerCore] Cleaning up ${categoryIdsToDelete.length} orphaned tags for evidence ${evidenceId}`);
+      
+      for (const categoryId of categoryIdsToDelete) {
+        await tagService.deleteTag(evidenceId, categoryId, teamId);
+        console.log(`[OrganizerCore] Deleted orphaned tag for category ${categoryId}`);
+      }
+      
+      console.log(`[OrganizerCore] Successfully cleaned up orphaned tags`);
+    } catch (error) {
+      console.error('[OrganizerCore] Failed to cleanup orphaned tags:', error);
+      // Don't throw - this is background cleanup
     }
   };
 
@@ -91,8 +165,19 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
       
       if (metadataDoc.exists()) {
         const data = metadataDoc.data();
+        
+        // Normalize display name to use lowercase extension for consistency
+        let displayName = data.originalName || 'Unknown File';
+        if (displayName !== 'Unknown File') {
+          const parts = displayName.split('.');
+          if (parts.length > 1) {
+            parts[parts.length - 1] = parts[parts.length - 1].toLowerCase();
+            displayName = parts.join('.');
+          }
+        }
+        
         const displayInfo = {
-          displayName: data.originalName || 'Unknown File',
+          displayName: displayName,
           createdAt: data.lastModified || null
         };
         
@@ -154,14 +239,34 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
           
           // Process each evidence document
           let processedCount = 0;
-          for (const doc of snapshot.docs) {
-            const evidenceData = doc.data();
+          for (const docSnapshot of snapshot.docs) {
+            const evidenceData = docSnapshot.data();
             
             // Fetch display information from referenced metadata
             const displayInfo = await getDisplayInfo(evidenceData.displayCopy?.metadataHash, teamId);
             
             // Load tags for this evidence document
-            const tagData = await loadTagsForEvidence(doc.id, teamId);
+            const tagData = await loadTagsForEvidence(docSnapshot.id, teamId);
+            
+            // File size fallback and auto-migration
+            let finalFileSize = evidenceData.fileSize || 0;
+            if (!finalFileSize && evidenceData.storageRef?.fileHash) {
+              try {
+                const storageFileSize = await fileProcessingService.getFileSize(evidenceData, teamId);
+                if (storageFileSize > 0) {
+                  finalFileSize = storageFileSize;
+                  
+                  // Auto-migrate: Update Evidence document with correct file size
+                  const evidenceDocRef = doc(db, 'teams', teamId, 'evidence', docSnapshot.id);
+                  await updateDoc(evidenceDocRef, {
+                    fileSize: storageFileSize
+                  });
+                  console.log(`[OrganizerCore] Auto-migrated file size for evidence ${docSnapshot.id}: ${storageFileSize} bytes`);
+                }
+              } catch (error) {
+                console.warn(`[OrganizerCore] Failed to get file size fallback for evidence ${docSnapshot.id}:`, error);
+              }
+            }
             
             processedCount++;
             if (processedCount % 10 === 0 || processedCount === snapshot.docs.length) {
@@ -169,11 +274,12 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
             }
             
             evidence.push({
-              id: doc.id,
+              id: docSnapshot.id,
               ...evidenceData,
               // Add computed display fields
               displayName: displayInfo.displayName,
               createdAt: displayInfo.createdAt,
+              fileSize: finalFileSize,
               // Add tag data for both store compatibility
               subcollectionTags: tagData.subcollectionTags,
               tags: tagData.tags,
@@ -258,6 +364,39 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
   };
 
   /**
+   * Refresh tags for a specific evidence document after external changes
+   * Called when tags are modified externally (e.g., after AI processing)
+   */
+  const refreshEvidenceTags = async (evidenceId) => {
+    try {
+      const teamId = authStore.currentTeam;
+      if (!teamId || !evidenceId) return;
+
+      // Find the evidence in current list
+      const evidenceIndex = evidenceList.value.findIndex(e => e.id === evidenceId);
+      if (evidenceIndex === -1) {
+        console.warn(`[OrganizerCore] Evidence ${evidenceId} not found for tag refresh`);
+        return;
+      }
+
+      // Re-load tags for this evidence document
+      const tagData = await loadTagsForEvidence(evidenceId, teamId);
+      
+      // Update the evidence with fresh tag data
+      evidenceList.value[evidenceIndex] = {
+        ...evidenceList.value[evidenceIndex],
+        subcollectionTags: tagData.subcollectionTags,
+        tags: tagData.tags,
+      };
+      
+      notifyDataChange();
+      console.log(`[OrganizerCore] Refreshed tags for evidence ${evidenceId}`);
+    } catch (err) {
+      console.error('[OrganizerCore] Failed to refresh evidence tags:', err);
+    }
+  };
+
+  /**
    * Clear display info cache
    */
   const clearDisplayCache = () => {
@@ -301,6 +440,7 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
     getDisplayInfo,
     getEvidenceById,
     refreshEvidence,
+    refreshEvidenceTags,
     
     // Cache management
     clearDisplayCache,

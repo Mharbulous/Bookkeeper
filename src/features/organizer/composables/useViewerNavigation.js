@@ -6,7 +6,7 @@ import { ref, computed } from 'vue'
  */
 export function useViewerNavigation(files) {
   const currentIndex = ref(0)
-  const viewMode = ref('grid') // 'grid' or 'list'
+  const viewMode = ref('list') // 'list' or 'tree'
   
   const currentFile = computed(() => {
     return files.value?.[currentIndex.value] || null
@@ -39,7 +39,7 @@ export function useViewerNavigation(files) {
   }
   
   const toggleViewMode = () => {
-    viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid'
+    viewMode.value = viewMode.value === 'list' ? 'tree' : 'list'
   }
   
   return {

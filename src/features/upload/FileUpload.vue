@@ -249,7 +249,7 @@ const calculateFileHash = async (file) => {
 
 // Simple upload helper functions
 const generateStoragePath = (fileHash, originalFileName) => {
-  const extension = originalFileName.split('.').pop();
+  const extension = originalFileName.split('.').pop().toLowerCase();
   return `teams/${authStore.currentTeam}/matters/general/uploads/${fileHash}.${extension}`;
 };
 
@@ -722,6 +722,7 @@ const continueUpload = async () => {
             originalName: queueFile.name,
             lastModified: queueFile.lastModified,
             fileHash: queueFile.hash,
+            size: queueFile.size,
             sessionId: getCurrentSessionId(),
             originalPath: queueFile.path, // webkitRelativePath for folder uploads
           });
@@ -804,6 +805,7 @@ const continueUpload = async () => {
               originalName: queueFile.name,
               lastModified: queueFile.lastModified,
               fileHash: fileHash,
+              size: queueFile.size,
               sessionId: getCurrentSessionId(),
               originalPath: queueFile.path, // webkitRelativePath for folder uploads
             });
@@ -883,6 +885,7 @@ const continueUpload = async () => {
               originalName: queueFile.name,
               lastModified: queueFile.lastModified,
               fileHash: fileHash,
+              size: queueFile.size,
               sessionId: getCurrentSessionId(),
               originalPath: queueFile.path, // webkitRelativePath for folder uploads
             });

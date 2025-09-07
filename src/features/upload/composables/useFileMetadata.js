@@ -39,12 +39,13 @@ export function useFileMetadata() {
    * @param {string} fileData.originalName - Original filename
    * @param {number} fileData.lastModified - File's last modified timestamp
    * @param {string} fileData.fileHash - Content hash of the file
+   * @param {number} fileData.size - File size in bytes (used for Evidence document creation)
    * @param {string} [fileData.originalPath] - Full relative path from folder upload (used to extract folderPath)
    * @returns {Promise<string>} - The metadata hash used as document ID
    */
   const createMetadataRecord = async (fileData) => {
     try {
-      const { originalName, lastModified, fileHash, originalPath } = fileData;
+      const { originalName, lastModified, fileHash, size, originalPath } = fileData;
 
       if (!originalName || !lastModified || !fileHash) {
         throw new Error(
@@ -120,7 +121,7 @@ export function useFileMetadata() {
         const uploadMetadata = {
           hash: fileHash,
           originalName: originalName,
-          size: fileData.size || 0,
+          size: size || 0,
           folderPath: currentFolderPath || '/',
           metadataHash: metadataHash
         };

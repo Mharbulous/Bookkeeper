@@ -18,7 +18,7 @@
             </h4>
             <p class="file-metadata text-body-2 text-medium-emphasis">
               {{ formattedFileSize }} • 
-              {{ fileExtension.toUpperCase() }} • 
+              {{ fileExtension }} • 
               {{ formattedDate }}
             </p>
           </div>

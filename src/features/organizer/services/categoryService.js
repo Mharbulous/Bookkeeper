@@ -195,21 +195,55 @@ export class CategoryService {
       }
 
       const categoriesRef = this.getCategoriesCollection(teamId);
-      const q = query(
-        categoriesRef, 
-        where('isActive', '==', true),
-        orderBy('createdAt', 'asc')
-      );
-      
-      const snapshot = await getDocs(q);
+      let q, snapshot;
+
+      try {
+        // Try querying with isActive filter first
+        q = query(
+          categoriesRef, 
+          where('isActive', '==', true),
+          orderBy('createdAt', 'asc')
+        );
+        snapshot = await getDocs(q);
+      } catch (queryError) {
+        console.log('[CategoryService] isActive query failed, trying fallback query:', queryError.message);
+        
+        // Fallback: Get all categories without isActive filter
+        q = query(categoriesRef, orderBy('createdAt', 'asc'));
+        snapshot = await getDocs(q);
+      }
+
       const categories = [];
+      const categoriesToMigrate = [];
       
       snapshot.forEach(doc => {
-        categories.push({
-          id: doc.id,
-          ...doc.data()
-        });
+        const data = doc.data();
+        
+        // Check if isActive field exists
+        if (data.isActive === undefined) {
+          // Mark for migration
+          categoriesToMigrate.push({ id: doc.id, data });
+          // Include in results as active (default behavior)
+          categories.push({
+            id: doc.id,
+            ...data,
+            isActive: true // Default to true for missing field
+          });
+        } else if (data.isActive === true) {
+          // Include active categories
+          categories.push({
+            id: doc.id,
+            ...data
+          });
+        }
+        // Skip categories where isActive === false
       });
+
+      // Migrate categories missing isActive field
+      if (categoriesToMigrate.length > 0) {
+        console.log(`[CategoryService] Migrating ${categoriesToMigrate.length} categories to add isActive field`);
+        await this.migrateIsActiveField(teamId, categoriesToMigrate);
+      }
 
       return categories;
     } catch (error) {
@@ -219,18 +253,65 @@ export class CategoryService {
   }
 
   /**
+   * Migrate categories to add missing isActive field
+   */
+  static async migrateIsActiveField(teamId, categories) {
+    try {
+      const migrationPromises = categories.map(async ({ id }) => {
+        const categoryRef = doc(db, 'teams', teamId, 'categories', id);
+        return updateDoc(categoryRef, {
+          isActive: true,
+          updatedAt: serverTimestamp()
+        });
+      });
+
+      await Promise.all(migrationPromises);
+      console.log(`[CategoryService] Successfully migrated ${categories.length} categories with isActive field`);
+    } catch (error) {
+      console.error('[CategoryService] Failed to migrate categories:', error);
+      // Don't throw - this is a background migration
+    }
+  }
+
+  /**
    * Validate that category name is unique within team
    */
   static async validateUniqueName(teamId, categoryName, excludeCategoryId = null) {
     try {
       const categoriesRef = this.getCategoriesCollection(teamId);
-      const q = query(
-        categoriesRef,
-        where('isActive', '==', true),
-        where('name', '==', categoryName.trim())
-      );
+      let q, snapshot;
 
-      const snapshot = await getDocs(q);
+      try {
+        // Try querying with isActive filter first
+        q = query(
+          categoriesRef,
+          where('isActive', '==', true),
+          where('name', '==', categoryName.trim())
+        );
+        snapshot = await getDocs(q);
+      } catch (queryError) {
+        console.log('[CategoryService] isActive validation query failed, using fallback:', queryError.message);
+        
+        // Fallback: Get all categories with this name and filter manually
+        q = query(
+          categoriesRef,
+          where('name', '==', categoryName.trim())
+        );
+        snapshot = await getDocs(q);
+        
+        // Filter for active categories (including those missing isActive field)
+        const filteredDocs = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.isActive !== false) { // Include undefined and true
+            filteredDocs.push(doc);
+          }
+        });
+        
+        // Create a mock snapshot-like object for consistency
+        snapshot = { docs: filteredDocs };
+      }
+
       const existingCategories = snapshot.docs.filter(doc => doc.id !== excludeCategoryId);
 
       if (existingCategories.length > 0) {

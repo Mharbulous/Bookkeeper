@@ -149,8 +149,8 @@ async function migrateSoloUserToTeam(userId, newTeamId, role) {
 
 ```javascript
 async function migrateTeamData(fromTeamId, toTeamId) {
-  // Migrate all subcollections: clients, matters, logs, originalMetadata, etc.
-  const collections = ['clients', 'matters', 'logs', 'originalMetadata'];
+  // Migrate all team data collections as documented in FileMetadata.md
+  const collections = ['clients', 'matters', 'logs']; // File metadata collections handled separately
 
   for (const collectionName of collections) {
     const docs = await db.collection('teams').doc(fromTeamId).collection(collectionName).get();
