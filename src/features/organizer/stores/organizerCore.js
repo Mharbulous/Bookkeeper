@@ -32,19 +32,63 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
 
   /**
    * Load tags for an evidence document and structure them for both query and virtual folder stores
+   * Includes category validation and orphaned tag cleanup
    */
   const loadTagsForEvidence = async (evidenceId, teamId) => {
     try {
       const tags = await tagService.getTags(evidenceId, {}, teamId);
       
+      // If no tags exist, return early
+      if (!tags || tags.length === 0) {
+        return {
+          subcollectionTags: [],
+          tags: {}
+        };
+      }
+      
+      // Ensure category store is initialized before validation
+      if (!categoryStore.isInitialized) {
+        console.warn(`[OrganizerCore] Category store not initialized, skipping tag validation for evidence ${evidenceId}`);
+        // Return tags without validation if category store isn't ready
+        return {
+          subcollectionTags: tags.map(tag => ({
+            categoryId: tag.id,
+            categoryName: tag.id,
+            tagName: tag.tagName,
+            name: tag.tagName,
+            confidence: tag.confidence,
+            status: tag.status,
+            autoApproved: tag.autoApproved
+          })),
+          tags: {}
+        };
+      }
+      
       // Create both data structures for compatibility
       const subcollectionTags = []; // For organizerQueryStore (flat array)
       const groupedTags = {}; // For virtualFolderStore (category-grouped)
+      const tagsToDelete = []; // Track orphaned tags for cleanup
       
-      tags.forEach(tag => {
+      for (const tag of tags) {
         const categoryId = tag.id; // The document ID is the categoryId
         const category = categoryStore.getCategoryById(categoryId);
-        const categoryName = category?.name || categoryId;
+        
+        // Check category validation
+        if (!category) {
+          // Category doesn't exist - delete the orphaned tag
+          console.warn(`[OrganizerCore] Found orphaned tag for deleted category ${categoryId}, marking for deletion`);
+          tagsToDelete.push(categoryId);
+          continue;
+        }
+        
+        if (category.isActive === false) {
+          // Category exists but is inactive - skip display but don't delete tag
+          console.log(`[OrganizerCore] Skipping tag for inactive category ${categoryId} (${category.name})`);
+          continue;
+        }
+        
+        // Category is valid and active - include the tag
+        const categoryName = category.name || categoryId;
         
         const tagData = {
           categoryId,
@@ -64,7 +108,14 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
           groupedTags[categoryId] = [];
         }
         groupedTags[categoryId].push(tagData);
-      });
+      }
+      
+      // Clean up orphaned tags in background
+      if (tagsToDelete.length > 0) {
+        cleanupOrphanedTags(evidenceId, teamId, tagsToDelete).catch(error => {
+          console.error(`[OrganizerCore] Failed to cleanup orphaned tags for evidence ${evidenceId}:`, error);
+        });
+      }
       
       return {
         subcollectionTags,
@@ -76,6 +127,25 @@ export const useOrganizerCoreStore = defineStore('organizerCore', () => {
         subcollectionTags: [],
         tags: {}
       };
+    }
+  };
+
+  /**
+   * Clean up orphaned tags (tags belonging to deleted categories)
+   */
+  const cleanupOrphanedTags = async (evidenceId, teamId, categoryIdsToDelete) => {
+    try {
+      console.log(`[OrganizerCore] Cleaning up ${categoryIdsToDelete.length} orphaned tags for evidence ${evidenceId}`);
+      
+      for (const categoryId of categoryIdsToDelete) {
+        await tagService.deleteTag(evidenceId, categoryId, teamId);
+        console.log(`[OrganizerCore] Deleted orphaned tag for category ${categoryId}`);
+      }
+      
+      console.log(`[OrganizerCore] Successfully cleaned up orphaned tags`);
+    } catch (error) {
+      console.error('[OrganizerCore] Failed to cleanup orphaned tags:', error);
+      // Don't throw - this is background cleanup
     }
   };
 
