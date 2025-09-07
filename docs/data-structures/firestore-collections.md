@@ -1,6 +1,6 @@
 # Firestore Collections Schema
 
-Last Updated: 2025-08-31
+Last Updated: 2025-09-07
 
 ## Overview
 
@@ -265,6 +265,66 @@ const filtered = docs.docs.filter((doc) => {
 
 **Note**: Complex folder path queries may require client-side filtering due to Firestore's limited string matching capabilities. For high-performance folder-based queries, consider adding specific indexes or denormalized fields based on actual usage patterns.
 
+### Categories Collection: `/teams/{teamId}/categories/{categoryId}`
+
+**Purpose**: Store categorization system for organizing and tagging evidence documents using soft-delete pattern
+
+```javascript
+{
+  // Category information
+  name: 'Document Type',
+  color: '#1976d2',                      // Primary category color for UI display
+
+  // Soft-delete pattern
+  isActive: true,                        // Controls visibility (false = soft deleted)
+  deletedAt: Timestamp,                  // Set when isActive becomes false
+
+  // Available tags for this category
+  tags: [
+    {
+      id: 'tag-uuid-1',
+      name: 'Invoice',
+      color: '#1976d2'                   // Inherits or varies from category color
+    },
+    {
+      id: 'tag-uuid-2', 
+      name: 'Statement',
+      color: '#1565c0'                   // Darker shade of category color
+    }
+  ],
+
+  // Metadata
+  createdAt: Timestamp,
+  updatedAt: Timestamp
+}
+```
+
+**Key Design Features:**
+
+- **Soft Delete Pattern**: Uses `isActive: false` instead of hard deletion to preserve data integrity
+- **Query Filtering**: All queries include `where('isActive', '==', true)` to exclude deleted categories
+- **Tag Nesting**: Tags are embedded within categories for atomic operations
+- **Color Inheritance**: Tags can inherit or vary from category colors for consistent theming
+
+**Common Operations:**
+
+```javascript
+// Get all active categories
+const categories = await db
+  .collection('teams').doc(teamId)
+  .collection('categories')
+  .where('isActive', '==', true)
+  .orderBy('createdAt', 'asc')
+  .get()
+
+// Soft delete category
+await updateDoc(categoryRef, {
+  isActive: false,
+  deletedAt: serverTimestamp(),
+  updatedAt: serverTimestamp()
+});
+```
+
 ### Evidence Collection: `/teams/{teamId}/evidence/{evidenceId}`
 
 **Purpose**: Store organizational and processing metadata for uploaded files, providing user-facing document management capabilities
@@ -355,6 +415,13 @@ Keep indexes minimal:
     fields: [
       { field: 'clientId', order: 'ASCENDING' },
       { field: 'status', order: 'ASCENDING' },
+    ],
+  },
+  {
+    collection: 'teams/{teamId}/categories',
+    fields: [
+      { field: 'isActive', order: 'ASCENDING' },
+      { field: 'createdAt', order: 'ASCENDING' },
     ],
   },
   {

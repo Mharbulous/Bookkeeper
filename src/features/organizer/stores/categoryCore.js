@@ -45,24 +45,58 @@ export function useCategoryCore() {
 
       // Create query for categories collection
       const categoriesRef = collection(db, 'teams', teamId, 'categories');
-      const categoriesQuery = query(
-        categoriesRef,
-        where('isActive', '==', true),
-        orderBy('createdAt', 'asc')
-      );
+      let categoriesQuery;
+
+      try {
+        // Try to create query with isActive filter
+        categoriesQuery = query(
+          categoriesRef,
+          where('isActive', '==', true),
+          orderBy('createdAt', 'asc')
+        );
+      } catch (queryError) {
+        console.log('[CategoryCore] isActive query setup failed, using fallback query:', queryError.message);
+        // Fallback: Query without isActive filter
+        categoriesQuery = query(categoriesRef, orderBy('createdAt', 'asc'));
+      }
 
       // Set up real-time listener
       const unsubscribe = onSnapshot(
         categoriesQuery,
         async (snapshot) => {
           const loadedCategories = [];
+          const categoriesToMigrate = [];
           
           snapshot.docs.forEach(doc => {
-            loadedCategories.push({
-              id: doc.id,
-              ...doc.data()
-            });
+            const data = doc.data();
+            
+            // Handle missing isActive field
+            if (data.isActive === undefined) {
+              // Mark for migration
+              categoriesToMigrate.push({ id: doc.id, data });
+              // Include in results as active (default behavior)
+              loadedCategories.push({
+                id: doc.id,
+                ...data,
+                isActive: true
+              });
+            } else if (data.isActive === true) {
+              // Include active categories
+              loadedCategories.push({
+                id: doc.id,
+                ...data
+              });
+            }
+            // Skip categories where isActive === false
           });
+
+          // Migrate categories missing isActive field
+          if (categoriesToMigrate.length > 0) {
+            console.log(`[CategoryCore] Migrating ${categoriesToMigrate.length} categories to add isActive field`);
+            CategoryService.migrateIsActiveField(teamId, categoriesToMigrate).catch(err => {
+              console.error('[CategoryCore] Migration failed:', err);
+            });
+          }
 
           // If no categories exist, create default categories for first-time users
           if (loadedCategories.length === 0) {
