@@ -99,7 +99,7 @@ Keep it **dead simple**. Solo users have `teamId === userId`:
 | `/teams/{teamId}` | Full access | Read all, Write settings | Read only |
 | `/teams/{teamId}/clients` | Full access | Full access | Full access |
 | `/teams/{teamId}/matters` | Full access | Full access | Full access |
-| `/teams/{teamId}/evidence` | Full access | Full access | Full access |
+| File metadata collections (see [FileMetadata.md](./FileMetadata.md)) | Full access | Full access | Full access |
 
 ### Data Isolation Guarantees
 

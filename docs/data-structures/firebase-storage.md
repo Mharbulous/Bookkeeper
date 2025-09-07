@@ -122,17 +122,7 @@ File Merging → /merged/
 /teams/team-abc-123/matters/matter-001/uploads/abc123def456.pdf
 ```
 
-**Metadata**: Multiple records with different contexts
-```
-/teams/team-abc-123/matters/matter-001/originalMetadata/xyz789abc123
-/teams/team-abc-123/matters/matter-002/originalMetadata/def456xyz789
-```
-
-**Evidence**: Multiple evidence documents referencing same file
-```
-/teams/team-abc-123/evidence/evidence-001 → points to abc123def456.pdf
-/teams/team-abc-123/evidence/evidence-002 → points to abc123def456.pdf
-```
+**File Metadata**: Multiple metadata records preserve different contexts as documented in **[FileMetadata.md](./FileMetadata.md)**
 
 ### Same File, Different Names
 
@@ -143,11 +133,7 @@ File Merging → /merged/
 /teams/team-abc-123/matters/general/uploads/abc123def456.pdf
 ```
 
-**Metadata**: Different records for each name variation
-```
-originalMetadata/hash1: { originalName: "contract_v1.pdf", ... }
-originalMetadata/hash2: { originalName: "final_contract.pdf", ... }
-```
+**File Metadata**: Different metadata records for each name variation as documented in **[FileMetadata.md](./FileMetadata.md)**
 
 ## Access Control Integration
 
@@ -205,10 +191,7 @@ When document processing is implemented:
 
 ### Processing Status Tracking
 
-Processing status tracked in Evidence collection:
-- `processingStage`: 'uploaded' | 'ocring' | 'splitting' | 'merging' | 'complete'
-- `isProcessed`: Boolean flag for completion status
-- `hasAllPages`: OCR quality indicator
+File processing status is tracked in collections documented in **[FileMetadata.md](./FileMetadata.md)**
 
 ### Workflow Integration
 

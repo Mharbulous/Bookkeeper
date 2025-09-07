@@ -128,142 +128,14 @@ This document defines the Firestore collection schemas for our multi-tenant team
 }
 ```
 
-### Upload Events: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}`
+### File Upload Event Tracking
 
-**Purpose**: Track essential upload events with minimal information
+Upload events and file metadata management are comprehensively documented in **[FileMetadata.md](./FileMetadata.md)**.
 
-This collection logs only the 4 essential upload events with basic information:
+### File Metadata Management
 
-- **upload_interrupted**: Upload started but not completed
-- **upload_success**: Upload completed successfully
-- **upload_failed**: Upload failed
-- **upload_skipped_metadata_recorded**: File skipped but metadata recorded
+File metadata collections, including detailed schemas, deduplication architecture, and upload tracking, are comprehensively documented in **[FileMetadata.md](./FileMetadata.md)**.
 
-```javascript
-{
-  eventType: 'upload_success',                    // Event type
-  timestamp: Timestamp,                           // When event occurred
-  fileName: 'document.pdf',                       // Original file name
-  fileHash: 'abc123def456789abcdef012345...',     // SHA-256 of file content
-  metadataHash: 'xyz789abc123def456...',          // SHA-256 of metadata
-  teamId: 'team-abc-123',                         // Team identifier
-  userId: 'user-john-123'                         // User identifier
-}
-```
-
-**Event Types**:
-
-- `upload_interrupted`: Upload started (may remain if process interrupted)
-- `upload_success`: Upload completed successfully
-- `upload_failed`: Upload failed for any reason
-- `upload_skipped_metadata_recorded`: File skipped but metadata was recorded
-
-### File Metadata Records: `/teams/{teamId}/matters/{matterId}/originalMetadata/{metadataHash}`
-
-**Purpose**: Store unique combinations of file metadata using metadata hash as document ID
-
-**Hash Generation**:
-
-- **File Hash**: SHA-256 of file content (`abc123def456789abcdef012345...`)
-- **Metadata Hash**: SHA-256 of concatenated string: `originalName|lastModified|fileHash`
-
-```javascript
-{
-  // Core file metadata (only true file properties)
-  originalName: 'document.pdf',
-  lastModified: 1703123456789,  // Original files lastModified metadata info
-  fileHash: 'abc123def456789abcdef012345...',  // SHA-256 reference to actual file content
-  metadataHash: 'xyz789abc123'  // SHA-256 of concatenated metadata string (originalName|lastModified|fileHash)
-
-  // File path information (from folder uploads)
-  folderPaths: 'Documents/2023|Archive/Backup',  // Pipe-delimited paths, supports multiple contexts via pattern recognition
-
-
-}
-```
-
-## Folder Path System
-
-The `folderPaths` field stores folder path information for files uploaded through folder selection, supporting multiple organizational contexts for the same file content.
-
-**For complete documentation of the smart metadata capturing algorithm and pattern recognition logic, see:** **[docs/uploading.md - Smart Metadata Capturing](../uploading.md#smart-metadata-capturing-algorithm)**
-
-### Field Schema
-
-**Field Name**: `folderPaths`  
-**Type**: `string`  
-**Format**: Pipe-delimited paths using `"|"` separator  
-**Purpose**: Store multiple folder contexts for files uploaded via `webkitdirectory`
-
-### Data Format Examples
-
-**Single Path**:
-
-```javascript
-folderPaths: 'Documents/2023';
-```
-
-**Multiple Paths**:
-
-```javascript
-folderPaths: 'Documents/2023|Archive/Backup|Legal/Contracts';
-```
-
-**Root Level Files**:
-
-```javascript
-folderPaths: ''; // Empty string for files uploaded without folder context
-```
-
-### Path Extraction Rules
-
-Folder paths are automatically extracted from the HTML5 `webkitRelativePath` property:
-
-- `"Documents/2023/invoices/invoice.pdf"` → `folderPaths: "Documents/2023/invoices"`
-- `"photos/vacation.jpg"` → `folderPaths: "photos"`
-- `"readme.txt"` → `folderPaths: ""` (root level)
-
-### Field Properties
-
-- **Delimiter**: `"|"` character (invalid in most file systems, safe for separation)
-- **Path Format**: Forward slashes (`/`) regardless of operating system
-- **Normalization**: Leading slashes present, no trailing slashes (except root `"/"`)
-- **Empty Values**: Empty string `""` represents root-level files
-- **Multiple Contexts**: Same file content can have multiple folder contexts stored
-
-### Folder Path Querying
-
-The `folderPaths` field supports various query patterns for finding files by their organizational context:
-
-**Query Examples**:
-
-```javascript
-// Find all files in a specific folder path
-const docs = await db
-  .collection('teams')
-  .doc(teamId)
-  .collection('matters')
-  .doc(matterId)
-  .collection('originalMetadata')
-  .where('folderPaths', '==', 'Documents/2023')
-  .get();
-
-// Find files that contain a specific path (requires client-side filtering)
-const docs = await db
-  .collection('teams')
-  .doc(teamId)
-  .collection('matters')
-  .doc(matterId)
-  .collection('originalMetadata')
-  .get();
-
-const filtered = docs.docs.filter((doc) => {
-  const paths = doc.data().folderPaths.split('|');
-  return paths.some((path) => path.includes('2023'));
-});
-```
-
-**Note**: Complex folder path queries may require client-side filtering due to Firestore's limited string matching capabilities. For high-performance folder-based queries, consider adding specific indexes or denormalized fields based on actual usage patterns.
 
 ### Categories Collection: `/teams/{teamId}/categories/{categoryId}`
 
@@ -384,44 +256,6 @@ The `isActive` field implementation demonstrates the difference between **ideal 
 
 This robust approach ensures the application works in all deployment scenarios while gradually migrating toward the ideal state.
 
-### Evidence Collection: `/teams/{teamId}/evidence/{evidenceId}`
-
-**Purpose**: Store organizational and processing metadata for uploaded files, providing user-facing document management capabilities
-
-**For complete Evidence collection schema and Tag subcollections, see:** **[evidence-v1.1-schema.md](./evidence-v1.1-schema.md)**
-
-**Key Design Principles:**
-
-- **Single Source of Truth**: No redundant data - all display information references original metadata records
-- **Deduplication Aware**: Handles multiple original names and folder paths for identical files
-- **AI/Human Separation**: Distinguishes between AI-generated and human-applied tags
-- **Subcollection Architecture**: Category-based tags with confidence-based auto-approval
-
-**Core Structure Summary:**
-
-```javascript
-{
-  // File reference and display configuration
-  storageRef: { storage: 'uploads', fileHash: '...', fileTypes: '.pdf' },
-  displayCopy: 'metadataHash...',           // Points to chosen originalMetadata record
-  fileSize: 2048576,
-
-  // Processing status  
-  isProcessed: false,
-  processingStage: 'uploaded',
-
-  // Tag subcollection counters (for efficient querying)
-  tagCount: 8,
-  autoApprovedCount: 5,
-  reviewRequiredCount: 2,
-
-  updatedAt: Timestamp
-}
-```
-
-**Tag Subcollections:** `/teams/{teamId}/evidence/{evidenceId}/tags/{categoryId}`
-
-Uses `categoryId` as document ID to ensure mutually exclusive categories with confidence-based auto-approval workflow for AI tags.
 
 ## Custom Claims (Firebase Auth)
 

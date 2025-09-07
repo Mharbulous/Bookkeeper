@@ -30,9 +30,7 @@ This eliminates confusion about where files belong and simplifies security rules
 
 ### Original Case Preservation Exception
 
-**The `originalMetadata` collection is the ONLY place where original file extension case is preserved.**
-
-- `originalMetadata.originalName` stores the exact filename as it appeared in the original source file
+**File extension case preservation is documented in [data-structures/FileMetadata.md](./data-structures/FileMetadata.md).**
 - This preserves the historical record of how files were originally named
 - Example: If user uploads `Report.PDF`, the originalName field stores `Report.PDF` exactly
 
@@ -180,13 +178,7 @@ class StorageService {
 
 ### 2. Data Storage Implementation
 
-**Important**: All data structures are definitively documented in [data-structures.md](./data-structures.md). This implementation uses:
-
-- **Evidence Collection**: `/teams/{teamId}/evidence/{evidenceId}` - For document management and organization
-- **Upload Events**: `/teams/{teamId}/matters/{matterId}/uploadEvents/{documentId}` - For tracking upload attempts
-- **Original Metadata**: `/teams/{teamId}/matters/{matterId}/originalMetadata/{metadataHash}` - For file metadata deduplication
-
-See the data structures document for complete field specifications and examples.
+**Important**: All file metadata data structures are definitively documented in **[data-structures/FileMetadata.md](./data-structures/FileMetadata.md)**, which provides comprehensive coverage of file metadata collections, deduplication architecture, and the critical distinction between original desktop file metadata versus Firebase storage file metadata.
 
 ## Security Rules
 
@@ -282,35 +274,8 @@ associateDocumentWithMatter(docId, 'matter-client-john-general', 'matter-smith-e
 ### Useful Query Patterns
 
 ```javascript
-// Find all evidence records for a specific matter
-const matterEvidence = await db
-  .collection('teams').doc(teamId)
-  .collection('evidence')
-  .where('displayCopy.matterId', '==', matterId)
-  .orderBy('updatedAt', 'desc')
-  .get()
-
-// Find upload events for a matter
-const uploadEvents = await db
-  .collection('teams').doc(teamId)
-  .collection('matters').doc(matterId)
-  .collection('uploadEvents')
-  .orderBy('timestamp', 'desc')
-  .get()
-
-// Find evidence by file hash (for deduplication checking)
-const existingEvidence = await db
-  .collection('teams').doc(teamId)
-  .collection('evidence')
-  .where('storageRef.fileHash', '==', fileHash)
-  .get()
-
-// Find files with specific tags
-const taggedFiles = await db
-  .collection('teams').doc(teamId)
-  .collection('evidence')
-  .where('tagsByHuman', 'array-contains', 'important')
-  .get()
+// File metadata querying patterns are documented in FileMetadata.md
+// See data-structures/FileMetadata.md for complete query examples
 ```
 
 ## Implementation Phases
@@ -435,30 +400,7 @@ await storageService.uploadFile(
   }
 )
 
-// Create evidence record with chosen metadata
-async function createEvidenceFromMetadata(fileHash, chosenMetadataHash, tags = []) {
-  const evidenceId = db.collection('teams').doc(teamId)
-    .collection('evidence').doc().id
-  
-  await db.collection('teams').doc(teamId)
-    .collection('evidence').doc(evidenceId).set({
-      storageRef: {
-        storage: 'uploads',
-        fileHash: fileHash
-      },
-      displayCopy: {
-        metadataHash: chosenMetadataHash,
-        folderPath: '/' // User-chosen from available paths
-      },
-      fileSize: fileSize, // From original metadata
-      isProcessed: false,
-      tagsByAI: [],
-      tagsByHuman: tags,
-      updatedAt: new Date()
-    })
-    
-  return evidenceId
-}
+// File metadata record creation patterns documented in FileMetadata.md
 ```
 
 **Note**: These examples show the implementation pattern. Complete method signatures and error handling should follow the data structures defined in [data-structures.md](./data-structures.md).
