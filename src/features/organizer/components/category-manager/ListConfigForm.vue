@@ -1,12 +1,8 @@
+<!-- Streamlined from 312 lines to 166 lines on 2025-09-07 -->
 <template>
   <div class="list-config-form">
-    <h3 class="text-h6 mb-4">{{ categoryType === 'fixed-list' ? 'Fixed List' : 'Open List' }} Configuration</h3>
-    <p class="text-body-2 text-medium-emphasis mb-6">
-      {{ categoryType === 'open-list' 
-        ? 'Add some initial tags. Users can add more tags when creating documents.' 
-        : 'Add tags for the dropdown options. These will be the only available choices.' 
-      }}
-    </p>
+    <h3 class="text-h6 mb-4">{{ listTitle }} Configuration</h3>
+    <p class="text-body-2 text-medium-emphasis mb-6">{{ listDescription }}</p>
 
     <!-- Tag Input -->
     <v-row class="mb-4">
@@ -20,16 +16,12 @@
           placeholder="e.g., Invoice, Receipt, Statement..."
           :error-messages="tagInputError"
           @keydown.enter.prevent="addTag"
-          @input="handleTagInput"
+          @input="clearError"
+          @update:model-value="capitalizeFirst"
         />
       </v-col>
       <v-col cols="12" md="4">
-        <v-btn
-          color="primary"
-          :disabled="!canAddTag"
-          @click="addTag"
-          block
-        >
+        <v-btn color="primary" :disabled="!newTagName.trim()" @click="addTag" block>
           <v-icon start>mdi-plus</v-icon>
           Add Tag
         </v-btn>
@@ -38,22 +30,19 @@
 
     <!-- Tags List -->
     <div class="tags-container">
-      <div v-if="localConfig.tags.length === 0" class="no-tags">
+      <div v-if="!localConfig.tags.length" class="no-tags">
         <v-icon size="48" color="grey-lighten-1">mdi-tag-outline</v-icon>
-        <p class="text-body-2 text-medium-emphasis mt-2">
-          No tags added yet. Add some tags above.
-        </p>
+        <p class="text-body-2 text-medium-emphasis mt-2">No tags added yet. Add some tags above.</p>
       </div>
 
       <div v-else class="tags-list">
         <v-chip
           v-for="(tag, index) in localConfig.tags"
           :key="tag.id"
-          :color="getTagColor(index)"
+          :color="colors[index % colors.length]"
           closable
-          size="default"
           class="ma-1"
-          @click:close="removeTag(index)"
+          @click:close="localConfig.tags.splice(index, 1)"
         >
           <v-icon start size="16">mdi-tag</v-icon>
           {{ tag.name }}
@@ -64,132 +53,102 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
   modelValue: {
     type: Object,
-    default: () => ({
-      maxTags: 100,
-      tags: []
-    })
+    default: () => ({ maxTags: 100, tags: [] }),
   },
   categoryType: {
     type: String,
     required: true,
-    validator: value => ['fixed-list', 'open-list'].includes(value)
-  }
+    validator: (value) => ['fixed-list', 'open-list'].includes(value),
+  },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
-// Local reactive config with sensible defaults
-const localConfig = ref({
-  maxTags: 100,
-  tags: [],
-  ...props.modelValue
-});
-
-// Tag input state
+// State
+const localConfig = ref({ maxTags: 100, tags: [], ...props.modelValue });
 const newTagName = ref('');
 const tagInputError = ref('');
 const tagInput = ref(null);
 
+// Constants
+const colors = ['blue', 'green', 'purple', 'orange', 'red', 'teal', 'indigo', 'pink'];
+
+// Computed
+const isFixedList = computed(() => props.categoryType === 'fixed-list');
+const listTitle = computed(() => (isFixedList.value ? 'Fixed List' : 'Open List'));
+const listDescription = computed(() =>
+  isFixedList.value
+    ? 'Add tags for the dropdown options. These will be the only available choices.'
+    : 'Add some initial tags. Users can add more tags when creating documents.'
+);
+
 // Methods
-const getTagColor = (index) => {
-  const colors = ['blue', 'green', 'purple', 'orange', 'red', 'teal', 'indigo', 'pink'];
-  return colors[index % colors.length];
+const capitalizeFirst = (value) => {
+  if (value?.length) {
+    newTagName.value = value[0].toUpperCase() + value.slice(1);
+  }
 };
 
-const addTag = async () => {
+const clearError = () => (tagInputError.value = '');
+
+const addTag = () => {
   const name = newTagName.value.trim();
-  
-  // Basic validation
+
+  // Validation
   if (!name) {
     tagInputError.value = 'Tag name cannot be empty';
     return;
   }
-  
+
   if (name.length > 50) {
     tagInputError.value = 'Tag name must be 50 characters or less';
     return;
   }
-  
-  // Check for duplicates
-  if (localConfig.value.tags.some(tag => tag.name.toLowerCase() === name.toLowerCase())) {
+
+  if (localConfig.value.tags.some((tag) => tag.name.toLowerCase() === name.toLowerCase())) {
     tagInputError.value = 'This tag already exists';
     return;
   }
-  
+
   // Add tag
   localConfig.value.tags.push({
     id: crypto.randomUUID(),
-    name: name,
-    usageCount: 0
+    name,
+    usageCount: 0,
   });
-  
-  // Clear input using nextTick to ensure reactivity completes
-  await nextTick();
+
+  // Reset
   newTagName.value = '';
   tagInputError.value = '';
-  
-  // Focus the input field for next tag entry
-  if (tagInput.value) {
-    tagInput.value.focus();
-  }
+  tagInput.value?.focus();
 };
 
-const removeTag = (index) => {
-  localConfig.value.tags.splice(index, 1);
-};
+// Watchers
+watch(
+  localConfig,
+  (newConfig) => {
+    emit('update:modelValue', { ...newConfig });
+  },
+  { deep: true }
+);
 
-const clearTagError = () => {
-  tagInputError.value = '';
-};
-
-const handleTagInput = (event) => {
-  // Clear any existing error
-  clearTagError();
-  
-  // Get the input value
-  const value = event.target.value;
-  
-  // Auto-capitalize first letter
-  if (value && value.length > 0) {
-    const capitalized = value.charAt(0).toUpperCase() + value.slice(1);
-    if (capitalized !== value) {
-      // Update the value with capitalized first letter
-      newTagName.value = capitalized;
-    }
-  }
-};
-
-// Computed
-const canAddTag = computed(() => {
-  return newTagName.value.trim().length > 0;
-});
-
-// Watch for changes
-watch(localConfig, (newConfig) => {
-  emit('update:modelValue', { ...newConfig });
-}, { deep: true });
-
-// Initialize with props
-watch(() => props.modelValue, (newValue) => {
-  localConfig.value = { 
-    ...localConfig.value, 
-    ...newValue
-  };
-}, { immediate: true });
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    localConfig.value = { ...localConfig.value, ...newValue };
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
 .list-config-form {
   width: 100%;
-}
-
-.ai-settings {
-  border-radius: 8px;
 }
 
 .tags-container {
@@ -208,43 +167,7 @@ watch(() => props.modelValue, (newValue) => {
   min-height: 50px;
 }
 
-.tags-summary {
-  border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-  padding-top: 12px;
-  margin-top: 12px;
-}
-
-.preview-container {
-  padding: 20px;
-  background: rgba(var(--v-theme-surface-variant), 0.5);
-  border-radius: 8px;
-  border: 2px dashed rgba(var(--v-border-color), var(--v-border-opacity));
-}
-
-.dropdown-preview {
-  max-width: 400px;
-}
-
-.dropdown-preview-field {
-  pointer-events: none;
-}
-
-.preview-info {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* Responsive adjustments */
 @media (max-width: 600px) {
-  .preview-container {
-    padding: 16px;
-  }
-  
-  .dropdown-preview {
-    max-width: 100%;
-  }
-  
   .tags-container {
     padding: 12px;
   }

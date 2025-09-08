@@ -1,3 +1,4 @@
+<!-- Streamlined from 246 lines to 168 lines on 2025-09-07 -->
 <template>
   <div class="unique-string-config-form">
     <h3 class="text-h6 mb-4">Unique String Category Configuration</h3>
@@ -19,58 +20,25 @@
       class="mb-4"
     />
 
-    <!-- Case Sensitivity and Formatting -->
-    <div class="formatting-options mt-4">
+    <!-- Text Processing -->
+    <div class="section mt-4">
       <h4 class="text-subtitle-1 mb-3">Text Processing</h4>
       <v-row>
-        <v-col cols="12" md="6">
+        <v-col v-for="option in processingOptions" :key="option.key" cols="12" md="6">
           <v-checkbox
-            v-model="localConfig.caseSensitive"
-            label="Case sensitive"
+            v-model="localConfig[option.key]"
+            :label="option.label"
+            :hint="option.hint"
+            :persistent-hint="!!option.hint"
             color="deep-purple"
             density="compact"
-            hint="'ABC' and 'abc' are different values"
-            persistent-hint
-          />
-        </v-col>
-
-        <v-col cols="12" md="6">
-          <v-checkbox
-            v-model="localConfig.trimWhitespace"
-            label="Auto-trim whitespace"
-            color="deep-purple"
-            density="compact"
-            hint="Remove leading/trailing spaces"
-            persistent-hint
-          />
-        </v-col>
-      </v-row>
-
-      <v-row>
-        <v-col cols="12" md="6">
-          <v-checkbox
-            v-model="localConfig.allowNumbers"
-            label="Allow numbers"
-            color="deep-purple"
-            density="compact"
-          />
-        </v-col>
-
-        <v-col cols="12" md="6">
-          <v-checkbox
-            v-model="localConfig.allowSpecialChars"
-            label="Allow special characters"
-            color="deep-purple"
-            density="compact"
-            hint="Punctuation, symbols, etc."
-            persistent-hint
           />
         </v-col>
       </v-row>
     </div>
 
     <!-- Uniqueness Scope -->
-    <div class="uniqueness-scope mt-4">
+    <div class="section mt-4">
       <h4 class="text-subtitle-1 mb-3">Uniqueness Scope</h4>
       <v-select
         v-model="localConfig.uniquenessScope"
@@ -81,21 +49,19 @@
       />
     </div>
 
-
     <!-- Preview -->
     <v-card variant="tonal" color="deep-purple" class="mt-4">
       <v-card-text class="py-3">
         <div class="d-flex align-center mb-3">
           <v-icon color="deep-purple" class="mr-2">mdi-eye</v-icon>
           <div class="text-body-2">
-            <strong>Configuration:</strong> 
-            {{ localConfig.minLength || 1 }}-{{ localConfig.maxLength || 256 }} chars • 
+            <strong>Configuration:</strong>
+            {{ localConfig.minLength || 1 }}-{{ localConfig.maxLength || 256 }} chars •
             {{ localConfig.caseSensitive ? 'Case sensitive' : 'Case insensitive' }} •
             {{ localConfig.uniquenessScope === 'global' ? 'Globally unique' : 'Team unique' }}
           </div>
         </div>
 
-        <!-- Preview Input -->
         <v-text-field
           placeholder="Enter unique text..."
           variant="outlined"
@@ -107,11 +73,10 @@
           append-inner-icon="mdi-key-variant"
         />
 
-        <!-- Example Values -->
         <div class="mt-2">
           <strong class="text-caption">Examples:</strong>
           <v-chip
-            v-for="example in getExamples()"
+            v-for="example in examples"
             :key="example"
             size="x-small"
             class="ml-2"
@@ -124,52 +89,34 @@
       </v-card-text>
     </v-card>
 
-    <!-- Important Notes -->
+    <!-- Alerts -->
     <v-alert
-      type="warning"
+      v-for="alert in alerts"
+      :key="alert.type"
+      :type="alert.type"
       variant="tonal"
       class="mt-4"
     >
-      <v-icon start>mdi-alert</v-icon>
-      <strong>Important:</strong> Once a value is used in any document, it cannot be used again. 
-      This ensures each string is unique across your entire document collection.
-    </v-alert>
-
-    <!-- Use Cases -->
-    <v-alert
-      type="info"
-      variant="tonal"
-      class="mt-4"
-    >
-      <v-icon start>mdi-lightbulb-on</v-icon>
-      <strong>Perfect for:</strong> Document IDs, reference numbers, serial codes, unique identifiers, 
-      project codes, invoice numbers, tracking numbers.
+      <v-icon start>{{ alert.icon }}</v-icon>
+      <strong>{{ alert.title }}:</strong> {{ alert.text }}
     </v-alert>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch } from 'vue';
 
 const props = defineProps({
   modelValue: {
     type: Object,
-    default: () => ({
-      maxLength: 256,
-      minLength: 1,
-      caseSensitive: false,
-      trimWhitespace: true,
-      allowNumbers: true,
-      allowSpecialChars: true,
-      uniquenessScope: 'team'
-    })
-  }
+    default: () => ({}),
+  },
 });
 
 const emit = defineEmits(['update:modelValue']);
 
-// Local reactive config
-const localConfig = ref({
+// Default configuration
+const defaultConfig = {
   maxLength: 256,
   minLength: 1,
   caseSensitive: false,
@@ -177,60 +124,84 @@ const localConfig = ref({
   allowNumbers: true,
   allowSpecialChars: true,
   uniquenessScope: 'team',
-  ...props.modelValue
-});
+};
 
-// Options
+// Local reactive config
+const localConfig = ref({ ...defaultConfig, ...props.modelValue });
+
+// Configuration options
+const processingOptions = [
+  { key: 'caseSensitive', label: 'Case sensitive', hint: "'ABC' and 'abc' are different values" },
+  { key: 'trimWhitespace', label: 'Auto-trim whitespace', hint: 'Remove leading/trailing spaces' },
+  { key: 'allowNumbers', label: 'Allow numbers' },
+  {
+    key: 'allowSpecialChars',
+    label: 'Allow special characters',
+    hint: 'Punctuation, symbols, etc.',
+  },
+];
+
 const uniquenessScopeOptions = [
   { title: 'Within Team (recommended)', value: 'team' },
   { title: 'Globally Unique', value: 'global' },
-  { title: 'Within Category', value: 'category' }
+  { title: 'Within Category', value: 'category' },
 ];
 
+const alerts = [
+  {
+    type: 'warning',
+    icon: 'mdi-alert',
+    title: 'Important',
+    text: 'Once a value is used in any document, it cannot be used again. This ensures each string is unique across your entire document collection.',
+  },
+  {
+    type: 'info',
+    icon: 'mdi-lightbulb-on',
+    title: 'Perfect for',
+    text: 'Document IDs, reference numbers, serial codes, unique identifiers, project codes, invoice numbers, tracking numbers.',
+  },
+];
 
-// Helper methods
-const getExamples = () => {
-  const examples = [];
-  
-  if (localConfig.value.allowNumbers && localConfig.value.allowSpecialChars) {
-    examples.push('INV-2024-001', 'REF#12345', 'DOC_ABC123');
-  } else if (localConfig.value.allowNumbers) {
-    examples.push('DOC123', 'REF2024', 'ID001');
-  } else {
-    examples.push('REFERENCE', 'DOCUMENT', 'INVOICE');
-  }
-  
-  // Adjust case based on settings
-  if (localConfig.value.caseSensitive) {
-    examples.push('CaseSensitive');
-  }
-  
-  return examples.slice(0, 4);
+// Generate examples based on current config
+const examples = ref([]);
+const updateExamples = () => {
+  const { allowNumbers, allowSpecialChars, caseSensitive } = localConfig.value;
+
+  examples.value =
+    allowNumbers && allowSpecialChars
+      ? ['INV-2024-001', 'REF#12345', 'DOC_ABC123']
+      : allowNumbers
+        ? ['DOC123', 'REF2024', 'ID001']
+        : ['REFERENCE', 'DOCUMENT', 'INVOICE'];
+
+  if (caseSensitive) examples.value.push('CaseSensitive');
+  examples.value = examples.value.slice(0, 4);
 };
 
-// Watch for changes and emit
-watch(localConfig, (newConfig) => {
-  // Ensure minLength doesn't exceed maxLength
-  if (newConfig.minLength > newConfig.maxLength) {
-    newConfig.minLength = newConfig.maxLength;
-  }
-  
-  emit('update:modelValue', { ...newConfig });
-}, { deep: true });
+// Watch and emit changes
+watch(
+  localConfig,
+  (newConfig) => {
+    if (newConfig.minLength > newConfig.maxLength) {
+      newConfig.minLength = newConfig.maxLength;
+    }
+    updateExamples();
+    emit('update:modelValue', { ...newConfig });
+  },
+  { deep: true, immediate: true }
+);
 
-// Initialize with props
-watch(() => props.modelValue, (newValue) => {
-  localConfig.value = { ...localConfig.value, ...newValue };
-}, { immediate: true });
+// Sync with props
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    Object.assign(localConfig.value, newValue);
+  }
+);
 </script>
 
 <style scoped>
-.unique-string-config-form {
-  width: 100%;
-}
-
-.formatting-options,
-.uniqueness-scope {
+.section {
   border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   padding-top: 16px;
 }
