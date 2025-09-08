@@ -2,33 +2,30 @@
   <div class="counter-config-form">
     <h3 class="text-h6 mb-4">Counter Category Configuration</h3>
     <p class="text-body-2 text-medium-emphasis mb-4">
-      Configure automatic sequence generation for sequential numbering or lettering systems.
-      Each new document gets the next value in the sequence.
+      Set an optional starting value and prefix for automatic numbering.
     </p>
 
-    <!-- Sequence Type -->
     <v-row>
-      <v-col cols="12" md="6">
-        <v-select
-          v-model="localConfig.sequenceType"
-          label="Sequence Type"
-          :items="sequenceTypeOptions"
-          variant="outlined"
-          density="compact"
-          @update:model-value="updateSequenceType"
-        />
-      </v-col>
-
       <!-- Starting Value -->
       <v-col cols="12" md="6">
         <v-text-field
           v-model="localConfig.startValue"
-          label="Starting Value"
+          label="Starting Value (optional)"
           variant="outlined"
           density="compact"
-          :placeholder="getStartValuePlaceholder()"
-          :hint="getStartValueHint()"
-          persistent-hint
+          placeholder="1"
+        />
+      </v-col>
+
+      <!-- Prefix -->
+      <v-col cols="12" md="6">
+        <v-text-field
+          v-model="localConfig.prefix"
+          label="Prefix (optional)"
+          variant="outlined"
+          density="compact"
+          placeholder="e.g., DOC-, INV-"
+          :maxlength="10"
         />
       </v-col>
     </v-row>

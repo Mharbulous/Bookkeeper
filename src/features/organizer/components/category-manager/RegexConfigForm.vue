@@ -2,54 +2,19 @@
   <div class="regex-config-form">
     <h3 class="text-h6 mb-4">Regex Category Configuration</h3>
     <p class="text-body-2 text-medium-emphasis mb-4">
-      Configure pattern-based text validation using regular expressions to ensure text follows specific formats.
+      Enter a regular expression pattern to validate text inputs.
     </p>
 
-    <!-- Pattern Configuration -->
-    <v-row>
-      <!-- Predefined Patterns -->
-      <v-col cols="12" md="6">
-        <v-select
-          v-model="selectedPreset"
-          label="Common Patterns"
-          :items="presetPatterns"
-          variant="outlined"
-          density="compact"
-          placeholder="Choose a preset or create custom..."
-          @update:model-value="applyPreset"
-          clearable
-        />
-      </v-col>
-
-      <!-- Pattern Flags -->
-      <v-col cols="12" md="6">
-        <v-select
-          v-model="localConfig.flags"
-          label="Pattern Flags"
-          :items="flagOptions"
-          variant="outlined"
-          density="compact"
-          multiple
-          chips
-        />
-      </v-col>
-    </v-row>
-
-    <!-- Custom Pattern Input -->
-    <v-row>
-      <v-col cols="12">
-        <v-text-field
-          v-model="localConfig.pattern"
-          label="Regular Expression Pattern"
-          variant="outlined"
-          density="compact"
-          :error-messages="patternError"
-          placeholder="e.g., ^[A-Z]{3}-\d{4}$ for ABC-1234 format"
-          prepend-inner-icon="mdi-regex"
-          @input="validatePattern"
-        />
-      </v-col>
-    </v-row>
+    <!-- Pattern Input -->
+    <v-text-field
+      v-model="localConfig.pattern"
+      label="Regular Expression Pattern"
+      variant="outlined"
+      density="compact"
+      placeholder="e.g., ^[A-Z]{3}-\d{4}$ for ABC-1234 format"
+      prepend-inner-icon="mdi-regex"
+      class="mb-4"
+    />
 
     <!-- Error Message Configuration -->
     <v-row>

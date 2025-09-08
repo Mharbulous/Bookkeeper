@@ -2,41 +2,22 @@
   <div class="unique-string-config-form">
     <h3 class="text-h6 mb-4">Unique String Category Configuration</h3>
     <p class="text-body-2 text-medium-emphasis mb-4">
-      Configure validation for text strings that must be unique within this category.
-      Each string can only be used once across all documents.
+      Set an optional maximum length for unique text strings. Each string can only be used once.
     </p>
 
-    <v-row>
-      <!-- Maximum Length -->
-      <v-col cols="12" md="6">
-        <v-text-field
-          v-model.number="localConfig.maxLength"
-          label="Maximum Length"
-          type="number"
-          variant="outlined"
-          density="compact"
-          :min="1"
-          :max="256"
-          placeholder="256"
-          suffix="characters"
-        />
-      </v-col>
-
-      <!-- Minimum Length -->
-      <v-col cols="12" md="6">
-        <v-text-field
-          v-model.number="localConfig.minLength"
-          label="Minimum Length"
-          type="number"
-          variant="outlined"
-          density="compact"
-          :min="1"
-          :max="localConfig.maxLength || 256"
-          placeholder="1"
-          suffix="characters"
-        />
-      </v-col>
-    </v-row>
+    <!-- Maximum Length -->
+    <v-text-field
+      v-model.number="localConfig.maxLength"
+      label="Maximum Length (optional)"
+      type="number"
+      variant="outlined"
+      density="compact"
+      :min="1"
+      :max="256"
+      placeholder="256 characters"
+      clearable
+      class="mb-4"
+    />
 
     <!-- Case Sensitivity and Formatting -->
     <div class="formatting-options mt-4">
