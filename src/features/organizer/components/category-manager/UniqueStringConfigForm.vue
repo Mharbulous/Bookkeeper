@@ -81,32 +81,6 @@
       />
     </div>
 
-    <!-- Auto-generation Options -->
-    <div class="generation-options mt-4">
-      <h4 class="text-subtitle-1 mb-3">Auto-generation (Optional)</h4>
-      <v-row>
-        <v-col cols="12" md="6">
-          <v-checkbox
-            v-model="localConfig.enableAutoGeneration"
-            label="Enable auto-generation"
-            color="deep-purple"
-            density="compact"
-            hint="Generate unique values when needed"
-            persistent-hint
-          />
-        </v-col>
-
-        <v-col cols="12" md="6" v-if="localConfig.enableAutoGeneration">
-          <v-select
-            v-model="localConfig.generationPattern"
-            label="Generation Pattern"
-            :items="generationPatternOptions"
-            variant="outlined"
-            density="compact"
-          />
-        </v-col>
-      </v-row>
-    </div>
 
     <!-- Preview -->
     <v-card variant="tonal" color="deep-purple" class="mt-4">
@@ -159,9 +133,6 @@
       <v-icon start>mdi-alert</v-icon>
       <strong>Important:</strong> Once a value is used in any document, it cannot be used again. 
       This ensures each string is unique across your entire document collection.
-      <span v-if="localConfig.enableAutoGeneration">
-        Auto-generation will create new unique values when conflicts occur.
-      </span>
     </v-alert>
 
     <!-- Use Cases -->
@@ -190,9 +161,7 @@ const props = defineProps({
       trimWhitespace: true,
       allowNumbers: true,
       allowSpecialChars: true,
-      uniquenessScope: 'team',
-      enableAutoGeneration: false,
-      generationPattern: 'uuid'
+      uniquenessScope: 'team'
     })
   }
 });
@@ -208,8 +177,6 @@ const localConfig = ref({
   allowNumbers: true,
   allowSpecialChars: true,
   uniquenessScope: 'team',
-  enableAutoGeneration: false,
-  generationPattern: 'uuid',
   ...props.modelValue
 });
 
@@ -220,12 +187,6 @@ const uniquenessScopeOptions = [
   { title: 'Within Category', value: 'category' }
 ];
 
-const generationPatternOptions = [
-  { title: 'UUID (abc123de-f456-...)', value: 'uuid' },
-  { title: 'Short ID (ABC123)', value: 'shortid' },
-  { title: 'Timestamp (20241201-143022)', value: 'timestamp' },
-  { title: 'Sequential (DOC-001, DOC-002)', value: 'sequential' }
-];
 
 // Helper methods
 const getExamples = () => {
@@ -269,8 +230,7 @@ watch(() => props.modelValue, (newValue) => {
 }
 
 .formatting-options,
-.uniqueness-scope,
-.generation-options {
+.uniqueness-scope {
   border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   padding-top: 16px;
 }

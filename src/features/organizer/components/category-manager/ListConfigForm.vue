@@ -3,7 +3,7 @@
     <h3 class="text-h6 mb-4">{{ categoryType === 'fixed-list' ? 'Fixed List' : 'Open List' }} Configuration</h3>
     <p class="text-body-2 text-medium-emphasis mb-6">
       {{ categoryType === 'open-list' 
-        ? 'Add some initial tags. AI can create more tags automatically when processing documents.' 
+        ? 'Add some initial tags. Users can add more tags when creating documents.' 
         : 'Add tags for the dropdown options. These will be the only available choices.' 
       }}
     </p>
@@ -12,14 +12,15 @@
     <v-row class="mb-4">
       <v-col cols="12" md="8">
         <v-text-field
+          ref="tagInput"
           v-model="newTagName"
           label="Add a tag"
           variant="outlined"
           density="compact"
           placeholder="e.g., Invoice, Receipt, Statement..."
           :error-messages="tagInputError"
-          @keydown.enter="addTag"
-          @input="clearTagError"
+          @keydown.enter.prevent="addTag"
+          @input="handleTagInput"
         />
       </v-col>
       <v-col cols="12" md="4">
@@ -63,16 +64,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 
 const props = defineProps({
   modelValue: {
     type: Object,
     default: () => ({
-      allowAIExpansion: false,
       maxTags: 100,
-      aiConfidenceThreshold: 0.7,
-      requireHumanReview: false,
       tags: []
     })
   },
@@ -87,10 +85,7 @@ const emit = defineEmits(['update:modelValue']);
 
 // Local reactive config with sensible defaults
 const localConfig = ref({
-  allowAIExpansion: props.categoryType === 'open-list',
   maxTags: 100,
-  aiConfidenceThreshold: 0.75,
-  requireHumanReview: false,
   tags: [],
   ...props.modelValue
 });
@@ -98,6 +93,7 @@ const localConfig = ref({
 // Tag input state
 const newTagName = ref('');
 const tagInputError = ref('');
+const tagInput = ref(null);
 
 // Methods
 const getTagColor = (index) => {
@@ -105,7 +101,7 @@ const getTagColor = (index) => {
   return colors[index % colors.length];
 };
 
-const addTag = () => {
+const addTag = async () => {
   const name = newTagName.value.trim();
   
   // Basic validation
@@ -129,13 +125,18 @@ const addTag = () => {
   localConfig.value.tags.push({
     id: crypto.randomUUID(),
     name: name,
-    aiGenerated: false,
     usageCount: 0
   });
   
-  // Clear input
+  // Clear input using nextTick to ensure reactivity completes
+  await nextTick();
   newTagName.value = '';
   tagInputError.value = '';
+  
+  // Focus the input field for next tag entry
+  if (tagInput.value) {
+    tagInput.value.focus();
+  }
 };
 
 const removeTag = (index) => {
@@ -146,6 +147,23 @@ const clearTagError = () => {
   tagInputError.value = '';
 };
 
+const handleTagInput = (event) => {
+  // Clear any existing error
+  clearTagError();
+  
+  // Get the input value
+  const value = event.target.value;
+  
+  // Auto-capitalize first letter
+  if (value && value.length > 0) {
+    const capitalized = value.charAt(0).toUpperCase() + value.slice(1);
+    if (capitalized !== value) {
+      // Update the value with capitalized first letter
+      newTagName.value = capitalized;
+    }
+  }
+};
+
 // Computed
 const canAddTag = computed(() => {
   return newTagName.value.trim().length > 0;
@@ -153,9 +171,6 @@ const canAddTag = computed(() => {
 
 // Watch for changes
 watch(localConfig, (newConfig) => {
-  // Ensure allowAIExpansion matches category type
-  newConfig.allowAIExpansion = props.categoryType === 'open-list';
-  
   emit('update:modelValue', { ...newConfig });
 }, { deep: true });
 
@@ -163,15 +178,9 @@ watch(localConfig, (newConfig) => {
 watch(() => props.modelValue, (newValue) => {
   localConfig.value = { 
     ...localConfig.value, 
-    ...newValue,
-    allowAIExpansion: props.categoryType === 'open-list'
+    ...newValue
   };
 }, { immediate: true });
-
-// Watch category type changes
-watch(() => props.categoryType, (newType) => {
-  localConfig.value.allowAIExpansion = newType === 'open-list';
-});
 </script>
 
 <style scoped>

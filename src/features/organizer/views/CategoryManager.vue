@@ -10,9 +10,9 @@
 
     <!-- Add New Category -->
     <v-card class="mb-6" variant="outlined">
-      <v-card-title>
+      <v-card-title :class="{ 'dynamic-category-title': showCreationWizard && creationStep === 2 }">
         <v-icon class="mr-2">mdi-plus-circle</v-icon>
-        Add New Category
+        {{ wizardTitle }}
       </v-card-title>
       <v-card-text>
         <v-btn
@@ -27,14 +27,37 @@
 
         <!-- Category Creation Wizard -->
         <div v-else class="category-creation-wizard">
-          <v-stepper
-            v-model="creationStep"
-            :items="wizardSteps"
-            class="creation-stepper"
-            alt-labels
-          >
+          <!-- Custom Step Indicator -->
+          <div class="custom-wizard-header mb-6">
+            <div class="step-indicator">
+              <div class="step" :class="{ active: creationStep === 1 }">
+                <div class="step-number">
+                  <span>1</span>
+                </div>
+                <div class="step-content">
+                  <div class="step-title">Basic Info</div>
+                  <div class="step-subtitle">Category details</div>
+                </div>
+              </div>
+              
+              <div class="step-divider" :class="{ active: creationStep === 2 }"></div>
+              
+              <div class="step" :class="{ active: creationStep === 2 }">
+                <div class="step-number">
+                  <span>2</span>
+                </div>
+                <div class="step-content">
+                  <div class="step-title">Configuration</div>
+                  <div class="step-subtitle">Type-specific options</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step Content -->
+          <div class="wizard-content">
             <!-- Step 1: Basic Information -->
-            <template #item.1>
+            <div v-if="creationStep === 1" class="step-content">
               <div class="basic-info-step">
                 <h3 class="text-h6 mb-4">Category Information</h3>
                 <p class="text-body-2 text-medium-emphasis mb-4">
@@ -50,6 +73,7 @@
                       density="compact"
                       :error-messages="newCategoryErrors.name"
                       placeholder="e.g., Transaction Date, Invoice Amount"
+                      @input="handleCategoryNameInput"
                     />
                   </v-col>
                   
@@ -58,11 +82,24 @@
                   </v-col>
                 </v-row>
 
+                <v-row>
+                  <v-col cols="12">
+                    <v-checkbox
+                      v-model="newCategory.allowAI"
+                      label="Allow AI processing"
+                      color="blue"
+                      density="compact"
+                      hint="Enable AI to automatically process and enhance data for this category"
+                      persistent-hint
+                      class="mt-2"
+                    />
+                  </v-col>
+                </v-row>
               </div>
-            </template>
+            </div>
 
             <!-- Step 2: Type Configuration -->
-            <template #item.2>
+            <div v-if="creationStep === 2" class="step-content">
               <div class="type-config-step">
                 <!-- Date Configuration -->
                 <DateConfigForm
@@ -137,9 +174,8 @@
                   <p class="text-body-1 mt-2">Select a category type to configure options.</p>
                 </div>
               </div>
-            </template>
-
-          </v-stepper>
+            </div>
+          </div>
 
           <!-- Wizard Navigation -->
           <v-card-actions class="px-0 pt-4">
@@ -611,6 +647,7 @@ const creationStep = ref(1);
 const newCategory = ref({
   name: '',
   categoryType: 'open-list',
+  allowAI: true,
   typeConfig: {}
 });
 
@@ -624,27 +661,53 @@ const snackbar = ref({
   color: 'success'
 });
 
-// Wizard configuration
-const wizardSteps = [
-  { title: 'Basic Info', value: 1, icon: 'mdi-information-outline' },
-  { title: 'Configuration', value: 2, icon: 'mdi-cog-outline' }
-];
 
 // Categories that don't need configuration step
 const skipConfigurationTypes = ['currency'];
 
 // Computed
 const canCreateCategory = computed(() => {
-  return newCategory.value.name.trim().length > 0 && 
-         newCategory.value.categoryType !== null &&
-         creationStep.value === 2; // Only allow creation on final step
+  // Base validation
+  const baseValid = newCategory.value.name.trim().length > 0 && 
+                   newCategory.value.categoryType !== null &&
+                   creationStep.value === 2; // Only allow creation on final step
+  
+  if (!baseValid) return false;
+  
+  // Type-specific validation
+  switch (newCategory.value.categoryType) {
+    case 'open-list':
+      // Require minimum 2 tags for open lists (allows room for expansion)
+      return newCategory.value.typeConfig?.tags?.length >= 2;
+    
+    case 'fixed-list':
+      // Require minimum 1 tag for fixed lists (needs at least one option)
+      return newCategory.value.typeConfig?.tags?.length >= 1;
+    
+    default:
+      // Other category types use base validation only
+      return true;
+  }
 });
 
 const canProceedToNextStep = computed(() => {
+  console.log('Validation check:', {
+    step: creationStep.value,
+    nameLength: newCategory.value.name.trim().length,
+    categoryType: newCategory.value.categoryType
+  });
+  
   switch (creationStep.value) {
     case 1: // Basic info - name, type, color
-      return newCategory.value.name.trim().length > 0 && 
-             newCategory.value.categoryType !== null;
+      const isValid = newCategory.value.name.trim().length >= 3 && 
+                     newCategory.value.categoryType !== null;
+      console.log('Step 1 validation result:', isValid, {
+        nameValid: newCategory.value.name.trim().length >= 3,
+        nameLength: newCategory.value.name.trim().length,
+        typeValid: newCategory.value.categoryType !== null,
+        categoryType: newCategory.value.categoryType
+      });
+      return isValid;
     case 2: // Configuration
       return true; // Type-specific validation handled in components
     default:
@@ -652,7 +715,37 @@ const canProceedToNextStep = computed(() => {
   }
 });
 
+const wizardTitle = computed(() => {
+  if (creationStep.value === 1 || !showCreationWizard.value) {
+    return 'Add New Category';
+  }
+  
+  // Page 2: Show specific category type and name
+  const categoryType = getCategoryTypeText(newCategory.value.categoryType);
+  const categoryName = newCategory.value.name.trim();
+  
+  if (categoryName) {
+    return `New ${categoryType}: ${categoryName}`;
+  }
+  
+  return `New ${categoryType}`;
+});
+
 // Methods
+const handleCategoryNameInput = (event) => {
+  // Get the input value
+  const value = event.target.value;
+  
+  // Auto-capitalize first character
+  if (value && value.length > 0) {
+    const capitalized = value.charAt(0).toUpperCase() + value.slice(1);
+    if (capitalized !== value) {
+      // Update the value with capitalized first character
+      newCategory.value.name = capitalized;
+    }
+  }
+};
+
 const startCategoryCreation = () => {
   showCreationWizard.value = true;
   creationStep.value = 1;
@@ -660,6 +753,7 @@ const startCategoryCreation = () => {
   newCategory.value = {
     name: '',
     categoryType: 'open-list',
+    allowAI: true,
     typeConfig: {}
   };
   newCategoryErrors.value = { name: [] };
@@ -672,6 +766,7 @@ const cancelCategoryCreation = () => {
   newCategory.value = {
     name: '',
     categoryType: 'open-list',
+    allowAI: true,
     typeConfig: {}
   };
   newCategoryErrors.value = { name: [] };
@@ -996,5 +1091,93 @@ onMounted(async () => {
   border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   padding-top: 16px;
   margin-top: 16px;
+}
+
+/* Custom Wizard Styles */
+.custom-wizard-header {
+  padding: 24px 0;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  background-color: rgb(var(--v-theme-surface));
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-weight: 600;
+  font-size: 16px;
+  margin-right: 16px;
+  transition: all 0.3s ease;
+}
+
+.step.active .step-number {
+  border-color: rgb(var(--v-theme-primary));
+  background-color: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+}
+
+
+.step-content {
+  flex: 1;
+}
+
+.step-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: rgba(var(--v-theme-on-surface), 0.87);
+  line-height: 1.2;
+}
+
+.step.active .step-title {
+  color: rgb(var(--v-theme-primary));
+}
+
+
+.step-subtitle {
+  font-size: 14px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  margin-top: 2px;
+}
+
+.step-divider {
+  flex: 1;
+  height: 2px;
+  background-color: rgba(var(--v-border-color), var(--v-border-opacity));
+  margin: 0 24px;
+  transition: all 0.3s ease;
+}
+
+.step-divider.active {
+  background-color: rgb(var(--v-theme-success));
+}
+
+.wizard-content {
+  min-height: 200px;
+}
+
+.step-content {
+  padding: 0 8px;
+}
+
+.dynamic-category-title {
+  color: rgb(var(--v-theme-primary)) !important;
 }
 </style>
