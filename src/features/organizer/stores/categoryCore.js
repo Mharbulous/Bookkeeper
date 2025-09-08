@@ -66,6 +66,7 @@ export function useCategoryCore() {
         async (snapshot) => {
           const loadedCategories = [];
           const categoriesToMigrate = [];
+          const categoryTypesToMigrate = [];
           
           snapshot.docs.forEach(doc => {
             const data = doc.data();
@@ -87,6 +88,12 @@ export function useCategoryCore() {
                 ...data
               });
             }
+            
+            // Check for missing category type fields (legacy categories)
+            if (data.isActive !== false && !data.categoryType) {
+              categoryTypesToMigrate.push({ id: doc.id, data });
+            }
+            
             // Skip categories where isActive === false
           });
 
@@ -95,6 +102,14 @@ export function useCategoryCore() {
             console.log(`[CategoryCore] Migrating ${categoriesToMigrate.length} categories to add isActive field`);
             CategoryService.migrateIsActiveField(teamId, categoriesToMigrate).catch(err => {
               console.error('[CategoryCore] Migration failed:', err);
+            });
+          }
+
+          // Migrate categories missing category type fields
+          if (categoryTypesToMigrate.length > 0) {
+            console.log(`[CategoryCore] Migrating ${categoryTypesToMigrate.length} categories to add category type fields`);
+            CategoryService.migrateCategoryTypes(teamId, categoryTypesToMigrate).catch(err => {
+              console.error('[CategoryCore] Category type migration failed:', err);
             });
           }
 

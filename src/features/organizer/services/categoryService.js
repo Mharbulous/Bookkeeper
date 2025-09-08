@@ -14,7 +14,7 @@ export class CategoryService {
   }
 
   /**
-   * Validate category data structure
+   * Validate category data structure (enhanced for category types)
    */
   static validateCategoryData(categoryData) {
     const errors = [];
@@ -28,35 +28,49 @@ export class CategoryService {
       errors.push('Category name must be 50 characters or less');
     }
 
-    // Color validation removed - colors are now automatically assigned by UI
-
-    // Tags validation
-    if (categoryData.tags && !Array.isArray(categoryData.tags)) {
-      errors.push('Category tags must be an array');
+    // Category type validation
+    const validTypes = ['date', 'currency', 'fixed-list', 'open-list'];
+    if (categoryData.categoryType && !validTypes.includes(categoryData.categoryType)) {
+      errors.push(`Category type must be one of: ${validTypes.join(', ')}`);
     }
 
-    if (categoryData.tags && categoryData.tags.length > 100) {
-      errors.push('Category cannot have more than 100 tags');
+    // Type configuration validation
+    if (categoryData.typeConfig) {
+      const typeErrors = this.validateTypeConfig(categoryData.categoryType, categoryData.typeConfig);
+      errors.push(...typeErrors);
     }
 
-    // Validate individual tags
-    if (categoryData.tags && Array.isArray(categoryData.tags)) {
-      categoryData.tags.forEach((tag, index) => {
-        if (!tag.name || typeof tag.name !== 'string' || !tag.name.trim()) {
-          errors.push(`Tag ${index + 1}: name is required and must be a non-empty string`);
-        }
-        if (tag.name && tag.name.trim().length > 30) {
-          errors.push(`Tag ${index + 1}: name must be 30 characters or less`);
-        }
-        // Removed tag.color validation - tags no longer store individual colors
-      });
-
-      // Check for duplicate tag names
-      const tagNames = categoryData.tags.map(tag => tag.name?.trim().toLowerCase()).filter(Boolean);
-      const uniqueNames = [...new Set(tagNames)];
-      if (tagNames.length !== uniqueNames.length) {
-        errors.push('Category cannot have duplicate tag names');
+    // Tags validation (only for list types)
+    const categoryType = categoryData.categoryType || 'fixed-list'; // Default for backwards compatibility
+    if (categoryType === 'fixed-list' || categoryType === 'open-list') {
+      if (categoryData.tags && !Array.isArray(categoryData.tags)) {
+        errors.push('Category tags must be an array');
       }
+
+      if (categoryData.tags && categoryData.tags.length > 100) {
+        errors.push('Category cannot have more than 100 tags');
+      }
+
+      // Validate individual tags
+      if (categoryData.tags && Array.isArray(categoryData.tags)) {
+        categoryData.tags.forEach((tag, index) => {
+          if (!tag.name || typeof tag.name !== 'string' || !tag.name.trim()) {
+            errors.push(`Tag ${index + 1}: name is required and must be a non-empty string`);
+          }
+          if (tag.name && tag.name.trim().length > 30) {
+            errors.push(`Tag ${index + 1}: name must be 30 characters or less`);
+          }
+        });
+
+        // Check for duplicate tag names
+        const tagNames = categoryData.tags.map(tag => tag.name?.trim().toLowerCase()).filter(Boolean);
+        const uniqueNames = [...new Set(tagNames)];
+        if (tagNames.length !== uniqueNames.length) {
+          errors.push('Category cannot have duplicate tag names');
+        }
+      }
+    } else if (categoryData.tags && categoryData.tags.length > 0) {
+      errors.push(`Category type '${categoryType}' should not have tags array`);
     }
 
     if (errors.length > 0) {
@@ -64,6 +78,153 @@ export class CategoryService {
     }
 
     return true;
+  }
+
+  /**
+   * Validate type-specific configuration
+   */
+  static validateTypeConfig(categoryType, typeConfig) {
+    const errors = [];
+
+    if (!typeConfig || typeof typeConfig !== 'object') {
+      errors.push('Type configuration is required and must be an object');
+      return errors;
+    }
+
+    switch (categoryType) {
+      case 'date':
+        return this.validateDateConfig(typeConfig);
+      case 'currency':
+        return this.validateCurrencyConfig(typeConfig);
+      case 'fixed-list':
+      case 'open-list':
+        return this.validateListConfig(typeConfig);
+      default:
+        errors.push(`Unknown category type: ${categoryType}`);
+        return errors;
+    }
+  }
+
+  /**
+   * Validate date category configuration
+   */
+  static validateDateConfig(config) {
+    const errors = [];
+
+    if (config.dateFormat && typeof config.dateFormat !== 'string') {
+      errors.push('Date format must be a string');
+    }
+
+    if (config.defaultValue && typeof config.defaultValue !== 'string') {
+      errors.push('Default value must be a string');
+    }
+
+    return errors;
+  }
+
+  /**
+   * Validate currency category configuration
+   */
+  static validateCurrencyConfig(config) {
+    const errors = [];
+
+    if (config.defaultCurrency && (typeof config.defaultCurrency !== 'string' || !/^[A-Z]{3}$/.test(config.defaultCurrency))) {
+      errors.push('Default currency must be a valid 3-letter currency code');
+    }
+
+    if (config.supportedCurrencies) {
+      if (!Array.isArray(config.supportedCurrencies)) {
+        errors.push('Supported currencies must be an array');
+      } else {
+        config.supportedCurrencies.forEach((currency, index) => {
+          if (typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency)) {
+            errors.push(`Supported currency ${index + 1} must be a valid 3-letter currency code`);
+          }
+        });
+
+        if (config.supportedCurrencies.length > 20) {
+          errors.push('Cannot have more than 20 supported currencies');
+        }
+      }
+    }
+
+    if (config.allowNegative !== undefined && typeof config.allowNegative !== 'boolean') {
+      errors.push('allowNegative must be a boolean');
+    }
+
+    if (config.decimalPlaces !== undefined) {
+      if (typeof config.decimalPlaces !== 'number' || config.decimalPlaces < 0 || config.decimalPlaces > 8) {
+        errors.push('decimalPlaces must be a number between 0 and 8');
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Validate list category configuration
+   */
+  static validateListConfig(config) {
+    const errors = [];
+
+    if (config.allowAIExpansion === undefined || typeof config.allowAIExpansion !== 'boolean') {
+      errors.push('allowAIExpansion is required and must be a boolean');
+    }
+
+    if (config.maxTags !== undefined) {
+      if (typeof config.maxTags !== 'number' || config.maxTags < 1 || config.maxTags > 500) {
+        errors.push('maxTags must be a number between 1 and 500');
+      }
+    }
+
+    if (config.aiConfidenceThreshold !== undefined) {
+      if (typeof config.aiConfidenceThreshold !== 'number' || config.aiConfidenceThreshold < 0 || config.aiConfidenceThreshold > 1) {
+        errors.push('aiConfidenceThreshold must be a number between 0 and 1');
+      }
+    }
+
+    if (config.requireHumanReview !== undefined && typeof config.requireHumanReview !== 'boolean') {
+      errors.push('requireHumanReview must be a boolean');
+    }
+
+    return errors;
+  }
+
+  /**
+   * Get default type configuration for a category type
+   */
+  static getDefaultTypeConfig(categoryType, providedConfig = {}) {
+    const defaults = {
+      date: {
+        dateFormat: 'YYYY-MM-DD',
+        defaultValue: 't.b.d.',
+        allowFuture: true,
+        allowPast: true
+      },
+      currency: {
+        defaultCurrency: 'USD',
+        supportedCurrencies: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'INR', 'BTC', 'ETH'],
+        allowNegative: true,
+        allowZero: true,
+        decimalPlaces: 2
+      },
+      'fixed-list': {
+        allowAIExpansion: false,
+        maxTags: 100,
+        aiConfidenceThreshold: 0.85
+      },
+      'open-list': {
+        allowAIExpansion: true,
+        maxTags: 200,
+        aiConfidenceThreshold: 0.7,
+        requireHumanReview: false
+      }
+    };
+
+    return {
+      ...defaults[categoryType],
+      ...providedConfig
+    };
   }
 
   /**
@@ -81,14 +242,26 @@ export class CategoryService {
       // Check for duplicate category name
       await this.validateUniqueName(teamId, categoryData.name.trim());
 
-      // Prepare category document
+      // Prepare category document with type support
       const categoryDoc = {
         name: categoryData.name.trim(),
-        tags: categoryData.tags || [],
+        categoryType: categoryData.categoryType || 'fixed-list', // Default for backwards compatibility
+        typeConfig: this.getDefaultTypeConfig(categoryData.categoryType || 'fixed-list', categoryData.typeConfig),
         isActive: true,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
+
+      // Only include tags for list types
+      const categoryType = categoryData.categoryType || 'fixed-list';
+      if (categoryType === 'fixed-list' || categoryType === 'open-list') {
+        categoryDoc.tags = categoryData.tags || [];
+      }
+
+      // Include color if provided
+      if (categoryData.color) {
+        categoryDoc.color = categoryData.color;
+      }
 
       // Add to Firestore
       const categoriesRef = this.getCategoriesCollection(teamId);
@@ -344,35 +517,54 @@ export class CategoryService {
       const defaultCategories = [
         {
           name: 'Document Type',
+          categoryType: 'fixed-list',
           color: '#1976d2',
           tags: [
-            { name: 'Invoice', color: '#1976d2' },
-            { name: 'Statement', color: '#1565c0' },
-            { name: 'Receipt', color: '#0d47a1' },
-            { name: 'Contract', color: '#1976d2' },
-            { name: 'Report', color: '#1565c0' }
+            { id: crypto.randomUUID(), name: 'Invoice', aiGenerated: false },
+            { id: crypto.randomUUID(), name: 'Statement', aiGenerated: false },
+            { id: crypto.randomUUID(), name: 'Receipt', aiGenerated: false },
+            { id: crypto.randomUUID(), name: 'Contract', aiGenerated: false },
+            { id: crypto.randomUUID(), name: 'Report', aiGenerated: false }
           ]
         },
         {
-          name: 'Date/Period',
+          name: 'Transaction Date',
+          categoryType: 'date',
           color: '#388e3c',
-          tags: [
-            { name: 'Q1 2024', color: '#388e3c' },
-            { name: 'Q2 2024', color: '#2e7d32' },
-            { name: 'Q3 2024', color: '#1b5e20' },
-            { name: 'Q4 2024', color: '#388e3c' },
-            { name: '2024', color: '#2e7d32' }
-          ]
+          typeConfig: {
+            dateFormat: 'YYYY-MM-DD',
+            allowFuture: true,
+            allowPast: true,
+            defaultToToday: false
+          }
+        },
+        {
+          name: 'Amount',
+          categoryType: 'currency',
+          color: '#f57c00',
+          typeConfig: {
+            defaultCurrency: 'USD',
+            supportedCurrencies: ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'INR', 'BTC', 'ETH'],
+            allowNegative: true,
+            allowZero: true,
+            decimalPlaces: 2
+          }
         },
         {
           name: 'Institution',
+          categoryType: 'open-list',
           color: '#f57c00',
+          typeConfig: {
+            allowAIExpansion: true,
+            maxTags: 200,
+            aiConfidenceThreshold: 0.7,
+            requireHumanReview: false
+          },
           tags: [
-            { name: 'Bank of America', color: '#f57c00' },
-            { name: 'Chase', color: '#ef6c00' },
-            { name: 'Wells Fargo', color: '#e65100' },
-            { name: 'Credit Union', color: '#f57c00' },
-            { name: 'Other Bank', color: '#ef6c00' }
+            { id: crypto.randomUUID(), name: 'Bank of America', aiGenerated: false, usageCount: 0 },
+            { id: crypto.randomUUID(), name: 'Chase', aiGenerated: false, usageCount: 0 },
+            { id: crypto.randomUUID(), name: 'Wells Fargo', aiGenerated: false, usageCount: 0 },
+            { id: crypto.randomUUID(), name: 'Credit Union', aiGenerated: false, usageCount: 0 }
           ]
         }
       ];
@@ -430,6 +622,135 @@ export class CategoryService {
       }
       console.error('[CategoryService] Failed to validate category limit:', error);
       throw new Error('Failed to validate category limit');
+    }
+  }
+
+  /**
+   * Migrate legacy categories to include category type and type configuration
+   */
+  static async migrateCategoryTypes(teamId, categories) {
+    try {
+      const migrationPromises = categories.map(async ({ id, data }) => {
+        const categoryRef = doc(db, 'teams', teamId, 'categories', id);
+        
+        // Determine category type based on existing data
+        const migrationUpdate = {
+          categoryType: 'fixed-list', // Default for all legacy categories
+          typeConfig: this.getDefaultTypeConfig('fixed-list'),
+          migrated: true,
+          migratedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
+        // Ensure tags have proper structure for fixed-list categories
+        if (data.tags && Array.isArray(data.tags)) {
+          migrationUpdate.tags = data.tags.map(tag => ({
+            id: tag.id || crypto.randomUUID(),
+            name: tag.name,
+            aiGenerated: false,
+            usageCount: tag.usageCount || 0
+          }));
+        }
+
+        return updateDoc(categoryRef, migrationUpdate);
+      });
+
+      await Promise.all(migrationPromises);
+      console.log(`[CategoryService] Successfully migrated ${categories.length} categories to new type system`);
+    } catch (error) {
+      console.error('[CategoryService] Failed to migrate category types:', error);
+      // Don't throw - this is a background migration
+    }
+  }
+
+  /**
+   * Add new tag to open-list category (for AI expansion)
+   */
+  static async addTagToCategory(teamId, categoryId, tagData) {
+    try {
+      if (!teamId || typeof teamId !== 'string') {
+        throw new Error('Valid team ID is required');
+      }
+      if (!categoryId || typeof categoryId !== 'string') {
+        throw new Error('Valid category ID is required');
+      }
+
+      // Get the current category
+      const categoryRef = doc(db, 'teams', teamId, 'categories', categoryId);
+      const categories = await this.getActiveCategories(teamId);
+      const category = categories.find(cat => cat.id === categoryId);
+
+      if (!category) {
+        throw new Error('Category not found');
+      }
+
+      if (category.categoryType !== 'open-list') {
+        throw new Error('Can only add tags to open-list categories');
+      }
+
+      // Check if tag already exists
+      const existingTag = category.tags?.find(tag => 
+        tag.name.toLowerCase() === tagData.name.toLowerCase()
+      );
+      if (existingTag) {
+        throw new Error('Tag already exists in category');
+      }
+
+      // Prepare new tag
+      const newTag = {
+        id: tagData.id || crypto.randomUUID(),
+        name: tagData.name.trim(),
+        aiGenerated: tagData.aiGenerated || false,
+        usageCount: tagData.usageCount || 0
+      };
+
+      // Add tag to category
+      const updatedTags = [...(category.tags || []), newTag];
+      await updateDoc(categoryRef, {
+        tags: updatedTags,
+        updatedAt: serverTimestamp()
+      });
+
+      console.log(`[CategoryService] Added tag '${newTag.name}' to category ${categoryId}`);
+      return newTag;
+    } catch (error) {
+      console.error('[CategoryService] Failed to add tag to category:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Increment tag usage count
+   */
+  static async incrementTagUsage(teamId, categoryId, tagName) {
+    try {
+      const categories = await this.getActiveCategories(teamId);
+      const category = categories.find(cat => cat.id === categoryId);
+
+      if (!category || !category.tags) {
+        return;
+      }
+
+      const updatedTags = category.tags.map(tag => {
+        if (tag.name === tagName) {
+          return {
+            ...tag,
+            usageCount: (tag.usageCount || 0) + 1
+          };
+        }
+        return tag;
+      });
+
+      const categoryRef = doc(db, 'teams', teamId, 'categories', categoryId);
+      await updateDoc(categoryRef, {
+        tags: updatedTags,
+        updatedAt: serverTimestamp()
+      });
+
+      console.log(`[CategoryService] Incremented usage count for tag '${tagName}' in category ${categoryId}`);
+    } catch (error) {
+      console.error('[CategoryService] Failed to increment tag usage:', error);
+      // Don't throw - this is a background operation
     }
   }
 }
