@@ -83,6 +83,54 @@
                   :category-type="newCategory.categoryType"
                 />
 
+                <!-- Checkbox Configuration -->
+                <CheckboxConfigForm
+                  v-else-if="newCategory.categoryType === 'checkbox'"
+                  v-model="newCategory.typeConfig"
+                />
+
+                <!-- Integer Configuration -->
+                <IntegerConfigForm
+                  v-else-if="newCategory.categoryType === 'integer'"
+                  v-model="newCategory.typeConfig"
+                />
+
+                <!-- Float Configuration -->
+                <FloatConfigForm
+                  v-else-if="newCategory.categoryType === 'float'"
+                  v-model="newCategory.typeConfig"
+                />
+
+                <!-- Textarea Configuration -->
+                <TextareaConfigForm
+                  v-else-if="newCategory.categoryType === 'textarea'"
+                  v-model="newCategory.typeConfig"
+                />
+
+                <!-- Percentage Configuration -->
+                <PercentageConfigForm
+                  v-else-if="newCategory.categoryType === 'percentage'"
+                  v-model="newCategory.typeConfig"
+                />
+
+                <!-- Unique String Configuration -->
+                <UniqueStringConfigForm
+                  v-else-if="newCategory.categoryType === 'unique-string'"
+                  v-model="newCategory.typeConfig"
+                />
+
+                <!-- Regex Configuration -->
+                <RegexConfigForm
+                  v-else-if="newCategory.categoryType === 'regex'"
+                  v-model="newCategory.typeConfig"
+                />
+
+                <!-- Counter Configuration -->
+                <CounterConfigForm
+                  v-else-if="newCategory.categoryType === 'counter'"
+                  v-model="newCategory.typeConfig"
+                />
+
                 <!-- Fallback -->
                 <div v-else class="text-center py-6">
                   <v-icon size="48" color="grey">mdi-cog-outline</v-icon>
@@ -114,7 +162,7 @@
             </v-btn>
 
             <v-btn
-              v-if="creationStep === 1 && newCategory.categoryType !== 'currency'"
+              v-if="creationStep === 1 && !skipConfigurationTypes.includes(newCategory.categoryType)"
               color="primary"
               :disabled="!canProceedToNextStep"
               @click="creationStep++"
@@ -123,9 +171,9 @@
               <v-icon end>mdi-arrow-right</v-icon>
             </v-btn>
 
-            <!-- Skip configuration step for currency categories -->
+            <!-- Skip configuration step for simple categories -->
             <v-btn
-              v-if="creationStep === 1 && newCategory.categoryType === 'currency'"
+              v-if="creationStep === 1 && skipConfigurationTypes.includes(newCategory.categoryType)"
               color="success"
               :loading="creating"
               :disabled="!canProceedToNextStep"
@@ -290,6 +338,158 @@
                         </v-card-text>
                       </v-card>
 
+                      <!-- Checkbox Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'checkbox'"
+                        variant="tonal"
+                        color="orange"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="orange" class="mr-2">mdi-checkbox-outline</v-icon>
+                            <div class="text-body-2">
+                              <strong>{{ category.typeConfig?.displayStyle || 'checkbox' }}</strong> • 
+                              Default: {{ category.typeConfig?.defaultValue ? category.typeConfig?.trueLabel || 'Yes' : category.typeConfig?.falseLabel || 'No' }}
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
+                      <!-- Integer Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'integer'"
+                        variant="tonal"
+                        color="indigo"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="indigo" class="mr-2">mdi-numeric</v-icon>
+                            <div class="text-body-2">
+                              <strong>Integer input</strong> • 
+                              Range: {{ formatRange(category.typeConfig?.minValue, category.typeConfig?.maxValue) }} • 
+                              Step: {{ category.typeConfig?.step || 1 }}
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
+                      <!-- Float Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'float'"
+                        variant="tonal"
+                        color="teal"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="teal" class="mr-2">mdi-decimal</v-icon>
+                            <div class="text-body-2">
+                              <strong>Decimal input</strong> • 
+                              {{ category.typeConfig?.decimalPlaces || 2 }} decimals • 
+                              Range: {{ formatRange(category.typeConfig?.minValue, category.typeConfig?.maxValue) }}
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
+                      <!-- Textarea Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'textarea'"
+                        variant="tonal"
+                        color="brown"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="brown" class="mr-2">mdi-text-box</v-icon>
+                            <div class="text-body-2">
+                              <strong>Multi-line text</strong> • 
+                              {{ category.typeConfig?.rows || 3 }} rows
+                              <span v-if="category.typeConfig?.maxLength"> • {{ category.typeConfig.maxLength }} char limit</span>
+                              <span v-if="category.typeConfig?.required"> • Required</span>
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
+                      <!-- Percentage Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'percentage'"
+                        variant="tonal"
+                        color="pink"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="pink" class="mr-2">mdi-percent</v-icon>
+                            <div class="text-body-2">
+                              <strong>{{ category.typeConfig?.inputMethod === 'slider' ? 'Slider' : 'Number' }} input</strong> • 
+                              {{ category.typeConfig?.decimalPlaces || 1 }} decimals • 
+                              Step: {{ category.typeConfig?.step || '0.1' }}%
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
+                      <!-- Unique String Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'unique-string'"
+                        variant="tonal"
+                        color="deep-purple"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="deep-purple" class="mr-2">mdi-key-variant</v-icon>
+                            <div class="text-body-2">
+                              <strong>Unique strings</strong> • 
+                              {{ category.typeConfig?.minLength || 1 }}-{{ category.typeConfig?.maxLength || 256 }} chars • 
+                              {{ category.typeConfig?.caseSensitive ? 'Case sensitive' : 'Case insensitive' }}
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
+                      <!-- Regex Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'regex'"
+                        variant="tonal"
+                        color="red"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="red" class="mr-2">mdi-regex</v-icon>
+                            <div class="text-body-2">
+                              <strong>Pattern validation</strong> • 
+                              <code class="text-caption">{{ (category.typeConfig?.pattern || '').length > 30 ? (category.typeConfig?.pattern || '').substring(0, 30) + '...' : category.typeConfig?.pattern || 'No pattern' }}</code>
+                              <span v-if="category.typeConfig?.required"> • Required</span>
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
+                      <!-- Counter Category Info -->
+                      <v-card
+                        v-else-if="category.categoryType === 'counter'"
+                        variant="tonal"
+                        color="cyan"
+                        class="mb-2"
+                      >
+                        <v-card-text class="py-2">
+                          <div class="d-flex align-center">
+                            <v-icon color="cyan" class="mr-2">mdi-counter</v-icon>
+                            <div class="text-body-2">
+                              <strong>{{ getCounterTypeLabel(category.typeConfig?.sequenceType) }}</strong> • 
+                              Start: {{ category.typeConfig?.startValue || '1' }}
+                              <span v-if="category.typeConfig?.prefix || category.typeConfig?.suffix"> • Format: {{ category.typeConfig?.prefix }}N{{ category.typeConfig?.suffix }}</span>
+                            </div>
+                          </div>
+                        </v-card-text>
+                      </v-card>
+
                       <!-- Legacy/Unknown Type -->
                       <v-card
                         v-else
@@ -389,6 +589,14 @@ import CategoryTypeSelector from '../components/category-manager/CategoryTypeSel
 import DateConfigForm from '../components/category-manager/DateConfigForm.vue';
 import CurrencyConfigForm from '../components/category-manager/CurrencyConfigForm.vue';
 import ListConfigForm from '../components/category-manager/ListConfigForm.vue';
+import CheckboxConfigForm from '../components/category-manager/CheckboxConfigForm.vue';
+import IntegerConfigForm from '../components/category-manager/IntegerConfigForm.vue';
+import FloatConfigForm from '../components/category-manager/FloatConfigForm.vue';
+import TextareaConfigForm from '../components/category-manager/TextareaConfigForm.vue';
+import PercentageConfigForm from '../components/category-manager/PercentageConfigForm.vue';
+import UniqueStringConfigForm from '../components/category-manager/UniqueStringConfigForm.vue';
+import RegexConfigForm from '../components/category-manager/RegexConfigForm.vue';
+import CounterConfigForm from '../components/category-manager/CounterConfigForm.vue';
 
 // Store
 const organizerStore = useOrganizerStore();
@@ -422,6 +630,8 @@ const wizardSteps = [
   { title: 'Configuration', value: 2, icon: 'mdi-cog-outline' }
 ];
 
+// Categories that don't need configuration step
+const skipConfigurationTypes = ['currency'];
 
 // Computed
 const canCreateCategory = computed(() => {
@@ -563,6 +773,14 @@ const getCategoryTypeColor = (categoryType) => {
     case 'currency': return 'green';
     case 'fixed-list': return 'grey-darken-4';
     case 'open-list': return 'blue';
+    case 'checkbox': return 'orange';
+    case 'integer': return 'indigo';
+    case 'float': return 'teal';
+    case 'textarea': return 'brown';
+    case 'percentage': return 'pink';
+    case 'unique-string': return 'deep-purple';
+    case 'regex': return 'red';
+    case 'counter': return 'cyan';
     default: return 'grey';
   }
 };
@@ -573,6 +791,14 @@ const getCategoryTypeColorValue = (categoryType) => {
     case 'currency': return '#388e3c'; // Green
     case 'fixed-list': return '#424242'; // Black/Dark Grey
     case 'open-list': return '#1976d2'; // Blue
+    case 'checkbox': return '#ff9800'; // Orange
+    case 'integer': return '#3f51b5'; // Indigo
+    case 'float': return '#009688'; // Teal
+    case 'textarea': return '#795548'; // Brown
+    case 'percentage': return '#e91e63'; // Pink
+    case 'unique-string': return '#673ab7'; // Deep Purple
+    case 'regex': return '#f44336'; // Red
+    case 'counter': return '#00bcd4'; // Cyan
     default: return '#9e9e9e'; // Grey
   }
 };
@@ -584,6 +810,14 @@ const getCategoryTypeIcon = (categoryType) => {
     case 'currency': return 'mdi-currency-usd';
     case 'fixed-list': return 'mdi-format-list-bulleted';
     case 'open-list': return 'mdi-playlist-plus';
+    case 'checkbox': return 'mdi-checkbox-outline';
+    case 'integer': return 'mdi-numeric';
+    case 'float': return 'mdi-decimal';
+    case 'textarea': return 'mdi-text-box';
+    case 'percentage': return 'mdi-percent';
+    case 'unique-string': return 'mdi-key-variant';
+    case 'regex': return 'mdi-regex';
+    case 'counter': return 'mdi-counter';
     default: return 'mdi-folder';
   }
 };
@@ -594,6 +828,14 @@ const getCategoryTypeText = (categoryType) => {
     case 'currency': return 'Currency';
     case 'fixed-list': return 'Fixed List';
     case 'open-list': return 'Open List';
+    case 'checkbox': return 'Checkbox';
+    case 'integer': return 'Integer';
+    case 'float': return 'Float';
+    case 'textarea': return 'Textarea';
+    case 'percentage': return 'Percentage';
+    case 'unique-string': return 'Unique String';
+    case 'regex': return 'Regex';
+    case 'counter': return 'Counter';
     default: return 'Legacy';
   }
 };
@@ -622,9 +864,77 @@ const getCategoryDescription = (category) => {
       const threshold = Math.round((category.typeConfig?.aiConfidenceThreshold || 0.7) * 100);
       return `Smart dropdown • ${openTagCount} initial options • AI expansion at ${threshold}% confidence`;
     
+    case 'checkbox':
+      const displayStyle = category.typeConfig?.displayStyle || 'checkbox';
+      const defaultState = category.typeConfig?.defaultValue ? 'checked' : 'unchecked';
+      return `${displayStyle.charAt(0).toUpperCase() + displayStyle.slice(1)} input • Default: ${defaultState}`;
+    
+    case 'integer':
+      const intRange = formatRange(category.typeConfig?.minValue, category.typeConfig?.maxValue);
+      const intStep = category.typeConfig?.step || 1;
+      return `Whole number input • Range: ${intRange} • Step: ${intStep}`;
+    
+    case 'float':
+      const floatRange = formatRange(category.typeConfig?.minValue, category.typeConfig?.maxValue);
+      const floatDecimals = category.typeConfig?.decimalPlaces || 2;
+      return `Decimal input • ${floatDecimals} decimal places • Range: ${floatRange}`;
+    
+    case 'textarea':
+      const rows = category.typeConfig?.rows || 3;
+      const maxLength = category.typeConfig?.maxLength;
+      const required = category.typeConfig?.required ? ' • Required' : '';
+      return `Multi-line text • ${rows} rows${maxLength ? ` • ${maxLength} char limit` : ''}${required}`;
+    
+    case 'percentage':
+      const inputMethod = category.typeConfig?.inputMethod === 'slider' ? 'Slider' : 'Number';
+      const percentDecimals = category.typeConfig?.decimalPlaces || 1;
+      const percentStep = category.typeConfig?.step || (percentDecimals === 0 ? 5 : 0.1);
+      return `${inputMethod} input • ${percentDecimals} decimals • Step: ${percentStep}%`;
+    
+    case 'unique-string':
+      const minLen = category.typeConfig?.minLength || 1;
+      const maxLen = category.typeConfig?.maxLength || 256;
+      const caseSensitive = category.typeConfig?.caseSensitive ? 'case sensitive' : 'case insensitive';
+      return `Unique text • ${minLen}-${maxLen} characters • ${caseSensitive}`;
+    
+    case 'regex':
+      const pattern = category.typeConfig?.pattern || 'No pattern';
+      const patternPreview = pattern.length > 30 ? pattern.substring(0, 30) + '...' : pattern;
+      const regexRequired = category.typeConfig?.required ? ' • Required' : '';
+      return `Pattern validation • ${patternPreview}${regexRequired}`;
+    
+    case 'counter':
+      const sequenceType = getCounterTypeLabel(category.typeConfig?.sequenceType);
+      const startValue = category.typeConfig?.startValue || '1';
+      const hasFormat = category.typeConfig?.prefix || category.typeConfig?.suffix;
+      return `${sequenceType} • Start: ${startValue}${hasFormat ? ' • Custom format' : ''}`;
+    
     default:
       const legacyTagCount = (category.tags || []).length;
       return `Basic tag list • ${legacyTagCount} tags`;
+  }
+};
+
+// Helper functions for template
+const formatRange = (min, max) => {
+  if (min !== null && min !== undefined && max !== null && max !== undefined) {
+    return `${min} to ${max}`;
+  } else if (min !== null && min !== undefined) {
+    return `${min} and above`;
+  } else if (max !== null && max !== undefined) {
+    return `${max} and below`;
+  } else {
+    return 'Any value';
+  }
+};
+
+const getCounterTypeLabel = (sequenceType) => {
+  switch (sequenceType) {
+    case 'numeric': return 'Numeric sequence';
+    case 'letters': return 'Letter sequence';
+    case 'roman-lower': return 'Roman numerals (lowercase)';
+    case 'roman-upper': return 'Roman numerals (uppercase)';
+    default: return 'Auto sequence';
   }
 };
 
