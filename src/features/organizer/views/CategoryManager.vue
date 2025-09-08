@@ -13,25 +13,24 @@
     <v-card class="mb-6" variant="outlined">
       <v-card-title :class="{ 'text-primary': showCreationWizard }">
         <v-icon class="mr-2">mdi-plus-circle</v-icon>
-        {{ wizardTitle }}
+        Add New Category
       </v-card-title>
       <v-card-text>
         <v-btn
           v-if="!showCreationWizard"
           color="primary"
           size="large"
-          @click="startCategoryCreation"
+          @click="showCreationWizard = true"
         >
           <v-icon start>mdi-plus</v-icon>
           Create New Category
         </v-btn>
 
-        <!-- Category Creation Wizard Component -->
         <CategoryCreationWizard
           :categories="categories"
           :show="showCreationWizard"
           @category-created="handleCategoryCreated"
-          @wizard-closed="handleWizardClosed"
+          @wizard-closed="showCreationWizard = false"
         />
       </v-card-text>
     </v-card>
@@ -43,7 +42,6 @@
         Existing Categories ({{ categories.length }})
       </v-card-title>
       <v-card-text>
-        <!-- Category List Component -->
         <CategoryList
           :categories="categories"
           :loading="loading"
@@ -64,59 +62,42 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrganizerStore } from '../stores/organizer.js';
 import { typeConfig } from '../utils/categoryConfig.js';
-
-// Import decomposed components
 import CategoryCreationWizard from '../components/CategoryCreationWizard.vue';
 import CategoryList from '../components/CategoryList.vue';
 
-// Store
+// Store & reactive state
 const organizerStore = useOrganizerStore();
 const { categories, loading } = storeToRefs(organizerStore);
-
-// Local state
 const showCreationWizard = ref(false);
 const snackbar = ref({ show: false, message: '', color: 'success' });
 
-// Computed
-const wizardTitle = computed(() => {
-  return showCreationWizard.value ? 'Add New Category' : 'Add New Category';
-});
-
 // Methods
-const startCategoryCreation = () => {
-  showCreationWizard.value = true;
+const showNotification = (message, color = 'success') => {
+  snackbar.value = { show: true, message, color };
+};
+
+const getCssColor = (colorName) => {
+  const cssVar = `--v-theme-${colorName}`;
+  return getComputedStyle(document.documentElement).getPropertyValue(cssVar)?.trim() || '#9e9e9e';
 };
 
 const handleCategoryCreated = async (categoryData) => {
   try {
-    const type = categoryData.categoryType;
-    const colorValue = typeConfig[type]?.color;
-    const color = colorValue
-      ? getComputedStyle(document.documentElement)
-          .getPropertyValue(`--v-theme-${colorValue}`)
-          ?.trim() || '#9e9e9e'
+    const color = typeConfig[categoryData.categoryType]?.color
+      ? getCssColor(typeConfig[categoryData.categoryType].color)
       : '#9e9e9e';
 
-    const finalCategoryData = {
-      ...categoryData,
-      color,
-    };
-
-    await organizerStore.createCategory(finalCategoryData);
+    await organizerStore.createCategory({ ...categoryData, color });
     showNotification(`Category "${categoryData.name}" created successfully`, 'success');
     showCreationWizard.value = false;
   } catch (error) {
     console.error('Failed to create category:', error);
-    showNotification('Failed to create category: ' + error.message, 'error');
+    showNotification(`Failed to create category: ${error.message}`, 'error');
   }
-};
-
-const handleWizardClosed = () => {
-  showCreationWizard.value = false;
 };
 
 const handleEditCategory = (category) => {
@@ -132,17 +113,13 @@ const handleDeleteCategory = async (category) => {
     showNotification(`Category "${category.name}" deleted successfully`, 'success');
   } catch (error) {
     console.error('Failed to delete category:', error);
-    showNotification('Failed to delete category: ' + error.message, 'error');
+    showNotification(`Failed to delete category: ${error.message}`, 'error');
   }
-};
-
-const showNotification = (message, color = 'success') => {
-  snackbar.value = { show: true, message, color };
 };
 
 // Lifecycle
 onMounted(async () => {
-  if (!organizerStore.isInitialized || categories.value.length === 0) {
+  if (!organizerStore.isInitialized || !categories.value.length) {
     await organizerStore.initialize();
   }
 });
@@ -155,3 +132,4 @@ onMounted(async () => {
   padding: 24px;
 }
 </style>
+<!-- Streamlined from 154 lines to 125 lines on 2025-09-08 -->

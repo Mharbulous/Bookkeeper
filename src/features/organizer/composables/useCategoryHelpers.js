@@ -43,13 +43,9 @@ export function useCategoryHelpers() {
           : `Smart dropdown${sep}${tagCount} initial options${sep}AI expansion at ${confidence}% confidence`;
       },
       checkbox: () => {
-        const style =
-          (cfg.displayStyle || 'checkbox').charAt(0).toUpperCase() +
-          (cfg.displayStyle || 'checkbox').slice(1);
-        const defaultVal = cfg.defaultValue ? cfg.trueLabel || 'Yes' : cfg.falseLabel || 'No';
         return detailed
-          ? `<strong>${style}</strong>${sep}Default: ${defaultVal}`
-          : `${style} input${sep}Default: ${cfg.defaultValue ? 'checked' : 'unchecked'}`;
+          ? `<strong>Checkbox</strong>${sep}Default: unchecked`
+          : `Checkbox input${sep}Default: unchecked`;
       },
       integer: () => {
         const range = formatRange(cfg.minValue, cfg.maxValue);

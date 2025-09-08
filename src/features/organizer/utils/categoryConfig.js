@@ -2,7 +2,6 @@
 import DateConfigForm from '../components/category-manager/DateConfigForm.vue';
 import CurrencyConfigForm from '../components/category-manager/CurrencyConfigForm.vue';
 import ListConfigForm from '../components/category-manager/ListConfigForm.vue';
-import CheckboxConfigForm from '../components/category-manager/CheckboxConfigForm.vue';
 import IntegerConfigForm from '../components/category-manager/IntegerConfigForm.vue';
 import FloatConfigForm from '../components/category-manager/FloatConfigForm.vue';
 import TextareaConfigForm from '../components/category-manager/TextareaConfigForm.vue';
@@ -33,7 +32,6 @@ export const configComponents = {
   currency: CurrencyConfigForm,
   'fixed-list': ListConfigForm,
   'open-list': ListConfigForm,
-  checkbox: CheckboxConfigForm,
   integer: IntegerConfigForm,
   float: FloatConfigForm,
   textarea: TextareaConfigForm,
@@ -44,7 +42,7 @@ export const configComponents = {
 };
 
 // Types that skip the configuration step
-export const skipConfigurationTypes = ['currency'];
+export const skipConfigurationTypes = ['currency', 'checkbox'];
 
 // Wizard steps configuration
 export const wizardSteps = [
