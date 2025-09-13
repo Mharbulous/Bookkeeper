@@ -161,6 +161,7 @@ export function useCategoryCore() {
 
       const newCategory = {
         name: categoryData.name.trim(),
+        type: categoryData.type || 'Fixed List', // Default type
         color: categoryData.color || '#1976d2', // Default color will be handled by color module
         tags: categoryData.tags || [],
         isActive: true,

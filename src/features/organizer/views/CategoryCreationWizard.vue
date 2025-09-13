@@ -39,7 +39,41 @@
                 @input="capitalizeFirstLetters"
               />
             </v-col>
-            
+
+            <v-col cols="12">
+              <v-select
+                v-model="newCategory.type"
+                label="Category Type"
+                variant="outlined"
+                density="comfortable"
+                :error-messages="newCategoryErrors.type"
+                :items="categoryTypeOptions"
+                item-title="title"
+                item-value="value"
+                placeholder="Select category type"
+                hint="Choose how this category will organize data"
+                persistent-hint
+              >
+                <template #selection="{ item }">
+                  <div class="d-flex align-center">
+                    <v-icon :color="item.raw.color" size="20" class="mr-2">
+                      {{ item.raw.icon }}
+                    </v-icon>
+                    <span>{{ item.raw.title }}</span>
+                  </div>
+                </template>
+                <template #item="{ props, item }">
+                  <v-list-item v-bind="props" :title="item.raw.title">
+                    <template #prepend>
+                      <v-icon :color="item.raw.color" size="20">
+                        {{ item.raw.icon }}
+                      </v-icon>
+                    </template>
+                  </v-list-item>
+                </template>
+              </v-select>
+            </v-col>
+
             <v-col cols="12">
               <div class="text-subtitle-2 mb-3">Color Preview</div>
               <div class="d-flex align-center">
@@ -77,7 +111,7 @@
         <v-btn
           color="primary"
           :loading="creating"
-          :disabled="!newCategory.name.trim()"
+          :disabled="!newCategory.name.trim() || !newCategory.type"
           @click="createCategory"
           size="large"
         >
@@ -108,8 +142,59 @@ const organizerStore = useOrganizerStore();
 const { categories } = storeToRefs(organizerStore);
 
 const creating = ref(false);
-const newCategory = ref({ name: '' });
-const newCategoryErrors = ref({ name: [] });
+const newCategory = ref({ name: '', type: 'Fixed List' });
+const newCategoryErrors = ref({ name: [], type: [] });
+
+const categoryTypeOptions = [
+  {
+    title: 'Fixed List',
+    value: 'Fixed List',
+    icon: 'mdi-format-list-bulleted',
+    color: '#1976d2' // Blue
+  },
+  {
+    title: 'Open List',
+    value: 'Open List',
+    icon: 'mdi-playlist-plus',
+    color: '#1565c0' // Darker blue (similar tone to Fixed List)
+  },
+  {
+    title: 'Currency',
+    value: 'Currency',
+    icon: 'mdi-currency-usd',
+    color: '#388e3c' // Green
+  },
+  {
+    title: 'Date',
+    value: 'Date',
+    icon: 'mdi-calendar',
+    color: '#f57c00' // Orange
+  },
+  {
+    title: 'Timestamp',
+    value: 'Timestamp',
+    icon: 'mdi-clock-outline',
+    color: '#7b1fa2' // Purple
+  },
+  {
+    title: 'TextArea',
+    value: 'TextArea',
+    icon: 'mdi-text-box-outline',
+    color: '#5d4037' // Brown
+  },
+  {
+    title: 'Sequence',
+    value: 'Sequence',
+    icon: 'mdi-numeric',
+    color: '#00796b' // Teal
+  },
+  {
+    title: 'Regex',
+    value: 'Regex',
+    icon: 'mdi-regex',
+    color: '#c62828' // Red
+  }
+];
 const snackbar = ref({ show: false, message: '', color: 'success' });
 
 const previewColor = computed(() => {
@@ -127,19 +212,31 @@ const capitalizeFirstLetters = (event) => {
 };
 
 const validateNewCategory = () => {
-  const errors = [];
+  const nameErrors = [];
+  const typeErrors = [];
   const name = newCategory.value.name.trim();
+  const type = newCategory.value.type;
 
+  // Validate name
   if (!name) {
-    errors.push('Category name is required');
+    nameErrors.push('Category name is required');
   } else if (name.length > 50) {
-    errors.push('Category name must be 50 characters or less');
+    nameErrors.push('Category name must be 50 characters or less');
   } else if (categories.value.some((cat) => cat.name.toLowerCase() === name.toLowerCase())) {
-    errors.push('Category name already exists');
+    nameErrors.push('Category name already exists');
   }
 
-  newCategoryErrors.value.name = errors;
-  return !errors.length;
+  // Validate type
+  if (!type) {
+    typeErrors.push('Category type is required');
+  } else if (!categoryTypeOptions.find(option => option.value === type)) {
+    typeErrors.push('Please select a valid category type');
+  }
+
+  newCategoryErrors.value.name = nameErrors;
+  newCategoryErrors.value.type = typeErrors;
+
+  return nameErrors.length === 0 && typeErrors.length === 0;
 };
 
 const createCategory = async () => {
@@ -148,8 +245,10 @@ const createCategory = async () => {
   creating.value = true;
   try {
     const name = newCategory.value.name.trim();
+    const type = newCategory.value.type;
     await organizerStore.createCategory({
       name,
+      type,
       color: previewColor.value,
       tags: [],
     });
