@@ -7,42 +7,21 @@
       </p>
     </div>
 
-    <v-card class="mb-6" variant="outlined">
-      <v-card-title>
-        <v-icon class="mr-2">mdi-plus-circle</v-icon>
-        Add New Category
-      </v-card-title>
-      <v-card-text>
-        <v-row>
-          <v-col cols="12" md="6">
-            <v-text-field
-              v-model="newCategory.name"
-              label="Category Name"
-              variant="outlined"
-              density="compact"
-              :error-messages="newCategoryErrors.name"
-              placeholder="e.g., Project Code"
-            />
-          </v-col>
-          <v-col cols="12" md="6" class="d-flex align-center">
-            <v-btn
-              color="primary"
-              :loading="creating"
-              :disabled="!newCategory.name.trim()"
-              @click="createCategory"
-            >
-              <v-icon start>mdi-plus</v-icon>
-              Create Category
-            </v-btn>
-          </v-col>
-        </v-row>
-      </v-card-text>
-    </v-card>
 
     <v-card variant="outlined">
-      <v-card-title>
+      <v-card-title class="d-flex align-center">
         <v-icon class="mr-2">mdi-folder-multiple</v-icon>
         Existing Categories ({{ categories.length }})
+        <v-spacer />
+        <v-btn
+          color="primary"
+          :to="{ name: 'category-creation-wizard' }"
+          variant="elevated"
+          size="small"
+        >
+          <v-icon start>mdi-plus</v-icon>
+          Create Category
+        </v-btn>
       </v-card-title>
       <v-card-text>
         <div v-if="loading" class="text-center py-6">
@@ -144,52 +123,13 @@ import { getAutomaticTagColor } from '../utils/automaticTagColors.js';
 const organizerStore = useOrganizerStore();
 const { categories, loading } = storeToRefs(organizerStore);
 
-const creating = ref(false);
 const expandedPanels = ref([]);
-const newCategory = ref({ name: '' });
-const newCategoryErrors = ref({ name: [] });
 const snackbar = ref({ show: false, message: '', color: 'success' });
 
 const getColor = (index) => getAutomaticTagColor(index);
 
 const showNotification = (message, color = 'success') => {
   snackbar.value = { show: true, message, color };
-};
-
-const validateNewCategory = () => {
-  const errors = [];
-  const name = newCategory.value.name.trim();
-
-  if (!name) errors.push('Category name is required');
-  else if (name.length > 50) errors.push('Category name must be 50 characters or less');
-  else if (categories.value.some((cat) => cat.name.toLowerCase() === name.toLowerCase())) {
-    errors.push('Category name already exists');
-  }
-
-  newCategoryErrors.value.name = errors;
-  return !errors.length;
-};
-
-const createCategory = async () => {
-  if (!validateNewCategory()) return;
-
-  creating.value = true;
-  try {
-    const name = newCategory.value.name.trim();
-    await organizerStore.createCategory({
-      name,
-      color: getColor(categories.value.length),
-      tags: [],
-    });
-
-    newCategory.value.name = '';
-    newCategoryErrors.value.name = [];
-    showNotification(`Category "${name}" created successfully`, 'success');
-  } catch (error) {
-    showNotification('Failed to create category: ' + error.message, 'error');
-  } finally {
-    creating.value = false;
-  }
 };
 
 const editCategory = (category) => {
