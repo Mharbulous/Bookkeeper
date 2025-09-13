@@ -343,7 +343,7 @@ const organizerStore = useOrganizerStore();
 const { categories } = storeToRefs(organizerStore);
 
 const creating = ref(false);
-const newCategory = ref({ name: '', type: 'Fixed List', defaultCurrency: 'CAD', defaultDateFormat: 'YYYY-MM-DD', defaultTimeFormat: 'HH:mm', defaultSequenceFormat: '1, 2, 3, ...', regexDefinition: '', regexExamples: '', allowDuplicateValues: false, allowGaps: false });
+const newCategory = ref({ name: '', type: 'Fixed List', defaultCurrency: 'CAD', defaultDateFormat: 'YYYY-MM-DD', defaultTimeFormat: 'HH:mm', defaultSequenceFormat: '1, 2, 3, ...', regexDefinition: '.*', regexExamples: '', allowDuplicateValues: false, allowGaps: false });
 const newCategoryErrors = ref({ name: [], type: [], defaultCurrency: [], defaultDateFormat: [], defaultTimeFormat: [], defaultSequenceFormat: [], regexDefinition: [], regexExamples: [], allowDuplicateValues: [], allowGaps: [] });
 
 const categoryTypeOptions = [
