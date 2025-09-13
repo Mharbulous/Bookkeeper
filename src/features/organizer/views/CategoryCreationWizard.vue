@@ -36,6 +36,7 @@
                 hint="Choose a descriptive name for your category"
                 persistent-hint
                 autofocus
+                @input="capitalizeFirstLetters"
               />
             </v-col>
             
@@ -117,6 +118,12 @@ const previewColor = computed(() => {
 
 const showNotification = (message, color = 'success') => {
   snackbar.value = { show: true, message, color };
+};
+
+const capitalizeFirstLetters = (event) => {
+  const input = event.target.value;
+  const capitalized = input.charAt(0).toUpperCase() + input.slice(1);
+  newCategory.value.name = capitalized;
 };
 
 const validateNewCategory = () => {
